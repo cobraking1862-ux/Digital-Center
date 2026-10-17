@@ -213,7 +213,15 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         };
     }
 
-    public async Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default)
+    /// <summary>Series metadata including every available season's episodes.</summary>
+    public Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default) =>
+        GetSeriesCoreAsync(tmdbId, fetchSeasons: true, ct);
+
+    /// <summary>Series metadata in one request, without the per-season episode lists.</summary>
+    public Task<TmdbTitleMetadata?> GetSeriesSummaryAsync(long tmdbId, CancellationToken ct = default) =>
+        GetSeriesCoreAsync(tmdbId, fetchSeasons: false, ct);
+
+    private async Task<TmdbTitleMetadata?> GetSeriesCoreAsync(long tmdbId, bool fetchSeasons, CancellationToken ct)
     {
         using var json = await GetJsonAsync($"tv/{tmdbId}?append_to_response=credits,videos,external_ids", ct);
         var root = json.RootElement;
@@ -249,8 +257,11 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         }
 
         // Season/episode breakdown: one request per season, capped to keep
-        // pathological metadata from stalling the import.
+        // pathological metadata from stalling the import. Callers that only
+        // need one season (the import workflow) use the summary + a single
+        // GetSeriesSeasonAsync call instead of paying for all of them.
         var seasons = new List<TmdbSeasonMetadata>();
+        var seasonCount = 0;
         if (root.TryGetProperty("seasons", out var seasonList) && seasonList.ValueKind == JsonValueKind.Array)
         {
             foreach (var season in seasonList.EnumerateArray())
@@ -262,6 +273,12 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
 
                 var number = sn.GetInt32();
                 if (number < 0 || number > 25 || seasons.Any(s => s.SeasonNumber == number))
+                {
+                    continue;
+                }
+
+                seasonCount++;
+                if (!fetchSeasons)
                 {
                     continue;
                 }
@@ -290,40 +307,62 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
             Genres = genres,
             Countries = countries,
             People = people,
-            Seasons = seasons
+            Seasons = seasons,
+            SeasonCount = seasonCount > 0 ? seasonCount : null
         };
     }
 
-    private async Task<IReadOnlyList<TmdbEpisodeInfo>> FetchSeasonEpisodesAsync(long tmdbId, int seasonNumber, CancellationToken ct)
+    /// <summary>Episodes of a single season; null when TMDb does not have it.</summary>
+    public async Task<TmdbSeasonMetadata?> GetSeriesSeasonAsync(long tmdbId, int seasonNumber, CancellationToken ct = default)
     {
+        if (seasonNumber < 0)
+        {
+            return null;
+        }
+
         try
         {
             using var seasonJson = await GetJsonAsync($"tv/{tmdbId}/season/{seasonNumber}", ct);
-            var episodes = new List<TmdbEpisodeInfo>();
-            if (seasonJson.RootElement.TryGetProperty("episodes", out var list) && list.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var ep in list.EnumerateArray())
-                {
-                    if (!ep.TryGetProperty("episode_number", out var en) || en.ValueKind != JsonValueKind.Number)
-                    {
-                        continue;
-                    }
-
-                    episodes.Add(new TmdbEpisodeInfo(
-                        seasonNumber,
-                        en.GetInt32(),
-                        ep.TryGetProperty("name", out var name) ? name.GetString() : null));
-                }
-            }
-
-            return episodes;
+            return new TmdbSeasonMetadata(seasonNumber, ParseSeasonEpisodes(seasonJson.RootElement, seasonNumber));
         }
         catch (TmdbRequestException ex)
         {
             // A missing/unavailable season must not fail the whole import.
             _logger?.Warn($"TMDb season fetch failed for series {tmdbId} season {seasonNumber}: {ex.Message}");
-            return [];
+            return null;
         }
+    }
+
+    private async Task<IReadOnlyList<TmdbEpisodeInfo>> FetchSeasonEpisodesAsync(long tmdbId, int seasonNumber, CancellationToken ct)
+    {
+        var season = await GetSeriesSeasonAsync(tmdbId, seasonNumber, ct);
+        return season?.Episodes ?? [];
+    }
+
+    private static IReadOnlyList<TmdbEpisodeInfo> ParseSeasonEpisodes(JsonElement root, int seasonNumber)
+    {
+        var episodes = new List<TmdbEpisodeInfo>();
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("episodes", out var list) || list.ValueKind != JsonValueKind.Array)
+        {
+            return episodes;
+        }
+
+        foreach (var ep in list.EnumerateArray())
+        {
+            if (!ep.TryGetProperty("episode_number", out var en) || en.ValueKind != JsonValueKind.Number)
+            {
+                continue;
+            }
+
+            episodes.Add(new TmdbEpisodeInfo(
+                seasonNumber,
+                en.GetInt32(),
+                ep.TryGetProperty("name", out var name) ? name.GetString() : null,
+                ep.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number ? id.GetInt64() : null));
+        }
+
+        return episodes;
     }
 
     private async Task<Stream> DownloadImageAsync(string imagePath, string size, CancellationToken ct)

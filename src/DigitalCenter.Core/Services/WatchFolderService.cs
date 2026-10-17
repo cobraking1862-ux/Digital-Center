@@ -58,34 +58,65 @@ public sealed class WatchFolderService : IDisposable
 
     public bool IsRunning => _loopTask is { IsCompleted: false };
 
+    /// <summary>
+    /// The folder currently being monitored, or null while monitoring is
+    /// stopped. There is exactly one Watch Folder; its authoritative value is
+    /// <see cref="AppSettings.WatchFolderPath"/> (managed in the Management
+    /// workspace), and starting with another path simply moves the single
+    /// monitor over — it never runs two monitors side by side.
+    /// </summary>
+    public string? CurrentPath { get; private set; }
+
     public void Start(string watchFolderPath, TimeSpan? pollInterval = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(watchFolderPath);
+
+        CancellationTokenSource? previousCts;
+        Task? previousLoop;
         lock (_lifecycleLock)
         {
-            if (IsRunning)
+            if (IsRunning && string.Equals(CurrentPath, watchFolderPath, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return; // Already monitoring exactly this folder.
             }
+
+            // A different folder was requested: retire the old loop first so
+            // only one monitor ever runs.
+            previousCts = _loopCts;
+            previousLoop = _loopTask;
+            previousCts?.Cancel();
 
             _loopCts = new CancellationTokenSource();
             var token = _loopCts.Token;
+            CurrentPath = watchFolderPath;
             _loopTask = Task.Run(() => PollLoopAsync(watchFolderPath, pollInterval ?? TimeSpan.FromSeconds(15), token), CancellationToken.None);
             _logger?.Info($"Watch Folder monitoring started for '{watchFolderPath}'.");
         }
+
+        Retire(previousLoop, previousCts);
     }
 
     public void Stop()
     {
         Task? loop;
+        CancellationTokenSource? cts;
         lock (_lifecycleLock)
         {
-            _loopCts?.Cancel();
+            cts = _loopCts;
             loop = _loopTask;
-            _loopCts?.Dispose();
+            cts?.Cancel();
             _loopCts = null;
             _loopTask = null;
+            CurrentPath = null;
         }
 
+        Retire(loop, cts);
+        _logger?.Info("Watch Folder monitoring stopped.");
+    }
+
+    /// <summary>Waits (bounded) for a retired poll loop and releases its token source.</summary>
+    private static void Retire(Task? loop, CancellationTokenSource? cts)
+    {
         try
         {
             loop?.Wait(TimeSpan.FromSeconds(5));
@@ -95,7 +126,27 @@ public sealed class WatchFolderService : IDisposable
             // Shutdown must never hang on the poll loop.
         }
 
-        _logger?.Info("Watch Folder monitoring stopped.");
+        cts?.Dispose();
+    }
+
+    /// <summary>
+    /// Applies a new Watch Folder path. When monitoring was running it is
+    /// restarted on the new folder (only one monitor ever exists); when it was
+    /// stopped it stays stopped. Existing files, import history and catalog
+    /// records are never touched by a path change.
+    /// </summary>
+    public void ChangePath(string watchFolderPath, TimeSpan? pollInterval = null)
+    {
+        if (IsRunning)
+        {
+            Start(watchFolderPath, pollInterval);
+            return;
+        }
+
+        lock (_lifecycleLock)
+        {
+            CurrentPath = null;
+        }
     }
 
     private async Task PollLoopAsync(string watchFolder, TimeSpan interval, CancellationToken token)
@@ -126,6 +177,15 @@ public sealed class WatchFolderService : IDisposable
                 break;
             }
         }
+    }
+
+    /// <summary>Rescans the configured default Watch Folder (see <see cref="AppSettings.WatchFolderPath"/>).</summary>
+    public Task<WatchScanResult> RescanConfiguredAsync(CancellationToken ct = default)
+    {
+        var path = _settings.Load().WatchFolderPath;
+        return string.IsNullOrWhiteSpace(path)
+            ? Task.FromResult(new WatchScanResult(0, 0, 0, 0, 0, []))
+            : RescanOnceAsync(path, ct);
     }
 
     /// <summary>

@@ -240,9 +240,12 @@ public static class MetadataMerge
             details.AiringStatus = metadata.AiringStatus;
         }
 
-        if (metadata.Seasons.Count > 0)
+        // The season count comes from the catalogue entry itself; a partial
+        // fetch (one season, for one imported episode) must never lower it.
+        var seasonCount = metadata.SeasonCount ?? (metadata.Seasons.Count > 0 ? metadata.Seasons.Count : null);
+        if (seasonCount is > 0 && (details.TotalSeasons is null || details.TotalSeasons < seasonCount.Value))
         {
-            details.TotalSeasons = metadata.Seasons.Count;
+            details.TotalSeasons = seasonCount;
         }
 
         foreach (var seasonMeta in metadata.Seasons)
@@ -266,13 +269,18 @@ public static class MetadataMerge
                         EpisodeNumber = episodeMeta.EpisodeNumber,
                         Title = string.IsNullOrWhiteSpace(episodeMeta.Title)
                             ? $"Episode {episodeMeta.EpisodeNumber}"
-                            : episodeMeta.Title
+                            : episodeMeta.Title,
+                        TmdbId = episodeMeta.TmdbId
                     });
                 }
-                else if (!string.IsNullOrWhiteSpace(episodeMeta.Title) &&
-                         (string.IsNullOrWhiteSpace(episode.Title) || episode.Title.StartsWith("Episode ", StringComparison.Ordinal)))
+                else
                 {
-                    episode.Title = episodeMeta.Title;
+                    episode.TmdbId ??= episodeMeta.TmdbId;
+                    if (!string.IsNullOrWhiteSpace(episodeMeta.Title) &&
+                        (string.IsNullOrWhiteSpace(episode.Title) || episode.Title.StartsWith("Episode ", StringComparison.Ordinal)))
+                    {
+                        episode.Title = episodeMeta.Title;
+                    }
                 }
             }
         }

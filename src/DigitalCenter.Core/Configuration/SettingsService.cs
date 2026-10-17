@@ -63,6 +63,24 @@ public sealed class SettingsService
         }
     }
 
+    /// <summary>
+    /// Loads the current settings, applies <paramref name="change"/> and saves
+    /// them again in one step. Every screen that owns only part of the
+    /// configuration (Settings owns the library roots and preferences,
+    /// Management owns the Watch Folder) must go through this method: building
+    /// a fresh <see cref="AppSettings"/> and saving it would silently drop the
+    /// values owned by the other screen.
+    /// </summary>
+    public AppSettings Update(Action<AppSettings> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        var settings = Load();
+        change(settings);
+        Save(settings);
+        return settings;
+    }
+
     public void Save(AppSettings settings)
     {
         var directory = Path.GetDirectoryName(_settingsFile);
@@ -87,6 +105,35 @@ public sealed class SettingsService
 
         ValidateRoot(settings.MoviesRoot, "Movies library root", issues);
         ValidateRoot(settings.SeriesRoot, "Series library root", issues);
+
+        issues.AddRange(ValidateWatchFolder(settings));
+
+        if (settings.MinimumMatchConfidence is < 0.30 or > 0.95)
+        {
+            issues.Add("The minimum match confidence must be between 0.30 and 0.95.");
+        }
+
+        if (!settings.MovieFilenameTemplate.Contains("{Title}", StringComparison.Ordinal))
+        {
+            issues.Add("The movie file-name template must contain {Title}.");
+        }
+
+        if (!settings.SeriesFilenameTemplate.Contains("{Title}", StringComparison.Ordinal))
+        {
+            issues.Add("The series file-name template must contain {Title}.");
+        }
+
+        return issues;
+    }
+
+    /// <summary>
+    /// Validates only the Watch Folder rules. The Watch Folder is configured in
+    /// the Management workspace, so that screen validates its own input without
+    /// being blocked by unrelated settings (an unset library root, for example).
+    /// </summary>
+    public static IReadOnlyList<string> ValidateWatchFolder(AppSettings settings)
+    {
+        var issues = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(settings.WatchFolderPath))
         {
@@ -115,21 +162,6 @@ public sealed class SettingsService
         if (settings.StabilityDelaySeconds is < 2 or > 600)
         {
             issues.Add("The file-stability delay must be between 2 and 600 seconds.");
-        }
-
-        if (settings.MinimumMatchConfidence is < 0.30 or > 0.95)
-        {
-            issues.Add("The minimum match confidence must be between 0.30 and 0.95.");
-        }
-
-        if (!settings.MovieFilenameTemplate.Contains("{Title}", StringComparison.Ordinal))
-        {
-            issues.Add("The movie file-name template must contain {Title}.");
-        }
-
-        if (!settings.SeriesFilenameTemplate.Contains("{Title}", StringComparison.Ordinal))
-        {
-            issues.Add("The series file-name template must contain {Title}.");
         }
 
         return issues;

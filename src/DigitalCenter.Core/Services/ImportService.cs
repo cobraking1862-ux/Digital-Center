@@ -159,6 +159,22 @@ public sealed class ImportService
             log.SourceFile,
             string.IsNullOrEmpty(log.SourcePath) ? null : Path.GetDirectoryName(log.SourcePath));
 
+        // Rows detected by an older parser may still carry movie values for a
+        // TV episode; the season/episode markers found now win, so a repeated
+        // scan repairs the classification instead of duplicating it.
+        if (parsed.IsSeries && parsed.Season.HasValue && parsed.Episode.HasValue)
+        {
+            log.IsSeries = true;
+            log.ParsedSeason = parsed.Season;
+            log.ParsedEpisode = parsed.Episode;
+            if (!string.IsNullOrWhiteSpace(parsed.Title))
+            {
+                log.ParsedTitle = parsed.Title;
+            }
+
+            log.ParsedYear ??= parsed.Year;
+        }
+
         // Non-media files were already marked Unsupported at detection time;
         // a pending row without any usable signal can never match.
         if (!parsed.HasExternalId && string.IsNullOrWhiteSpace(parsed.Title))
@@ -181,20 +197,34 @@ public sealed class ImportService
             if (outcome.IsMatch)
             {
                 log.IsSeries = outcome.IsSeries;
-                // TMDb metadata wins over the parsed name when it arrives.
-                var metadata = outcome.IsSeries
-                    ? await _tmdb.GetSeriesAsync(outcome.TmdbId!.Value, ct)
-                    : await _tmdb.GetMovieAsync(outcome.TmdbId!.Value, ct);
-                if (metadata is not null)
+                // TMDb metadata wins over the parsed name when it arrives. A
+                // search match already carries the catalogue title/year, so no
+                // second request is needed; only identifier matches (TMDb/IMDb
+                // tags) resolve their title here.
+                if (!string.IsNullOrWhiteSpace(outcome.Title))
                 {
-                    if (!string.IsNullOrWhiteSpace(metadata.Title))
+                    log.ParsedTitle = outcome.Title;
+                    if (outcome.Year.HasValue)
                     {
-                        log.ParsedTitle = metadata.Title;
+                        log.ParsedYear = outcome.Year.Value;
                     }
-
-                    if (metadata.Year.HasValue)
+                }
+                else
+                {
+                    var metadata = outcome.IsSeries
+                        ? await _tmdb.GetSeriesSummaryAsync(outcome.TmdbId!.Value, ct)
+                        : await _tmdb.GetMovieAsync(outcome.TmdbId!.Value, ct);
+                    if (metadata is not null)
                     {
-                        log.ParsedYear = metadata.Year.Value;
+                        if (!string.IsNullOrWhiteSpace(metadata.Title))
+                        {
+                            log.ParsedTitle = metadata.Title;
+                        }
+
+                        if (metadata.Year.HasValue)
+                        {
+                            log.ParsedYear = metadata.Year.Value;
+                        }
                     }
                 }
 
@@ -456,14 +486,14 @@ public sealed class ImportService
             title = await db.MediaTitles.FirstOrDefaultAsync(t => t.TmdbId == log.TmdbId.Value, ct);
         }
 
-        title ??= await FindExistingTitleAsync(db, kind, log.ParsedTitle ?? string.Empty, log.ParsedYear, ct);
+        title ??= await FindExistingTitleAsync(db, kind, log.ParsedTitle ?? string.Empty, log.ParsedYear, log.TmdbId, ct);
 
         TmdbTitleMetadata? metadata = null;
         string? posterPath = null;
         if (useTmdb && log.TmdbId.HasValue)
         {
             metadata = log.IsSeries
-                ? await _tmdb.GetSeriesAsync(log.TmdbId.Value, ct)
+                ? await GetSeriesMetadataAsync(log.TmdbId.Value, log.ParsedSeason, ct)
                 : await _tmdb.GetMovieAsync(log.TmdbId.Value, ct);
 
             // TMDb result wins over the parsed name when available.
@@ -516,8 +546,21 @@ public sealed class ImportService
         return (title.Id, posterPath, metadata);
     }
 
-    private static async Task<MediaTitle?> FindExistingTitleAsync(DigitalCenterDbContext db, MediaKind kind, string titleName, int? year, CancellationToken ct)
+    /// <summary>
+    /// Finds the catalog entry an import belongs to, so repeated scans never
+    /// stack duplicate titles (and, for a series, duplicate season/episode
+    /// trees). A TMDb id is the authoritative identity: when the import knows
+    /// one and no title carries it, a same-name entry with a different id is a
+    /// different work (remake, reboot) and is left alone.
+    /// </summary>
+    private static async Task<MediaTitle?> FindExistingTitleAsync(
+        DigitalCenterDbContext db, MediaKind kind, string titleName, int? year, long? tmdbId, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(titleName))
+        {
+            return null;
+        }
+
         var candidates = await db.MediaTitles
             .Where(t => t.Type == kind && t.Title == titleName) // COLLATE NOCASE
             .ToListAsync(ct);
@@ -527,15 +570,53 @@ public sealed class ImportService
             return null;
         }
 
-        if (candidates.Count == 1)
+        if (tmdbId.HasValue)
         {
-            var single = candidates[0];
-            return !year.HasValue || !single.ReleaseYear.HasValue || single.ReleaseYear == year.Value
-                ? single
-                : null;
+            return candidates.FirstOrDefault(t => t.TmdbId == tmdbId.Value);
         }
 
-        return year.HasValue ? candidates.FirstOrDefault(t => t.ReleaseYear == year.Value) : null;
+        if (year.HasValue)
+        {
+            var byYear = candidates.FirstOrDefault(t => t.ReleaseYear == year.Value);
+            if (byYear is not null)
+            {
+                return byYear;
+            }
+        }
+
+        // Without an external identity, one unambiguous same-name entry is
+        // reused (a differing or missing year is far more often a re-release or
+        // rip year than another work). Several candidates stay ambiguous: a new
+        // record is created rather than guessing.
+        return candidates.Count == 1 ? candidates[0] : null;
+    }
+
+    /// <summary>
+    /// Series metadata for an import: one request for the series itself plus at
+    /// most one request for the season the detected episode belongs to (instead
+    /// of every season the series has). Unavailable season details never fail
+    /// the import — the episode is then created from the parsed numbers.
+    /// </summary>
+    private async Task<TmdbTitleMetadata?> GetSeriesMetadataAsync(long tmdbId, int? seasonNumber, CancellationToken ct)
+    {
+        var summary = await _tmdb.GetSeriesSummaryAsync(tmdbId, ct);
+        if (summary is null || !seasonNumber.HasValue)
+        {
+            return summary;
+        }
+
+        try
+        {
+            var season = await _tmdb.GetSeriesSeasonAsync(tmdbId, seasonNumber.Value, ct);
+            return season is null || season.Episodes.Count == 0
+                ? summary
+                : summary with { Seasons = [season] };
+        }
+        catch (Exception ex) when (ex is TmdbRequestException or IOException)
+        {
+            _logger?.Warn($"Season details for series {tmdbId} season {seasonNumber.Value} are unavailable: {ex.Message}");
+            return summary;
+        }
     }
 
     private sealed record MoveOutcome(bool Success, string? Message, string? Note);
