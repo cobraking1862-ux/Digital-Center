@@ -241,7 +241,7 @@
                                                                Margin="0,8,0,0"/>
                                                 </StackPanel>
                                             </Border>
-                                            <Border CornerRadius="12" ClipToBounds="True">
+                                            <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True">
                                                 <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
                                                        Stretch="UniformToFill" VerticalAlignment="Top"/>
                                             </Border>
@@ -272,7 +272,7 @@
                                             </Ellipse>
 
                                             <!-- Hover scrim with the cart quick action -->
-                                            <Border x:Name="HoverScrim" CornerRadius="12" Opacity="0" IsHitTestVisible="True">
+                                            <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
                                                 <Border.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                         <GradientStop Color="#00000000" Offset="0.42"/>

@@ -61,7 +61,7 @@
                                            Style="{StaticResource StatusBarText}"
                                            Margin="0,9,0,0"
                                            TextTrimming="CharacterEllipsis"/>
-                                <Border Background="{StaticResource PanelBrush}" CornerRadius="11" Padding="12,9" Margin="0,10,0,0"
+                                <Border Background="{StaticResource PanelBrush}" CornerRadius="{StaticResource Radius.Tile}" Padding="12,9" Margin="0,10,0,0"
                                         Visibility="{Binding HasScanSummary, Converter={StaticResource BusyToVisibility}}">
                                     <TextBox Text="{Binding ScanSummary, Mode=OneWay}"
                                              IsReadOnly="True"
@@ -114,7 +114,7 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <Border Background="{StaticResource PanelBrush}" CornerRadius="11" Padding="12,9" Margin="0,12,0,0"
+                                <Border Background="{StaticResource PanelBrush}" CornerRadius="{StaticResource Radius.Tile}" Padding="12,9" Margin="0,12,0,0"
                                         Visibility="{Binding HasReportSummary, Converter={StaticResource BusyToVisibility}}">
                                     <TextBox Text="{Binding ReportSummary, Mode=OneWay}"
                                              IsReadOnly="True"

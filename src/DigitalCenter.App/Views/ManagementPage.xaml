@@ -423,7 +423,8 @@
                                             Command="{Binding SkipFileCommand}"
                                             IsEnabled="{Binding CanSkipSelected}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                             <TextBlock Text="Skip File"/>
                                         </StackPanel>
                                     </Button>

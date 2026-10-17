@@ -631,7 +631,7 @@
 
     <!-- Selectable filter chip (genre browser) -->
     <Style x:Key="ChipToggle" TargetType="ToggleButton">
-        <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+        <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource SubTextBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="Padding" Value="14,7"/>
@@ -649,7 +649,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlHoverBrush}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
