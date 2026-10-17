@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DigitalCenter.App/DigitalCenter.App.csproj" />
+    <Project Path="src/DigitalCenter.Core/DigitalCenter.Core.csproj" />
+    <Project Path="src/DigitalCenter.ViewModels/DigitalCenter.ViewModels.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DigitalCenter.Tests/DigitalCenter.Tests.csproj" />
+  </Folder>
+</Solution>

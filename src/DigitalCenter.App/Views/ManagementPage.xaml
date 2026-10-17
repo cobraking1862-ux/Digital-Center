@@ -1,0 +1,368 @@
+<UserControl x:Class="DigitalCenter.App.Views.ManagementPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:DigitalCenter.App.Converters">
+
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisInverted" Invert="True"/>
+        <conv:NullToVisibilityConverter x:Key="NullToVis"/>
+        <conv:InverseBoolConverter x:Key="InverseBool"/>
+        <conv:StatusKeyToBrushConverter x:Key="StatusBrush"/>
+
+        <!-- Status pill tinted by the row's status key (Ok/Bad/Active/Pending/Neutral) -->
+        <Style x:Key="RowStatusPill" TargetType="Border">
+            <Setter Property="Background" Value="#1FFFFFFF"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="999"/>
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="26,20,26,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ Header: identity + monitoring controls ============ -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Management" Style="{StaticResource EyebrowText}"/>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Border Style="{StaticResource IconTile}">
+                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphIcon}" FontSize="20"
+                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
+                        <TextBlock Text="Watch Folder" Style="{StaticResource PageTitle}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                       Foreground="{StaticResource FaintTextBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding WatchPathDisplay}" Style="{StaticResource SubText}" Margin="7,0,0,0"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="640"
+                                       ToolTip="{Binding WatchPathDisplay}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Border Style="{StaticResource StatusPill}" Margin="0,0,12,0" VerticalAlignment="Center"
+                        Background="{StaticResource PrimaryDimBrush}">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#6E7A8C"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource OkBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding MonitorStatusText}" FontSize="12" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+                <Button x:Name="StartStopButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                        Click="OnToggleMonitoringClick" ToolTip="Start or stop Watch Folder monitoring">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="StartStopGlyph" FontSize="12" Margin="0,0,8,0"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphSmall}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
+                                            <Setter Property="Text" Value="{StaticResource Icon.Stop}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Text" Value="Start Monitoring"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
+                                            <Setter Property="Text" Value="Stop Monitoring"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                        Command="{Binding RescanNowCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                        <TextBlock Text="Rescan Now"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource SecondaryButton}" Command="{Binding OpenWatchFolderCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                        <TextBlock Text="Open Folder"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ============ Statistics ============ -->
+        <UniformGrid Grid.Row="1" Rows="1" Columns="6" Margin="0,18,0,0">
+            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Total detected" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding TotalCount}" Style="{StaticResource StatValue}" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Check}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource OkBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Imported" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ImportedCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource OkBrush}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Awaiting destination" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding AwaitingCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource PrimaryBrush}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="No match" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding NoMatchCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource WarnBrush}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Skipped" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding SkippedCount}" Style="{StaticResource StatValue}" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource StatCard}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                                   Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Text="Failed" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding FailedCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource DangerBrush}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="4,12,0,2"
+                   TextTrimming="CharacterEllipsis"/>
+
+        <!-- ============ Activity list + file preview ============ -->
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="7*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="5*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Recent activity -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Padding="18,14,18,10">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphIcon}" FontSize="16"
+                                       Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Recent Activity" Style="{StaticResource SectionTitle}" Margin="10,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Activity}"
+                             SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             VirtualizingPanel.IsVirtualizing="True">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Chrome" Background="Transparent" Padding="16,10" BorderThickness="0,0,0,1"
+                                                    BorderBrush="{StaticResource DividerBrush}">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardBackgroundHover}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource NavActiveBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Width="206">
+                                        <Ellipse Fill="{Binding StatusKey, Converter={StaticResource StatusBrush}}"
+                                                 Width="9" Height="9" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                                        <StackPanel Margin="9,0,0,0">
+                                            <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding DetectedType}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,0,10,0">
+                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding SourcePath}"/>
+                                        <TextBlock Text="{Binding MatchSummary}" Style="{StaticResource SubText}" FontSize="11.5"
+                                                   Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="2" Style="{StaticResource RowStatusPill}">
+                                        <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding StatusKey, Converter={StaticResource StatusBrush}}"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- File preview -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="18">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="260"
+                                Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisInverted}}">
+                        <Border Style="{StaticResource EmptyMedallion}">
+                            <TextBlock Text="{StaticResource Icon.OpenFile}" Style="{StaticResource GlyphLarge}" FontSize="26"
+                                       Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Select an activity row to preview the file."
+                                   Style="{StaticResource SubText}" HorizontalAlignment="Center" Margin="0,14,0,0"
+                                   TextWrapping="Wrap" TextAlignment="Center"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding HasPreview, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="File preview" Style="{StaticResource EyebrowText}"/>
+                            <TextBlock Text="{Binding PreviewFileName}" FontSize="15" FontWeight="SemiBold" Margin="0,6,0,0"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding PreviewSourcePath}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Border Style="{StaticResource StatusPill}" Padding="9,3">
+                                    <TextBlock Text="{Binding PreviewSizeText}" FontSize="11" FontWeight="SemiBold"/>
+                                </Border>
+                                <Border Style="{StaticResource StatusPill}" Padding="9,3" Margin="7,0,0,0">
+                                    <TextBlock Text="{Binding PreviewTypeText}" FontSize="11" FontWeight="SemiBold"/>
+                                </Border>
+                            </StackPanel>
+
+                            <Separator Style="{StaticResource Divider}"/>
+
+                            <TextBlock Text="Match" Style="{StaticResource FieldLabel}" Margin="0,2,0,4"/>
+                            <TextBlock Text="{Binding PreviewMatchText}" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding PreviewDetailText}" Style="{StaticResource SubText}" Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding PreviewDetailText, Converter={StaticResource NullToVis}}"/>
+
+                            <TextBlock Text="Destination" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding DestinationPreviewText, Mode=OneWay}" IsReadOnly="True"
+                                     Visibility="{Binding PreviewIsMedia, Converter={StaticResource BoolToVis}}"/>
+                            <TextBlock Text="{Binding PreviewTargetText}" Style="{StaticResource CaptionText}" Margin="0,7,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding PreviewHasTarget, Converter={StaticResource BoolToVis}}"/>
+
+                            <StackPanel Margin="0,18,0,0"
+                                        Visibility="{Binding PreviewIsMedia, Converter={StaticResource BoolToVis}}">
+                                <Button Command="{Binding ConfirmMoveCommand}" HorizontalAlignment="Stretch"
+                                        IsEnabled="{Binding CanConfirmSelected}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                        <TextBlock Text="Move to Library"/>
+                                    </StackPanel>
+                                </Button>
+                                <Grid Margin="0,9,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="9"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Stretch"
+                                            Command="{Binding ChooseDestinationCommand}"
+                                            IsEnabled="{Binding CanChooseDestination}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Choose Destination…"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="2" Style="{StaticResource DangerButton}" HorizontalAlignment="Stretch"
+                                            Command="{Binding SkipFileCommand}"
+                                            IsEnabled="{Binding CanSkipSelected}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Skip File"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <TextBlock Text="Files without a reliable match stay in the Watch Folder untouched."
+                                           Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
