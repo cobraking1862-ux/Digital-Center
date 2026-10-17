@@ -45,9 +45,17 @@ public partial class App : Application
 
             await Services.GetRequiredService<DatabaseInitializer>().InitializeAsync();
 
+            var mainViewModel = Services.GetRequiredService<MainViewModel>();
+
+            // Details screens are created per title, so the shell receives a
+            // factory from the container. Without this assignment the shell
+            // silently ignores card activation (that is why double-clicking a
+            // poster used to do nothing at all).
+            mainViewModel.DetailsFactory = Services.GetRequiredService<Func<int, DetailsViewModel>>();
+
             var mainWindow = new MainWindow
             {
-                DataContext = Services.GetRequiredService<MainViewModel>()
+                DataContext = mainViewModel
             };
 
             MainWindow = mainWindow;
@@ -92,8 +100,13 @@ public partial class App : Application
             }
             else
             {
-                logger.Info("Watch Folder monitoring not started (disabled or not configured in Settings).");
+                logger.Info("Watch Folder monitoring not started (disabled or not configured in Management).");
             }
+
+            // Initial screen loads (library grid + the cart badge in the
+            // sidebar). Monitoring is started above and only above, so the
+            // Watch Folder has exactly one startup path.
+            await Services.GetRequiredService<MainViewModel>().InitializeAsync();
         }
         catch (Exception ex)
         {
@@ -165,6 +178,11 @@ public partial class App : Application
         services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAppControl, AppControl>();
+
+        // One details view model per opened title: transient, built through a
+        // factory that supplies the title id (the rest comes from the container).
+        services.AddTransient<Func<int, DetailsViewModel>>(sp =>
+            titleId => ActivatorUtilities.CreateInstance<DetailsViewModel>(sp, titleId));
 
         services.AddSingleton<LibraryViewModel>();
         services.AddSingleton<UsbCartViewModel>();

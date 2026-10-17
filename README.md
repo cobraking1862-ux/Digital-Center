@@ -17,14 +17,18 @@ a TMDb token is configured.
    with **"Add N to USB queue"**, cached poster artwork, live file
    availability dots, details window with editable metadata and per-episode
    file overviews.
-2. **Import Review** — Watch Folder monitoring (polling + file-stability
+2. **Management** — the one place the single default Watch Folder is
+   configured (path, browse, open in Explorer, start/stop monitoring, rescan,
+   file-stability delay) and where its activity is reviewed: monitoring
+   (polling + file-stability
    checks: size must stay identical across checks and the file must be
    readable, so half-written downloads are never imported). Every detection
    lands in the review list with the parsed title/year/season/episode. The
-   operator can correct every field, search TMDb, pick a candidate, and
-   **approve** (full metadata + poster + move into the library) or
-   **reject** (file stays in the Watch Folder). Offline "approve with file
-   names only" keeps the workflow working without TMDb. Every decision is
+   operator sees the detected file with its parsed fields and the automatic
+   TMDb match, chooses a **destination folder**, and **confirms** the import
+   (full metadata + poster + move into the library) or **skips** it (the file
+   stays in the Watch Folder). Files without a reliable match are marked
+   "No Match" and left untouched. Every decision is
    persisted in the import history, and **interrupted imports are recovered
    automatically at the next startup** (checkpointed state machine).
 3. **USB Copy Queue** — persistent queue (the table doubles as the copy
@@ -40,10 +44,13 @@ a TMDb token is configured.
    multiple locations, multiple versions per title/episode), FTS5 index
    rebuild, CSV export (RFC 4180, one row per file) and additive CSV import,
    database backup/restore with validation and safety copies.
-5. **Settings** — library root, Watch Folder (validated to be outside the
-   library), USB subfolder, default categories, hash-verification flag,
-   TMDb status indicator with connection test, and the local data folder
-   location.
+5. **Settings** — library roots (movies and series), metadata/artwork
+   preferences with a TMDb status indicator and connection test, the minimum
+   match confidence, file-operation defaults (clean file names, hash
+   verification, collision policy), USB layout and naming templates, and the
+   local data folder location. The Watch Folder is deliberately **not** here:
+   it is owned by Management, so there is exactly one saved path and one
+   monitoring state.
 
 ## Technology stack
 
@@ -56,7 +63,7 @@ a TMDb token is configured.
 | ORM              | Entity Framework Core 10 (SQLite provider)   |
 | Full-text search | SQLite FTS5 (bundled SQLite has it built in) |
 | TMDb             | Official REST API v3 via HttpClient (bearer token) |
-| Tests            | xUnit (93 tests, all offline)                |
+| Tests            | xUnit (175 test cases, all offline)          |
 
 Note: CommunityToolkit.Mvvm is pinned to **8.4.2** — 8.4.0 source generators
 do not emit members under the .NET 10 SDK's Roslyn 5.0 compiler.
@@ -78,7 +85,7 @@ DigitalCenter.slnx
 │   ├── DigitalCenter.ViewModels/   View models (CommunityToolkit.Mvvm) + UI service interfaces
 │   └── DigitalCenter.App/          WPF application (views, DI composition root, dialogs)
 └── tests/
-    └── DigitalCenter.Tests/        Unit + integration tests (93 tests, all offline)
+    └── DigitalCenter.Tests/        Unit + integration tests (175 cases, all offline)
 ```
 
 Why three libraries: the MVVM source generator does not run inside the WPF
@@ -116,10 +123,16 @@ All application data lives under `%APPDATA%\DigitalCenter`:
 | Logs            | `Logs/digitalcenter-YYYYMMDD.log` |
 | Backups         | `Backups/`                      |
 
-Settings (library root, Watch Folder, USB defaults, verification flags) are
-edited in the Settings screen and stored as JSON with an atomic write.
-Validation rules: both paths must be absolute and the Watch Folder must not
-be inside the library root.
+There is exactly **one** `settings.json` and exactly one Watch Folder. The
+Settings screen owns the library roots and the application preferences; the
+Management workspace owns `WatchFolderPath` and the monitoring switches
+(`WatchFolderEnabled`, `ScanOnStartup`, `WatchFolderIncludeSubfolders`,
+`StabilityDelaySeconds`). Both screens save through
+`SettingsService.Update(load → apply → save)`, so neither can clobber the
+other's values. Validation rules: every configured path must be absolute,
+library roots must exist, and the Watch Folder must exist and must not be
+inside either library root. Changing the Watch Folder path never moves media
+and never erases catalog or import records.
 
 ### TMDb credentials
 
@@ -170,12 +183,15 @@ Indian, Pakistani) are seeded on first start.
 ## The import workflow in detail
 
 ```
-Watch Folder poll (every 15 s, or "Check now")
+Watch Folder poll (every 15 s, or "Rescan Now" in Management)
    └─ new video file + stable size + readable  →  MetadataImportLog (Pending)
-Import Review screen
-   ├─ operator corrects parsed fields (title/year/season/episode/type/category)
-   ├─ "Search TMDb" → candidate list → operator selects one
-   └─ APPROVE                                   REJECT
+      parsed title/year/season/episode (S01E01, S01.E01, 1x01, "Season 1
+      Episode 1", folder season hints) decide series vs movie
+Management workspace
+   ├─ automatic TMDb match: identifiers first, then title/year
+   │    (parsed episodes search /search/tv only — never /search/movie)
+   │    → Matched (awaiting destination) or No Match (file stays in place)
+   └─ CONFIRM (destination folder chosen)        SKIP
         │                                          └─ file stays in Watch Folder
         ▼
    metadata upsert (title/seasons/episodes/cast/genres/countries/category)
@@ -212,6 +228,42 @@ tags, codecs, release groups) is stripped; unparsable names are reported,
 never guessed into the wrong place. The USB destination mirrors this layout
 under the chosen drive (e.g. `E:\DigitalCenter\Movies\...`).
 
+## Design system (Obsidian Aurora 2026)
+
+All shared geometry, color and icon decisions live in
+`src/DigitalCenter.App/Themes/Styles.xaml`. Screens reference the tokens;
+they never invent their own values, which is what keeps Home, details, USB
+Cart, Management and Settings visually identical.
+
+| Token group | Values | Used for |
+|-------------|--------|----------|
+| `Radius.Xs` / `Radius.Sm` | 3 / 6 | hairlines, small parts, **text badges and status chips** |
+| `Radius.Control` | 8 | buttons, text boxes, combo boxes, search field, nav rows |
+| `Radius.Tile` / `Radius.Art` | 10 | icon tiles and chips, posters, tooltips |
+| `Radius.Card` / `Radius.Popup` | 12 | cards, panels, stat tiles, floating panels, popups |
+| `Radius.Pill` | 999 | **reserved**: selected navigation tabs, small category chips, switch tracks, slider/scrollbar/progress thumbs, the empty-state medallion |
+
+Pills are never used for buttons, labels or icon containers — a 999 px radius
+on a long label ("Awaiting destination") reads as a distorted oval, which is
+the bug this scale exists to prevent.
+
+* **Controls vs. panels** — inputs and secondary buttons use `ControlBrush` /
+  `ControlHoverBrush` / `ControlPressedBrush` and a darker, more opaque
+  `InputBackground`, so a control always reads as something pressable sitting
+  *on* a glass panel rather than as part of it.
+* **Control metrics** — `ControlPadding`, `ControlPaddingCompact` and
+  `ControlMinHeight` (34 px) keep buttons and fields properly proportioned
+  whatever the label length.
+* **Icons** — one family (Segoe Fluent Icons) behind named `Icon.*` resources
+  (no raw codepoints in screens, no emoji) and one size scale: `GlyphXs` 12,
+  `GlyphSmall` 14, `GlyphIcon` 16, `GlyphMedium`/`NavGlyph` 20, `GlyphLarge`
+  26, `GlyphHero` 34. Icon containers (`IconTile`, `IconChip`) are square with
+  the tile radius.
+* **Card activation** — `Controls/CardActivation` is the one attached
+  behaviour that makes a poster card selectable: one click selects, a second
+  click (or Enter/Space on the focused card) opens the details screen, and a
+  click that starts on an in-card control ("Add to Cart") never navigates.
+
 ## Engineering decisions worth knowing
 
 - **Scans are additive and safe** — the scanner only reads the filesystem;
@@ -235,17 +287,26 @@ under the chosen drive (e.g. `E:\DigitalCenter\Movies\...`).
 
 ## Testing
 
-93 tests cover the highest-risk behavior: filename parsing (movies with
-years, series markers, ambiguous/malformed names, folder-derived show
-titles), database rules (type CHECK, file XOR association, case-insensitive
+175 test cases cover the highest-risk behavior: filename parsing (movies with
+years; every supported series marker format — `S01E01`, `S01.E01`, `S01 E01`,
+`S01_E01`, `1x01`, `Season 1 Episode 1`, `E01`, folder season hints — with
+quality tags, release years and extra punctuation; ambiguous/malformed names;
+folder-derived show titles), database rules (type CHECK, file XOR association, case-insensitive
 unique paths, cascades, FTS trigger sync), scanner end-to-end, the full
-import workflow with a scripted fake TMDb provider (approve movie/series,
-filename-only offline approve, reject, rename-on-collision, duplicate
-rejection), crash recovery (crash after copy / after move / source
-vanished), Watch Folder detection (stability, growth in progress, dedupe by
-path), USB copying (skip/overwrite/rename, insufficient space, missing
-source, deterministic cancel mid-copy + resume, retry, queue persistence,
-space estimation accounting for skips), maintenance (missing files,
+import workflow with a scripted fake TMDb provider (confirm movie/series,
+skip, rename-on-collision, duplicate rejection), the series import path end
+to end (`Reacher.S01.E01.mkv` and the other marker formats are matched as TV
+episodes, never searched as movies, linked to the right Series/Season/Episode
+rows, and repeated scans never duplicate them; an unavailable season, no
+match and being offline all leave the library intact), Watch Folder
+ownership (a Settings save keeps what Management owns and vice versa, a path
+change moves the single monitor without touching files or records), crash
+recovery (crash after copy / after move / source vanished), Watch Folder
+detection (stability, growth in progress, dedupe by path), USB copying
+(skip/overwrite/rename, insufficient space, missing source, deterministic
+cancel mid-copy + resume, retry, queue persistence, space estimation
+accounting for skips, throttled progress reporting, SHA-256 verification of a
+multi-chunk copy, a job queued without a known size), maintenance (missing files,
 duplicates, index rebuild, CSV round-trip incl. quoting) and TMDb response
 parsing from canned JSON (no network). Tests use temporary directories and
 databases; the TMDb provider is always mocked in workflow tests.

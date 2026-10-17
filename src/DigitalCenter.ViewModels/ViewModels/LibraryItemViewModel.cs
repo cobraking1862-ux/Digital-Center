@@ -1,11 +1,16 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using DigitalCenter.Core.Models;
 using DigitalCenter.Core.Services;
 using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.ViewModels;
 
-/// <summary>Display row for one catalog title on the Library screen.</summary>
-public sealed class LibraryItemViewModel
+/// <summary>
+/// Display row for one catalog title on the Library screen. A row is observable
+/// so the grid can show which card is selected: one click selects, two clicks
+/// open the details screen.
+/// </summary>
+public sealed partial class LibraryItemViewModel : ObservableObject
 {
     public LibraryItemViewModel(LibraryPageItem item)
     {
@@ -64,4 +69,8 @@ public sealed class LibraryItemViewModel
 
     /// <summary>Available / Partial / Missing — used by UI triggers for the status dot color.</summary>
     public string AvailabilityState { get; }
+
+    /// <summary>True while this card is the selected one in the grid.</summary>
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
 }

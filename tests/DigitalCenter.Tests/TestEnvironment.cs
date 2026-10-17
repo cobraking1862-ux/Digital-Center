@@ -152,6 +152,11 @@ public sealed class FakeTmdbProvider : ITmdbMetadataProvider
     public int SeriesDetailCalls { get; private set; }
     public int SeriesSummaryCalls { get; private set; }
     public List<(long SeriesId, int Season)> SeasonCalls { get; } = [];
+
+    /// <summary>Every search that actually ran, so tests can prove a parsed
+    /// episode was searched as a series and never as a movie.</summary>
+    public List<(string Query, int? Year)> MovieSearches { get; } = [];
+    public List<(string Query, int? Year)> SeriesSearches { get; } = [];
     public byte[] PosterBytes { get; set; } = [0x89, 0x50, 0x4E, 0x47]; // PNG header bytes
 
     public bool IsConfigured => Configured;
@@ -168,6 +173,7 @@ public sealed class FakeTmdbProvider : ITmdbMetadataProvider
             throw new TmdbNotConfiguredException();
         }
 
+        MovieSearches.Add((query, year));
         return Task.FromResult(MovieSearchResults);
     }
 
@@ -183,6 +189,7 @@ public sealed class FakeTmdbProvider : ITmdbMetadataProvider
             throw new TmdbNotConfiguredException();
         }
 
+        SeriesSearches.Add((query, year));
         return Task.FromResult(SeriesSearchResults);
     }
 

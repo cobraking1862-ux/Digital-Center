@@ -60,14 +60,14 @@
                 <TextBox Style="{StaticResource SearchBox}"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="Search the library"/>
-                <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphIcon}" FontSize="14"
+                <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphSmall}"
                            Foreground="{StaticResource FaintTextBrush}" Margin="15,0,0,0"
                            HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 <Button Style="{StaticResource IconButton}" Width="28" Height="28"
                         HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0"
                         Click="OnClearSearchClick" ToolTip="Clear search"
                         Visibility="{Binding SearchText, Converter={StaticResource NullToVis}}">
-                    <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphSmall}" FontSize="11"
+                    <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphXs}"
                                Foreground="{StaticResource SubTextBrush}"/>
                 </Button>
             </Grid>
@@ -112,7 +112,7 @@
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
                 <Border Style="{StaticResource EmptyMedallion}">
-                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}" FontSize="28"
+                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
                                Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <ProgressBar IsIndeterminate="True" Width="220" HorizontalAlignment="Center" Margin="0,22,0,0"/>
@@ -124,7 +124,7 @@
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="{Binding LoadError, Converter={StaticResource NullToVis}}">
                 <Border Style="{StaticResource EmptyMedallion}">
-                    <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphLarge}" FontSize="28"
+                    <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphLarge}"
                                Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="The library could not be loaded." FontSize="17" FontWeight="SemiBold" Margin="0,18,0,0"
@@ -139,7 +139,7 @@
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="{Binding HasNoItems, Converter={StaticResource BoolToVis}}">
                 <Border Style="{StaticResource EmptyMedallion}">
-                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}" FontSize="28"
+                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
                                Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="Nothing here yet" FontSize="18" FontWeight="SemiBold" Margin="0,18,0,0"
@@ -155,7 +155,7 @@
                 <Border Style="{StaticResource CardBorder}" Padding="32,30" MaxWidth="520">
                     <StackPanel>
                         <Border Style="{StaticResource EmptyMedallion}">
-                            <TextBlock Text="{StaticResource Icon.Library}" Style="{StaticResource GlyphLarge}" FontSize="28"
+                            <TextBlock Text="{StaticResource Icon.Library}" Style="{StaticResource GlyphLarge}"
                                        Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Collections" FontSize="21" FontWeight="SemiBold" Margin="0,18,0,0"
@@ -209,35 +209,39 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
+                                <!-- One click selects, two clicks (or Enter/Space on the
+                                     focused card) open the details screen. The shared
+                                     CardActivation behaviour ignores clicks that start on an
+                                     in-card control, so "Add to Cart" never navigates. -->
                                 <Border x:Name="CardHost" Style="{StaticResource PosterCard}"
                                         Width="196" Height="380"
                                         Cursor="Hand"
-                                        MouseLeftButtonUp="OnCardClick"
-                                        ToolTip="{Binding Title}">
+                                        Focusable="True"
+                                        ToolTip="{Binding Title}"
+                                        AutomationProperties.Name="{Binding Title}"
+                                        AutomationProperties.ItemType="Media title"
+                                        controls:CardActivation.IsEnabled="True"
+                                        controls:CardActivation.SelectCommand="{Binding DataContext.SelectItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        controls:CardActivation.OpenCommand="{Binding DataContext.OpenDetailsCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
                                     <Border.RenderTransform>
                                         <TransformGroup>
                                             <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1"/>
                                             <TranslateTransform x:Name="CardLift" Y="0"/>
                                         </TransformGroup>
                                     </Border.RenderTransform>
-                                    <Border.InputBindings>
-                                        <MouseBinding Gesture="LeftDoubleClick"
-                                                      Command="{Binding DataContext.OpenDetailsCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                      CommandParameter="{Binding}"/>
-                                    </Border.InputBindings>
                                     <StackPanel>
                                         <!-- 2:3 portrait poster -->
                                         <Grid Height="272">
                                             <Border Style="{StaticResource PosterPlaceholder}">
                                                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}" FontSize="26"
+                                                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
                                                                Foreground="#3A3450" HorizontalAlignment="Center"/>
                                                     <TextBlock Text="{Binding Initials}" FontSize="17" FontWeight="Bold"
                                                                Foreground="#584F78" HorizontalAlignment="Center"
                                                                Margin="0,8,0,0"/>
                                                 </StackPanel>
                                             </Border>
-                                            <Border CornerRadius="12" ClipToBounds="True">
+                                            <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True">
                                                 <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
                                                        Stretch="UniformToFill" VerticalAlignment="Top"/>
                                             </Border>
@@ -268,7 +272,7 @@
                                             </Ellipse>
 
                                             <!-- Hover scrim with the cart quick action -->
-                                            <Border x:Name="HoverScrim" CornerRadius="12" Opacity="0" IsHitTestVisible="True">
+                                            <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
                                                 <Border.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                         <GradientStop Color="#00000000" Offset="0.42"/>
@@ -282,7 +286,7 @@
                                                         CommandParameter="{Binding}"
                                                         ToolTip="Add this title to the USB cart">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,7,0"/>
+                                                        <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphXs}" Margin="0,0,7,0"/>
                                                         <TextBlock Text="Add to Cart"/>
                                                     </StackPanel>
                                                 </Button>
@@ -315,6 +319,11 @@
                                 </Border>
 
                                 <DataTemplate.Triggers>
+                                    <!-- Selection ring: single click only marks the card -->
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                        <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowAccent}"/>
+                                    </DataTrigger>
                                     <Trigger SourceName="CardHost" Property="IsMouseOver" Value="True">
                                         <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
                                         <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowElevated}"/>

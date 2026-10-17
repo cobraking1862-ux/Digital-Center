@@ -302,4 +302,100 @@ public sealed class UsbCopyServiceTests : IDisposable
         Assert.Equal(relative, job.RelativeTargetPath);
         Assert.True(File.Exists(Path.Combine(DriveRoot, relative)));
     }
+
+    /// <summary>Records every progress report synchronously, so report counts can be asserted.</summary>
+    private sealed class RecordingProgress : IProgress<CopyProgressReport>
+    {
+        public List<CopyProgressReport> Reports { get; } = [];
+
+        public void Report(CopyProgressReport value) => Reports.Add(value);
+    }
+
+    [Fact]
+    public async Task Progress_Reports_Are_Throttled_But_Still_End_At_One_Hundred_Percent()
+    {
+        const int size = 4 * 1024 * 1024; // four 1 MiB chunks
+        var (throttledFileId, _, _) = await CreateMovieFileAsync("Throttled.mkv", new string('a', size));
+        var (chattyFileId, _, _) = await CreateMovieFileAsync("Chatty.mkv", new string('b', size));
+
+        // One copy with the production throttle …
+        await _env.CopyService.EnqueueAsync([throttledFileId], _env.LibraryDir);
+        _env.CopyService.ProgressReportInterval = TimeSpan.FromMinutes(5);
+        var throttled = new RecordingProgress();
+        var throttledSummary = await _env.CopyService.RunAsync(
+            new CopyRunOptions(DriveRoot, CopyConflictAction.Skip, CopyVerifyMode.Size), throttled);
+        Assert.Equal(1, throttledSummary.Completed);
+
+        // … and the same copy reporting every chunk (the old behaviour).
+        await _env.CopyService.EnqueueAsync([chattyFileId], _env.LibraryDir);
+        _env.CopyService.ProgressReportInterval = TimeSpan.Zero;
+        var chatty = new RecordingProgress();
+        var chattySummary = await _env.CopyService.RunAsync(
+            new CopyRunOptions(DriveRoot, CopyConflictAction.Skip, CopyVerifyMode.Size), chatty);
+        Assert.Equal(1, chattySummary.Completed);
+
+        // Both copies publish the finished file, so the UI never looks stalled.
+        Assert.Contains(throttled.Reports, r => r.CurrentFilePercent >= 100.0);
+        Assert.Contains(chatty.Reports, r => r.CurrentFilePercent >= 100.0);
+
+        // The throttle removes the per-chunk UI churn: start + first chunk +
+        // finished file + run summary, instead of one report per MiB.
+        Assert.True(throttled.Reports.Count <= 4,
+            $"Throttled run published {throttled.Reports.Count} reports: {string.Join(" | ", throttled.Reports.Select(r => r.Message))}");
+        Assert.True(chatty.Reports.Count > throttled.Reports.Count,
+            $"Unthrottled ({chatty.Reports.Count}) must publish more reports than throttled ({throttled.Reports.Count}).");
+    }
+
+    [Fact]
+    public async Task Hash_Verification_Still_Runs_On_A_Multi_Chunk_Copy()
+    {
+        var (fileId, sourcePath, relative) = await CreateMovieFileAsync("Verified.mkv", new string('c', 3 * 1024 * 1024));
+        await _env.CopyService.EnqueueAsync([fileId], _env.LibraryDir);
+
+        var summary = await _env.CopyService.RunAsync(
+            new CopyRunOptions(DriveRoot, CopyConflictAction.Skip, CopyVerifyMode.SizeAndHash), null);
+
+        Assert.Equal(1, summary.Completed);
+        Assert.Equal(0, summary.Failed);
+
+        var target = Path.Combine(DriveRoot, relative);
+        Assert.Equal(await File.ReadAllTextAsync(sourcePath), await File.ReadAllTextAsync(target));
+
+        await using var db = await _env.Factory.CreateDbContextAsync();
+        var job = await db.CopyJobs.SingleAsync();
+        // The source hash is now computed while the source streams past; the
+        // verification itself must never be dropped to make a copy look faster.
+        Assert.True(job.Verified, "SHA-256 verification must still pass for a copy larger than one chunk.");
+        Assert.Equal(job.FileSize, job.BytesCopied);
+        Assert.False(File.Exists(target + ".dcenter-tmp"));
+    }
+
+    [Fact]
+    public async Task A_File_Queued_Without_A_Known_Size_Is_Refreshed_From_Disk_And_Copied()
+    {
+        var (fileId, sourcePath, relative) = await CreateMovieFileAsync("UnknownSize.mkv", new string('d', 5_000));
+
+        // Simulate a job whose queued size was unknown (0): the copy must take
+        // the real size from the disk instead of failing its own size check.
+        await using (var db = await _env.Factory.CreateDbContextAsync())
+        {
+            var mediaFile = await db.MediaFiles.SingleAsync(f => f.Id == fileId);
+            mediaFile.FileSize = 0;
+            await db.SaveChangesAsync();
+        }
+
+        await _env.CopyService.EnqueueAsync([fileId], _env.LibraryDir);
+        var summary = await _env.CopyService.RunAsync(
+            new CopyRunOptions(DriveRoot, CopyConflictAction.Skip, CopyVerifyMode.SizeAndHash), null);
+
+        Assert.Equal(1, summary.Completed);
+        Assert.Equal(0, summary.Failed);
+        Assert.True(File.Exists(Path.Combine(DriveRoot, relative)));
+
+        await using var verify = await _env.Factory.CreateDbContextAsync();
+        var job = await verify.CopyJobs.SingleAsync();
+        Assert.Equal(new FileInfo(sourcePath).Length, job.FileSize);
+        Assert.Equal(job.FileSize, job.BytesCopied);
+        Assert.True(job.Verified);
+    }
 }

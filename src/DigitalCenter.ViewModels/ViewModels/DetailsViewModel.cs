@@ -301,6 +301,15 @@ public partial class DetailsViewModel : ObservableObject
                         _ => $"{episode.Files.Count} files · {UiFormat.FormatBytes(size)}"
                     };
                     rows.Add(new EpisodeRow(episode.Id, episode.EpisodeNumber, episode.Title ?? $"Episode {episode.EpisodeNumber}", summary));
+
+                    // A series title itself carries no media files — they hang
+                    // off its episodes. List them here too so the details screen
+                    // shows the local media of a series and "Open in Explorer"
+                    // has a real file to point at.
+                    foreach (var file in episode.Files.OrderBy(f => f.FilePath, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Files.Add(new MediaFileRow(file.Id, file.FilePath, UiFormat.FormatBytes(file.FileSize), File.Exists(file.FilePath)));
+                    }
                 }
 
                 Seasons.Add(new SeasonRow(season.SeasonNumber, rows));
@@ -321,10 +330,22 @@ public partial class DetailsViewModel : ObservableObject
 
     // ------------------------------------------------------------ actions
 
+    /// <summary>Returns to the library (Back button, Escape).</summary>
+    [RelayCommand]
+    private void Back() => CloseRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the first local media file in Windows Explorer. <see cref="Files"/>
+    /// contains the movie files and, for a series, the episode files, so this
+    /// works for both kinds.
+    /// </summary>
     [RelayCommand]
     private void OpenInExplorer()
     {
-        var file = _entity?.Files.OrderBy(f => f.FilePath).FirstOrDefault()?.FilePath;
+        var file = Files
+            .Select(row => row.FilePath)
+            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+
         if (string.IsNullOrWhiteSpace(file))
         {
             _dialogs.Info("Open in Explorer", "This title has no registered media file yet.");
