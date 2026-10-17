@@ -313,12 +313,22 @@ public partial class UsbCartViewModel : ObservableObject
 
         IsRunning = true;
         ResultSummaryText = string.Empty;
+        // The copy service already throttles its reports; this guard keeps a
+        // burst of identical reports from re-rendering the progress bar.
         var progress = new Progress<CopyProgressReport>(report =>
         {
-            OverallPercent = report.TotalBytes > 0 ? report.BytesCopied * 100.0 / report.TotalBytes : 0;
-            ProgressText = report.CurrentFileName is null
+            var overall = report.TotalBytes > 0 ? report.BytesCopied * 100.0 / report.TotalBytes : 0;
+            var text = report.CurrentFileName is null
                 ? report.Message
                 : $"{report.CompletedFiles + 1}/{report.TotalFiles} · {report.CurrentFileName} ({report.CurrentFilePercent:0}%)";
+
+            if (Math.Abs(overall - OverallPercent) < 0.05 && text == ProgressText)
+            {
+                return;
+            }
+
+            OverallPercent = overall;
+            ProgressText = text;
         });
 
         try

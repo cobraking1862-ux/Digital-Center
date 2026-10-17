@@ -100,8 +100,13 @@ public partial class App : Application
             }
             else
             {
-                logger.Info("Watch Folder monitoring not started (disabled or not configured in Settings).");
+                logger.Info("Watch Folder monitoring not started (disabled or not configured in Management).");
             }
+
+            // Initial screen loads (library grid + the cart badge in the
+            // sidebar). Monitoring is started above and only above, so the
+            // Watch Folder has exactly one startup path.
+            await Services.GetRequiredService<MainViewModel>().InitializeAsync();
         }
         catch (Exception ex)
         {

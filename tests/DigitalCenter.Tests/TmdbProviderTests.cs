@@ -221,6 +221,85 @@ public sealed class TmdbProviderTests
         Assert.Contains("401", exception.Message);
     }
 
+    [Fact]
+    public async Task GetSeriesSummary_Makes_One_Request_And_Reports_The_Season_Count()
+    {
+        var seriesJson = """
+        {
+          "id": 1396,
+          "name": "Breaking Bad",
+          "first_air_date": "2008-01-20",
+          "status": "Ended",
+          "seasons": [
+            { "season_number": 1, "episode_count": 7 },
+            { "season_number": 2, "episode_count": 13 }
+          ]
+        }
+        """;
+        var requests = new List<string>();
+
+        using var provider = CreateProvider(
+            new TmdbOptions { ReadAccessToken = "test-token" },
+            new StubHandler(request =>
+            {
+                requests.Add(request.RequestUri!.ToString());
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(seriesJson, Encoding.UTF8, "application/json") };
+            }));
+
+        var metadata = await provider.GetSeriesSummaryAsync(1396);
+
+        // Importing one episode must not walk every season of the series.
+        var request = Assert.Single(requests);
+        Assert.DoesNotContain("/season/", request);
+        Assert.NotNull(metadata);
+        Assert.Equal("Breaking Bad", metadata!.Title);
+        Assert.Equal("Ended", metadata.AiringStatus);
+        Assert.Equal(2, metadata.SeasonCount);
+        Assert.Empty(metadata.Seasons);
+    }
+
+    [Fact]
+    public async Task GetSeriesSeason_Returns_The_Episodes_Of_One_Season()
+    {
+        var seasonJson = """
+        {
+          "season_number": 2,
+          "episodes": [
+            { "episode_number": 1, "name": "Seven Thirty-Seven", "id": 62085 },
+            { "episode_number": 2, "name": "Grilled", "id": 62086 }
+          ]
+        }
+        """;
+        var requests = new List<string>();
+
+        using var provider = CreateProvider(
+            new TmdbOptions { ReadAccessToken = "test-token" },
+            new StubHandler(request =>
+            {
+                requests.Add(request.RequestUri!.ToString());
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(seasonJson, Encoding.UTF8, "application/json") };
+            }));
+
+        var season = await provider.GetSeriesSeasonAsync(1396, 2);
+
+        Assert.Contains("/tv/1396/season/2", Assert.Single(requests));
+        Assert.NotNull(season);
+        Assert.Equal(2, season!.SeasonNumber);
+        Assert.Equal(2, season.Episodes.Count);
+        Assert.Equal("Seven Thirty-Seven", season.Episodes[0].Title);
+        Assert.Equal(62085L, season.Episodes[0].TmdbId);
+    }
+
+    [Fact]
+    public async Task GetSeriesSeason_Returns_Null_When_Tmdb_Fails_Instead_Of_Failing_The_Import()
+    {
+        using var provider = CreateProvider(
+            new TmdbOptions { ReadAccessToken = "test-token" },
+            new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+
+        Assert.Null(await provider.GetSeriesSeasonAsync(1396, 99));
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>

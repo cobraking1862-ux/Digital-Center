@@ -46,7 +46,6 @@ public sealed partial class NavItem : ObservableObject
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private readonly WatchFolderService _watchFolder;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IAppLogger _logger;
 
@@ -63,7 +62,6 @@ public partial class MainViewModel : ObservableObject
         UsbCart = usbCart;
         Management = management;
         Settings = settings;
-        _watchFolder = watchFolder;
         _uiDispatcher = uiDispatcher;
         _logger = logger;
 
@@ -186,35 +184,15 @@ public partial class MainViewModel : ObservableObject
 
     public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
 
-    /// <summary>Called once at startup: initial loads and Watch Folder auto-start.</summary>
-    public async Task InitializeAsync(Core.Configuration.AppSettings settings)
+    /// <summary>
+    /// Called once at startup for the initial screen loads. Watch Folder
+    /// monitoring is deliberately NOT started here: <c>App.RunStartupMaintenanceAsync</c>
+    /// is the single startup path for it, so the monitor can never be started
+    /// twice from two places with two different ideas of the settings.
+    /// </summary>
+    public async Task InitializeAsync()
     {
         _ = Library.RefreshSafeAsync();
         await UsbCart.RefreshCartAsync();
-
-        var path = settings.WatchFolderPath;
-        if (settings.WatchFolderEnabled && !string.IsNullOrWhiteSpace(path))
-        {
-            _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
-            if (!_watchFolder.IsRunning)
-            {
-                _watchFolder.Start(path);
-            }
-
-            if (settings.ScanOnStartup)
-            {
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await _watchFolder.RescanOnceAsync(path);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Warn($"Startup watch-folder scan failed: {ex.Message}");
-                    }
-                });
-            }
-        }
     }
 }
