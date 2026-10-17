@@ -150,6 +150,8 @@ public sealed class FakeTmdbProvider : ITmdbMetadataProvider
     public bool ThrowOnSearch { get; set; }
     public int MovieDetailCalls { get; private set; }
     public int SeriesDetailCalls { get; private set; }
+    public int SeriesSummaryCalls { get; private set; }
+    public List<(long SeriesId, int Season)> SeasonCalls { get; } = [];
     public byte[] PosterBytes { get; set; } = [0x89, 0x50, 0x4E, 0x47]; // PNG header bytes
 
     public bool IsConfigured => Configured;
@@ -205,6 +207,48 @@ public sealed class FakeTmdbProvider : ITmdbMetadataProvider
 
         return Task.FromResult(Series.TryGetValue(tmdbId, out var metadata) ? metadata : null);
     }
+
+    /// <summary>Summary semantics: the series itself, without episode lists (one request).</summary>
+    public Task<TmdbTitleMetadata?> GetSeriesSummaryAsync(long tmdbId, CancellationToken ct = default)
+    {
+        SeriesSummaryCalls++;
+        if (!Configured)
+        {
+            throw new TmdbNotConfiguredException();
+        }
+
+        if (!Series.TryGetValue(tmdbId, out var metadata))
+        {
+            return Task.FromResult<TmdbTitleMetadata?>(null);
+        }
+
+        return Task.FromResult<TmdbTitleMetadata?>(metadata with
+        {
+            Seasons = [],
+            SeasonCount = metadata.SeasonCount ?? metadata.Seasons.Count
+        });
+    }
+
+    /// <summary>One season's episodes, or null when the series does not have that season.</summary>
+    public Task<TmdbSeasonMetadata?> GetSeriesSeasonAsync(long tmdbId, int seasonNumber, CancellationToken ct = default)
+    {
+        SeasonCalls.Add((tmdbId, seasonNumber));
+        if (!Configured)
+        {
+            throw new TmdbNotConfiguredException();
+        }
+
+        if (!Series.TryGetValue(tmdbId, out var metadata))
+        {
+            return Task.FromResult<TmdbSeasonMetadata?>(null);
+        }
+
+        var season = metadata.Seasons.FirstOrDefault(s => s.SeasonNumber == seasonNumber);
+        return Task.FromResult<TmdbSeasonMetadata?>(SeasonUnavailable ? null : season);
+    }
+
+    /// <summary>Simulates an unavailable season (TMDb 404 / offline): the import must still succeed.</summary>
+    public bool SeasonUnavailable { get; set; }
 
     public Task<Stream> DownloadPosterAsync(string posterPath, CancellationToken ct = default)
     {

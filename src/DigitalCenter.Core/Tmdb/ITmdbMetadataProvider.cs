@@ -11,8 +11,11 @@ public sealed record TmdbSearchCandidate(
     bool IsSeries,
     string ReleaseInfo);
 
-/// <summary>An episode entry of a season ("Poker Face", number 3).</summary>
-public sealed record TmdbEpisodeInfo(int SeasonNumber, int EpisodeNumber, string? Title);
+/// <summary>
+/// An episode entry of a season ("Poker Face", number 3). The optional TMDb
+/// episode id is the external identifier of that episode.
+/// </summary>
+public sealed record TmdbEpisodeInfo(int SeasonNumber, int EpisodeNumber, string? Title, long? TmdbId = null);
 
 /// <summary>One person credit (cast or crew) with an optional profile image.</summary>
 public sealed record TmdbPersonCredit(
@@ -49,6 +52,13 @@ public sealed record TmdbTitleMetadata
     public IReadOnlyList<TmdbPersonCredit> People { get; init; } = [];
     /// <summary>Season/episode breakdown when the metadata source provides one (may be empty).</summary>
     public IReadOnlyList<TmdbSeasonMetadata> Seasons { get; init; } = [];
+
+    /// <summary>
+    /// Number of seasons the catalog entry has (TMDb "seasons" array length),
+    /// independent of how many of them were actually fetched into
+    /// <see cref="Seasons"/>. Null when the source did not report it.
+    /// </summary>
+    public int? SeasonCount { get; init; }
 }
 
 public sealed record TmdbSeasonMetadata(int SeasonNumber, IReadOnlyList<TmdbEpisodeInfo> Episodes);
@@ -69,6 +79,22 @@ public interface ITmdbMetadataProvider
     Task<TmdbTitleMetadata?> GetMovieAsync(long tmdbId, CancellationToken ct = default);
 
     Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Series metadata in a single request, without per-season episode lists
+    /// (<see cref="TmdbTitleMetadata.Seasons"/> stays empty). This is the cheap
+    /// call for matching and importing one episode: the season that is
+    /// actually needed is fetched separately with
+    /// <see cref="GetSeriesSeasonAsync"/> instead of pulling every season.
+    /// </summary>
+    Task<TmdbTitleMetadata?> GetSeriesSummaryAsync(long tmdbId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Episodes of one season of a series. Returns null when TMDb does not
+    /// have that season (or it cannot be reached) — a missing season must
+    /// never fail an import, so callers treat null as "no episode details".
+    /// </summary>
+    Task<TmdbSeasonMetadata?> GetSeriesSeasonAsync(long tmdbId, int seasonNumber, CancellationToken ct = default);
 
     /// <summary>
     /// Resolves an IMDb id ("tt0111161") to the TMDb catalog entry. Returns

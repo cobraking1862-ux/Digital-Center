@@ -10,10 +10,16 @@ using DigitalCenter.ViewModels.Services;
 namespace DigitalCenter.ViewModels;
 
 /// <summary>
-/// Settings workspace: the only place where the default Watch Folder and the
-/// application preferences are configured. Save Settings validates and applies
-/// the changes; Discard Changes restores the last saved values. Changing
-/// paths never moves files or rewrites library records.
+/// Settings workspace: library roots, metadata/artwork, file-operation, USB and
+/// naming preferences. Save Settings validates and applies the changes;
+/// Discard Changes restores the last saved values. Changing paths never moves
+/// files or rewrites library records.
+///
+/// The Watch Folder is deliberately NOT configured here: Management owns the
+/// single default Watch Folder (path + monitoring), so this screen never
+/// maintains a second path or a conflicting monitoring state. Saving works on
+/// the loaded settings (see <see cref="SettingsService.Update"/>) and therefore
+/// cannot clobber the values Management owns.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
@@ -49,15 +55,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string MoviesRoot { get; set; }
     [ObservableProperty] public partial string SeriesRoot { get; set; }
 
-    // ------------------------------------------------------ watch folder
-    [ObservableProperty] public partial string WatchFolderPath { get; set; }
-    [ObservableProperty] public partial bool WatchFolderEnabled { get; set; }
-    [ObservableProperty] public partial bool ScanOnStartup { get; set; }
-    [ObservableProperty] public partial int StabilityDelaySeconds { get; set; }
-    [ObservableProperty] public partial bool WatchFolderIncludeSubfolders { get; set; }
+    // ---------------------------------------------------------- metadata
+    /// <summary>Auto-match threshold for the Watch Folder import (matching policy, not monitoring).</summary>
     [ObservableProperty] public partial double MinimumMatchConfidence { get; set; }
 
-    // ---------------------------------------------------------- metadata
     [ObservableProperty] public partial bool DownloadPosters { get; set; }
     [ObservableProperty] public partial bool DownloadBackdrops { get; set; }
     [ObservableProperty] public partial bool DownloadCastProfiles { get; set; }
@@ -89,11 +90,6 @@ public partial class SettingsViewModel : ObservableObject
         var settings = _settingsService.Load();
         MoviesRoot = settings.MoviesRoot ?? string.Empty;
         SeriesRoot = settings.SeriesRoot ?? string.Empty;
-        WatchFolderPath = settings.WatchFolderPath ?? string.Empty;
-        WatchFolderEnabled = settings.WatchFolderEnabled;
-        ScanOnStartup = settings.ScanOnStartup;
-        StabilityDelaySeconds = settings.StabilityDelaySeconds;
-        WatchFolderIncludeSubfolders = settings.WatchFolderIncludeSubfolders;
         MinimumMatchConfidence = settings.MinimumMatchConfidence;
         DownloadPosters = settings.DownloadPosters;
         DownloadBackdrops = settings.DownloadBackdrops;
@@ -114,40 +110,45 @@ public partial class SettingsViewModel : ObservableObject
         };
     }
 
+    /// <summary>
+    /// Applies the values this screen owns onto the loaded settings. Everything
+    /// owned elsewhere — above all the Watch Folder path and its monitoring
+    /// switches, which Management owns — is left exactly as it is.
+    /// </summary>
+    private void ApplyTo(AppSettings settings)
+    {
+        settings.MoviesRoot = NullIfEmpty(MoviesRoot);
+        settings.SeriesRoot = NullIfEmpty(SeriesRoot);
+        settings.MinimumMatchConfidence = MinimumMatchConfidence;
+        settings.DownloadPosters = DownloadPosters;
+        settings.DownloadBackdrops = DownloadBackdrops;
+        settings.DownloadCastProfiles = DownloadCastProfiles;
+        settings.FetchTrailers = FetchTrailers;
+        settings.AskForDestination = AskForDestination;
+        settings.CleanFilenames = CleanFilenames;
+        settings.UsbConflictAction = ConflictIndex switch
+        {
+            1 => "Overwrite",
+            2 => "Rename",
+            _ => "Skip"
+        };
+        settings.VerifyHashes = VerifyHashes;
+        settings.UsbCopySubfolder = string.IsNullOrWhiteSpace(UsbCopySubfolder) ? "DigitalCenter" : UsbCopySubfolder.Trim();
+        settings.CreatePerTitleFolders = CreatePerTitleFolders;
+        settings.MovieFilenameTemplate = string.IsNullOrWhiteSpace(MovieFilenameTemplate)
+            ? "{Title} ({Year})"
+            : MovieFilenameTemplate;
+        settings.SeriesFilenameTemplate = string.IsNullOrWhiteSpace(SeriesFilenameTemplate)
+            ? "{Title} - S{Season:00}E{Episode:00}"
+            : SeriesFilenameTemplate;
+    }
+
+    /// <summary>The settings as they would be saved (used for validation before writing).</summary>
     private AppSettings BuildSettings()
     {
-        return new AppSettings
-        {
-            MoviesRoot = NullIfEmpty(MoviesRoot),
-            SeriesRoot = NullIfEmpty(SeriesRoot),
-            WatchFolderPath = NullIfEmpty(WatchFolderPath),
-            WatchFolderEnabled = WatchFolderEnabled,
-            ScanOnStartup = ScanOnStartup,
-            StabilityDelaySeconds = StabilityDelaySeconds,
-            WatchFolderIncludeSubfolders = WatchFolderIncludeSubfolders,
-            MinimumMatchConfidence = MinimumMatchConfidence,
-            DownloadPosters = DownloadPosters,
-            DownloadBackdrops = DownloadBackdrops,
-            DownloadCastProfiles = DownloadCastProfiles,
-            FetchTrailers = FetchTrailers,
-            AskForDestination = AskForDestination,
-            CleanFilenames = CleanFilenames,
-            UsbConflictAction = ConflictIndex switch
-            {
-                1 => "Overwrite",
-                2 => "Rename",
-                _ => "Skip"
-            },
-            VerifyHashes = VerifyHashes,
-            UsbCopySubfolder = string.IsNullOrWhiteSpace(UsbCopySubfolder) ? "DigitalCenter" : UsbCopySubfolder.Trim(),
-            CreatePerTitleFolders = CreatePerTitleFolders,
-            MovieFilenameTemplate = string.IsNullOrWhiteSpace(MovieFilenameTemplate)
-                ? "{Title} ({Year})"
-                : MovieFilenameTemplate,
-            SeriesFilenameTemplate = string.IsNullOrWhiteSpace(SeriesFilenameTemplate)
-                ? "{Title} - S{Season:00}E{Episode:00}"
-                : SeriesFilenameTemplate
-        };
+        var settings = _settingsService.Load();
+        ApplyTo(settings);
+        return settings;
     }
 
     [RelayCommand]
@@ -167,16 +168,6 @@ public partial class SettingsViewModel : ObservableObject
         if (picked is not null)
         {
             SeriesRoot = picked;
-        }
-    }
-
-    [RelayCommand]
-    private void BrowseWatchFolder()
-    {
-        var picked = _dialogs.PickFolder(WatchFolderPath, "Choose the default Watch Folder");
-        if (picked is not null)
-        {
-            WatchFolderPath = picked;
         }
     }
 
@@ -233,9 +224,11 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            _settingsService.Save(settings);
-            StatusText = "Settings saved. Changing paths never moves files or modifies library records; " +
-                         "restart the application so the Watch Folder monitor picks up a new folder.";
+            // Update (load → apply → save) keeps the Watch Folder configuration
+            // that Management owns intact.
+            _settingsService.Update(ApplyTo);
+            StatusText = "Settings saved. Changing paths never moves files or modifies library records. " +
+                         "The Watch Folder is managed in the Management workspace.";
         }
         catch (Exception ex)
         {

@@ -16,11 +16,19 @@
                       hairline light border — glass that stays readable.
       • Accent        a violet → indigo aurora gradient with cyan highlights;
                       a single accent family used with restraint.
-      • Shape         generous 12–20 px corner geometry, pill toggles/chips.
+      • Shape         ONE corner-radius scale (the Radius.* tokens below):
+                      6 px small parts, 8 px controls and inputs, 10 px icon
+                      tiles and artwork, 12 px cards and panels. Pills are
+                      RESERVED for selected navigation tabs, small category
+                      chips, switch tracks, progress/scrollbar thumbs and the
+                      empty-state medallion — never for buttons, text labels,
+                      status badges or icon containers, which is what made
+                      long labels read as ovals.
       • Type          Segoe UI Variable with tracked uppercase eyebrows and
                       large cinematic display sizes.
       • Icons         Segoe Fluent Icons (vector) through NAMED resources —
-                      no raw codepoints in screens, no emoji, one family.
+                      no raw codepoints in screens, no emoji, one family, one
+                      size scale (Glyph*), square containers.
       • Motion        short and purposeful: 120 ms taps, 180 ms hovers,
                       260 ms transitions, cubic easing.
 
@@ -106,10 +114,44 @@
     <SolidColorBrush x:Key="DangerBrush" Color="#FB7185"/>
     <SolidColorBrush x:Key="InfoBrush"   Color="#38BDF8"/>
 
-    <!-- Inputs -->
-    <SolidColorBrush x:Key="InputBackground"      Color="#9914111E"/>
-    <SolidColorBrush x:Key="InputBackgroundHover" Color="#B3191626"/>
-    <SolidColorBrush x:Key="InputBorderBrush"     Color="#24FFFFFF"/>
+    <!-- Inputs: darker and more opaque than the glass they sit in, so a field
+         always reads as an inset control rather than part of the panel. -->
+    <SolidColorBrush x:Key="InputBackground"      Color="#D90C0A13"/>
+    <SolidColorBrush x:Key="InputBackgroundHover" Color="#EE131020"/>
+    <SolidColorBrush x:Key="InputBorderBrush"     Color="#33FFFFFF"/>
+
+    <!-- Control surfaces: raised against the cards/panels around them -->
+    <SolidColorBrush x:Key="ControlBrush"        Color="#332B2540"/>
+    <SolidColorBrush x:Key="ControlHoverBrush"   Color="#4D3A3358"/>
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#2A2438"/>
+
+    <!-- ===================================================== corner geometry
+         ONE scale for the whole application: every card, control, input, icon
+         container and artwork frame takes its radius from these tokens, so no
+         screen can drift into its own geometry and nothing is a pill by
+         accident. Radius.Pill is reserved for the shapes that are meant to be
+         pills (selected navigation tabs, small category chips, switch tracks,
+         progress and scrollbar thumbs, the empty-state medallion). -->
+    <CornerRadius x:Key="Radius.None">0</CornerRadius>
+    <CornerRadius x:Key="Radius.Xs">3</CornerRadius>
+    <CornerRadius x:Key="Radius.Sm">6</CornerRadius>
+    <CornerRadius x:Key="Radius.Control">8</CornerRadius>
+    <CornerRadius x:Key="Radius.Tile">10</CornerRadius>
+    <CornerRadius x:Key="Radius.Art">10</CornerRadius>
+    <CornerRadius x:Key="Radius.ArtBottom">0,0,10,10</CornerRadius>
+    <CornerRadius x:Key="Radius.Card">12</CornerRadius>
+    <CornerRadius x:Key="Radius.Popup">12</CornerRadius>
+    <CornerRadius x:Key="Radius.Pill">999</CornerRadius>
+
+    <!-- Control metrics: one height/padding scale. Buttons keep a 34 px
+         minimum height with an 8 px radius, so a short label can never turn
+         the control into a capsule and a long label never gets a distorted
+         background. -->
+    <Thickness x:Key="ControlPadding">16,8</Thickness>
+    <Thickness x:Key="ControlPaddingCompact">12,6</Thickness>
+    <sys:Double x:Key="ControlMinHeight">34</sys:Double>
+    <sys:Double x:Key="IconTileSize">44</sys:Double>
+    <sys:Double x:Key="IconChipSize">34</sys:Double>
 
     <!-- ============================================================ shadows -->
     <DropShadowEffect x:Key="ShadowCard"     BlurRadius="14" ShadowDepth="3"  Direction="270" Opacity="0.38" Color="#000000"/>
