@@ -150,7 +150,7 @@
     <Thickness x:Key="ControlPadding">16,8</Thickness>
     <Thickness x:Key="ControlPaddingCompact">12,6</Thickness>
     <sys:Double x:Key="ControlMinHeight">34</sys:Double>
-    <sys:Double x:Key="IconTileSize">44</sys:Double>
+    <sys:Double x:Key="IconTileSize">48</sys:Double>
     <sys:Double x:Key="IconChipSize">34</sys:Double>
 
     <!-- ============================================================ shadows -->
@@ -289,33 +289,45 @@
     <sys:String x:Key="Icon.Bookmarks">&#xE8A4;</sys:String>
     <sys:String x:Key="Icon.Rename">&#xE8AC;</sys:String>
     <sys:String x:Key="Icon.Scan">&#xE8FE;</sys:String>
+    <!-- Window caption glyphs: no raw codepoints anywhere in the app -->
+    <sys:String x:Key="Icon.Minimize">&#xE921;</sys:String>
+    <sys:String x:Key="Icon.Maximize">&#xE922;</sys:String>
+    <sys:String x:Key="Icon.Restore">&#xE923;</sys:String>
+    <sys:String x:Key="Icon.Close">&#xE8BB;</sys:String>
 
+    <!-- ONE icon size scale (12 / 14 / 16 / 20 / 26 / 34). Screens pick a step
+         instead of setting an ad-hoc FontSize, so every glyph is proportioned
+         the same way relative to the control that carries it. -->
     <Style x:Key="GlyphIcon" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
         <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
         <Setter Property="FontSize" Value="16"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="GlyphXs" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
+        <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style x:Key="GlyphSmall" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="14"/>
     </Style>
     <Style x:Key="GlyphMedium" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
-        <Setter Property="FontSize" Value="19"/>
+        <Setter Property="FontSize" Value="20"/>
     </Style>
     <Style x:Key="GlyphLarge" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
-        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontSize" Value="26"/>
     </Style>
     <Style x:Key="GlyphHero" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
         <Setter Property="FontSize" Value="34"/>
     </Style>
-    <Style x:Key="NavGlyph" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
-        <Setter Property="FontSize" Value="20"/>
-    </Style>
+    <Style x:Key="NavGlyph" TargetType="TextBlock" BasedOn="{StaticResource GlyphMedium}"/>
 
-    <!-- Accent icon tile for page headers and stat cards -->
+    <!-- Accent icon tile for page headers and stat cards: a SQUARE tile with the
+         tile radius — never a circle or an oval. -->
     <Style x:Key="IconTile" TargetType="Border">
-        <Setter Property="Width" Value="48"/>
-        <Setter Property="Height" Value="48"/>
-        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Width" Value="{StaticResource IconTileSize}"/>
+        <Setter Property="Height" Value="{StaticResource IconTileSize}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Tile}"/>
         <Setter Property="Background" Value="{StaticResource AccentGradientSoft}"/>
         <Setter Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -324,9 +336,9 @@
 
     <!-- Quiet icon chip: small rounded square behind an inline glyph -->
     <Style x:Key="IconChip" TargetType="Border">
-        <Setter Property="Width" Value="34"/>
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Width" Value="{StaticResource IconChipSize}"/>
+        <Setter Property="Height" Value="{StaticResource IconChipSize}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Tile}"/>
         <Setter Property="Background" Value="{StaticResource PrimaryDimBrush}"/>
         <Setter Property="Padding" Value="0"/>
     </Style>
@@ -342,7 +354,7 @@
                 <ControlTemplate TargetType="ToolTip">
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1" CornerRadius="10" Padding="12,8">
+                            BorderThickness="1" CornerRadius="{StaticResource Radius.Tile}" Padding="12,8">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.5" Color="#000000"/>
                         </Border.Effect>
@@ -354,11 +366,15 @@
     </Style>
 
     <!-- ============================================================== buttons -->
-    <!-- Primary action: aurora gradient pill with a soft violet glow on hover -->
+    <!-- Primary action: aurora gradient with a soft violet glow on hover. The
+         control radius is fixed by the token and the height has a floor, so a
+         short label ("OK") and a long one ("Start Monitoring") both stay a
+         properly proportioned rounded rectangle. -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentGradient}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Padding" Value="18,9"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPadding}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -368,7 +384,7 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="11"
+                            CornerRadius="{StaticResource Radius.Control}"
                             Padding="{TemplateBinding Padding}"
                             RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform>
@@ -405,11 +421,15 @@
         </Setter>
     </Style>
 
-    <!-- Secondary: glass surface, hairline border, accent border on hover -->
+    <!-- Secondary: a raised CONTROL surface (ControlBrush, not the panel's
+         CardBrush) with a hairline border and an accent border on hover, so it
+         always reads as something you can press rather than as part of the
+         panel it sits on. -->
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+        <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-        <Setter Property="Padding" Value="16,9"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPadding}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -421,17 +441,17 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{StaticResource BorderLowBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="11"
+                            CornerRadius="{StaticResource Radius.Control}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlHoverBrush}"/>
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#0D0B14"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlPressedBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
@@ -446,14 +466,15 @@
     <Style x:Key="GhostButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource SubTextBrush}"/>
-        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPaddingCompact}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="9"
+                            CornerRadius="{StaticResource Radius.Control}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
@@ -478,7 +499,8 @@
     <Style x:Key="DangerButton" TargetType="Button">
         <Setter Property="Background" Value="#26FB7185"/>
         <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-        <Setter Property="Padding" Value="16,9"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPadding}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -487,7 +509,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="#55FB7185"
                             BorderThickness="1"
-                            CornerRadius="11"
+                            CornerRadius="{StaticResource Radius.Control}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
                     </Border>
@@ -509,7 +531,7 @@
         </Setter>
     </Style>
 
-    <!-- Round icon button with tooltip-sized hit area and hover ring -->
+    <!-- Square icon button (rounded corners, never a circle) with a hover fill -->
     <Style x:Key="IconButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource SubTextBrush}"/>
@@ -522,7 +544,7 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="10"
+                            CornerRadius="{StaticResource Radius.Tile}"
                             Width="{TemplateBinding Width}"
                             Height="{TemplateBinding Height}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -554,7 +576,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="7">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Sm}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -575,7 +597,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="7">
+                    <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Sm}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -597,7 +619,7 @@
         <Setter Property="Background" Value="#23FFFFFF"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="999"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
         <Setter Property="Padding" Value="9,2.5"/>
     </Style>
 
@@ -621,7 +643,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="999"
+                            CornerRadius="{StaticResource Radius.Pill}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
@@ -644,12 +666,14 @@
     </Style>
 
     <!-- ============================================================== badges -->
-    <!-- Small pill pinned over posters -->
+    <!-- Type label pinned over posters. Badges are NOT pills: a long value
+         ("DOCUMENTARY") inside a 999 px radius reads as a distorted oval, so
+         they take the small radius instead. -->
     <Style x:Key="TypeBadge" TargetType="Border">
         <Setter Property="Background" Value="#CC16001A"/>
         <Setter Property="BorderBrush" Value="#40FFFFFF"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="999"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
         <Setter Property="Padding" Value="9,3"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="VerticalAlignment" Value="Top"/>
@@ -657,14 +681,19 @@
         <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
     </Style>
 
-    <Style x:Key="StatusPill" TargetType="Border">
+    <!-- Status chip: small radius (never a pill) so long statuses such as
+         "Awaiting destination" keep a calm rectangular background. -->
+    <Style x:Key="StatusChip" TargetType="Border">
         <Setter Property="Background" Value="#26FFFFFF"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="999"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
         <Setter Property="Padding" Value="11,4"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
+
+    <!-- Legacy key kept as an alias so existing screens do not break -->
+    <Style x:Key="StatusPill" TargetType="Border" BasedOn="{StaticResource StatusChip}"/>
 
     <Style x:Key="StatusDot" TargetType="Ellipse">
         <Setter Property="Width" Value="9"/>
@@ -690,7 +719,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border x:Name="Track"
-                                Width="42" Height="22" CornerRadius="999"
+                                Width="42" Height="22" CornerRadius="{StaticResource Radius.Pill}"
                                 Background="#33FFFFFF"
                                 BorderBrush="{StaticResource BorderHighBrush}"
                                 BorderThickness="1">
@@ -731,7 +760,8 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CaretBrush" Value="{StaticResource AccentBorderBrush}"/>
         <Setter Property="SelectionBrush" Value="{StaticResource PrimaryBrush}"/>
-        <Setter Property="Padding" Value="10,7"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPaddingCompact}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -740,7 +770,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="10">
+                            CornerRadius="{StaticResource Radius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
                                       VerticalAlignment="Center" Focusable="False"/>
                     </Border>
@@ -762,8 +792,10 @@
         </Setter>
     </Style>
 
-    <!-- Pill search field (icon glyphs are layered by the page) -->
+    <!-- Search field: an input, so it takes the control radius (36 px tall) —
+         a pill here stretched the background under long query text. -->
     <Style x:Key="SearchBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="MinHeight" Value="36"/>
         <Setter Property="Padding" Value="40,8,34,8"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -774,7 +806,7 @@
                             Background="{StaticResource InputBackground}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="999">
+                            CornerRadius="{StaticResource Radius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
                                       VerticalAlignment="Center" Focusable="False"/>
                     </Border>
@@ -804,7 +836,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="8"
+                    <Border x:Name="Chrome" Background="Transparent" CornerRadius="{StaticResource Radius.Sm}"
                             Padding="{TemplateBinding Padding}" Margin="6,1">
                         <ContentPresenter VerticalAlignment="Center"/>
                     </Border>
@@ -825,7 +857,8 @@
         <Setter Property="Background" Value="{StaticResource InputBackground}"/>
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}"/>
-        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="Padding" Value="{StaticResource ControlPaddingCompact}"/>
+        <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
@@ -844,10 +877,9 @@
                                             Background="{StaticResource InputBackground}"
                                             BorderBrush="{StaticResource InputBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="10">
+                                            CornerRadius="{StaticResource Radius.Control}">
                                         <TextBlock Text="{StaticResource Icon.ChevronDown}"
-                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                   FontSize="11" Margin="0,1,11,0"
+                                                   Style="{StaticResource GlyphXs}" Margin="0,1,11,0"
                                                    Foreground="{StaticResource FaintTextBrush}"
                                                    HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                     </Border>
@@ -860,7 +892,7 @@
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
-                        <Border x:Name="ChromeOverlay" Background="Transparent" CornerRadius="10"
+                        <Border x:Name="ChromeOverlay" Background="Transparent" CornerRadius="{StaticResource Radius.Control}"
                                 Margin="0,0,26,0" IsHitTestVisible="False"/>
                         <ContentPresenter x:Name="Selected"
                                           IsHitTestVisible="False"
@@ -878,7 +910,7 @@
                             <Border Background="{StaticResource CardStrongBrush}"
                                     BorderBrush="{StaticResource BorderLowBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="13"
+                                    CornerRadius="{StaticResource Radius.Popup}"
                                     Margin="12,6,12,14"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}"
@@ -911,7 +943,7 @@
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" Background="Transparent">
                         <Border x:Name="Box"
-                                Width="19" Height="19" CornerRadius="6"
+                                Width="19" Height="19" CornerRadius="{StaticResource Radius.Sm}"
                                 Background="{StaticResource InputBackground}"
                                 BorderBrush="{StaticResource BorderHighBrush}"
                                 BorderThickness="1"
@@ -955,7 +987,7 @@
                                 <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
-                                            <Border Height="5" CornerRadius="999"
+                                            <Border Height="5" CornerRadius="{StaticResource Radius.Pill}"
                                                     Background="{StaticResource AccentGradientCyan}"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
@@ -965,7 +997,7 @@
                                 <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
-                                            <Border Height="5" CornerRadius="999"
+                                            <Border Height="5" CornerRadius="{StaticResource Radius.Pill}"
                                                     Background="#26FFFFFF"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
@@ -1013,7 +1045,7 @@
                 <ControlTemplate TargetType="TabItem">
                     <Border x:Name="Chrome"
                             Background="Transparent"
-                            CornerRadius="999"
+                            CornerRadius="{StaticResource Radius.Pill}"
                             Padding="16,7"
                             Margin="0,0,6,0">
                         <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -1053,7 +1085,7 @@
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Background="#33FFFFFF" CornerRadius="999" Margin="2.5,0"
+                                            <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Pill}" Margin="2.5,0"
                                                     Cursor="Hand"/>
                                         </ControlTemplate>
                                     </Thumb.Template>
@@ -1082,7 +1114,7 @@
                                         <Thumb>
                                             <Thumb.Template>
                                                 <ControlTemplate TargetType="Thumb">
-                                                    <Border Background="#33FFFFFF" CornerRadius="999" Margin="0,2.5"
+                                                    <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Pill}" Margin="0,2.5"
                                                             Cursor="Hand"/>
                                                 </ControlTemplate>
                                             </Thumb.Template>
@@ -1098,7 +1130,8 @@
     </Style>
 
     <!-- ======================================================== navigation -->
-    <!-- Sidebar item: floating pill with icon + label, animated states -->
+    <!-- Sidebar item: rounded rectangle row (control geometry, not a pill —
+         a pill on a full-width row turns long labels into ovals) -->
     <Style x:Key="NavListBoxItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{StaticResource SubTextBrush}"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -1110,7 +1143,7 @@
                 <ControlTemplate TargetType="ListBoxItem">
                     <Border x:Name="Chrome"
                             Background="Transparent"
-                            CornerRadius="11"
+                            CornerRadius="{StaticResource Radius.Tile}"
                             Padding="10,9">
                         <ContentPresenter/>
                     </Border>
@@ -1132,12 +1165,12 @@
     </Style>
 
     <!-- ============================================================== cards -->
-    <!-- Standard content card: level-2 glass, 18 px corners -->
+    <!-- Standard content card: level-2 glass, card radius from the token -->
     <Style x:Key="CardBorder" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
         <Setter Property="Padding" Value="20"/>
         <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
     </Style>
@@ -1147,7 +1180,7 @@
         <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="15"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
         <Setter Property="Padding" Value="16"/>
     </Style>
 
@@ -1156,7 +1189,7 @@
         <Setter Property="Background" Value="{StaticResource CardStrongBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Popup}"/>
         <Setter Property="Padding" Value="16"/>
         <Setter Property="Effect" Value="{StaticResource ShadowPanel}"/>
     </Style>
@@ -1166,7 +1199,7 @@
         <Setter Property="Background" Value="{StaticResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
         <Setter Property="Padding" Value="16,14"/>
         <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
     </Style>
@@ -1181,7 +1214,7 @@
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
-        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Art}"/>
     </Style>
 
     <!-- Poster card: hover lift + zoom + accent ring (transform is animated
@@ -1191,7 +1224,7 @@
         <Setter Property="Background" Value="{StaticResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
         <Setter Property="Padding" Value="8"/>
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
     </Style>
@@ -1200,7 +1233,7 @@
     <Style x:Key="PosterCardBorder" TargetType="Border" BasedOn="{StaticResource PosterCard}"/>
 
     <Style x:Key="PosterScrim" TargetType="Border">
-        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Art}"/>
         <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
@@ -1208,7 +1241,7 @@
     <Style x:Key="EmptyMedallion" TargetType="Border">
         <Setter Property="Width" Value="84"/>
         <Setter Property="Height" Value="84"/>
-        <Setter Property="CornerRadius" Value="999"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
         <Setter Property="Background" Value="{StaticResource PrimaryDimBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -1225,9 +1258,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid>
-                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="999"/>
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Pill}"/>
                         <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
-                                CornerRadius="999" HorizontalAlignment="Left"/>
+                                CornerRadius="{StaticResource Radius.Pill}" HorizontalAlignment="Left"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -1279,7 +1312,7 @@
         <Setter Property="Background" Value="{StaticResource InputBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="999"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
         <Setter Property="Padding" Value="5"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
@@ -1295,7 +1328,7 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="Chrome"
                             Background="Transparent"
-                            CornerRadius="999"
+                            CornerRadius="{StaticResource Radius.Pill}"
                             Padding="18,8">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                           RecognizesAccessKey="True"/>

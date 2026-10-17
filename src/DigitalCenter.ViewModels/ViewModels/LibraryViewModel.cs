@@ -22,7 +22,12 @@ public enum LibraryTab
 /// Home screen: grid-only library with portrait poster cards. The top
 /// navigation selects Movies / Series / Collections / Genres; the subbar
 /// offers year, language and sorting; the search box on the right is the only
-/// other header control. Clicking a card raises <see cref="DetailsRequested"/>.
+/// other header control.
+///
+/// Card interaction is split in two: a single click selects the card
+/// (<see cref="SelectItemCommand"/>), a double click — or Enter/Space on a
+/// focused card — raises <see cref="DetailsRequested"/> and opens the details
+/// screen. Works identically for movies and series.
 /// </summary>
 public partial class LibraryViewModel : ObservableObject
 {
@@ -102,6 +107,9 @@ public partial class LibraryViewModel : ObservableObject
     public partial string StatusText { get; set; }
 
     [ObservableProperty]
+    public partial LibraryItemViewModel? SelectedItem { get; set; }
+
+    [ObservableProperty]
     public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
@@ -144,6 +152,15 @@ public partial class LibraryViewModel : ObservableObject
     partial void OnSortIndexChanged(int value) => _ = RefreshSafeAsync();
 
     partial void OnSelectedGenreChanged(string? value) => _ = RefreshSafeAsync();
+
+    /// <summary>Keeps exactly one card selected and mirrors the state onto the rows.</summary>
+    partial void OnSelectedItemChanged(LibraryItemViewModel? value)
+    {
+        foreach (var item in Items)
+        {
+            item.IsSelected = ReferenceEquals(item, value);
+        }
+    }
 
     partial void OnIsLoadingChanged(bool value)
     {
@@ -203,11 +220,17 @@ public partial class LibraryViewModel : ObservableObject
         {
             var page = await _queryService.QueryAsync(filter);
 
+            // Rebuilding the grid must not throw away the selection: keep it by
+            // title id so a background refresh cannot deselect the open card.
+            var selectedId = SelectedItem?.Id;
+
             Items.Clear();
             foreach (var row in page.Items)
             {
                 Items.Add(new LibraryItemViewModel(row));
             }
+
+            SelectedItem = selectedId is { } id ? Items.FirstOrDefault(item => item.Id == id) : null;
 
             TotalMatchesText = page.TotalMatches == page.Items.Count
                 ? $"{page.TotalMatches} title(s)"
@@ -281,8 +304,22 @@ public partial class LibraryViewModel : ObservableObject
         };
     }
 
+    /// <summary>Selects a card (single click). Does not navigate.</summary>
     [RelayCommand]
-    private void OpenDetails(LibraryItemViewModel? item) => DetailsRequested?.Invoke(item?.Id ?? 0);
+    private void SelectItem(LibraryItemViewModel? item) => SelectedItem = item;
+
+    /// <summary>Opens the details screen for a card (double click, Enter or Space).</summary>
+    [RelayCommand]
+    private void OpenDetails(LibraryItemViewModel? item)
+    {
+        if (item is null || item.Id <= 0)
+        {
+            return;
+        }
+
+        SelectedItem = item;
+        DetailsRequested?.Invoke(item.Id);
+    }
 
     [RelayCommand]
     private async Task AddToCartAsync(LibraryItemViewModel? item)

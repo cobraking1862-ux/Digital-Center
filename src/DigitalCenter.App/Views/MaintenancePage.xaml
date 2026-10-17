@@ -34,7 +34,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphIcon}" FontSize="15"
+                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphIcon}"
                                                        Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
                                             <TextBlock Text="Scan library folders" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
                                         </StackPanel>
@@ -47,7 +47,7 @@
                                             VerticalAlignment="Top"
                                             Command="{Binding ScanCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                                             <TextBlock Text="Scan now"/>
                                         </StackPanel>
                                     </Button>
@@ -87,7 +87,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}" FontSize="15"
+                                            <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}"
                                                        Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
                                             <TextBlock Text="Reports" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
                                         </StackPanel>
@@ -99,7 +99,7 @@
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                                         <Button Command="{Binding FindMissingFilesCommand}">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                                <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                                 <TextBlock Text="Missing files"/>
                                             </StackPanel>
                                         </Button>
@@ -177,7 +177,7 @@
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.ExternalLink}" Style="{StaticResource GlyphIcon}" FontSize="15"
+                                    <TextBlock Text="{StaticResource Icon.ExternalLink}" Style="{StaticResource GlyphIcon}"
                                                Foreground="{StaticResource OkBrush}" VerticalAlignment="Center"/>
                                     <TextBlock Text="Export the catalog" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
                                 </StackPanel>
@@ -188,7 +188,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                     <Button Command="{Binding ExportCsvCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                                             <TextBlock Text="Export as CSV…"/>
                                         </StackPanel>
                                     </Button>
@@ -199,7 +199,7 @@
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphIcon}" FontSize="15"
+                                    <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphIcon}"
                                                Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
                                     <TextBlock Text="Import a catalog" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
                                 </StackPanel>
@@ -210,7 +210,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                     <Button Command="{Binding ImportCsvCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                                             <TextBlock Text="Import CSV…"/>
                                         </StackPanel>
                                     </Button>
@@ -228,7 +228,7 @@
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphIcon}" FontSize="15"
+                                    <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphIcon}"
                                                Foreground="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
                                     <TextBlock Text="Database backup &amp; restore" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
                                 </StackPanel>
@@ -240,7 +240,7 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button Command="{Binding BackupCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                                             <TextBlock Text="Back up now"/>
                                         </StackPanel>
                                     </Button>

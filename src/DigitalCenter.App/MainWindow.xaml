@@ -103,27 +103,26 @@
                         Margin="10,0,0,0"
                         ToolTip="Toggle sidebar"
                         AutomationProperties.Name="Toggle sidebar">
-                    <TextBlock Text="{StaticResource Icon.Hamburger}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                    <TextBlock Text="{StaticResource Icon.Hamburger}" Style="{StaticResource GlyphIcon}"
                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                 </Button>
 
                 <!-- Brand -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                     <Grid Width="27" Height="27" VerticalAlignment="Center">
-                        <Border CornerRadius="9" Background="{StaticResource AccentGradient}"
+                        <Border CornerRadius="{StaticResource Radius.Control}" Background="{StaticResource AccentGradient}"
                                 BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.5" Color="#7C3AED"/>
                             </Border.Effect>
                         </Border>
-                        <TextBlock Text="{StaticResource Icon.Play}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                   FontSize="11" Foreground="White"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="1,0,0,0"/>
+                        <TextBlock Text="{StaticResource Icon.Play}" Style="{StaticResource GlyphXs}"
+                                   Foreground="White" Margin="1,0,0,0"/>
                     </Grid>
                     <TextBlock Text="DigitalCenter" Style="{StaticResource AppTitle}" Margin="11,0,0,0"
                                VerticalAlignment="Center"/>
                     <Border Background="#268B5CF6" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
-                            CornerRadius="999" Padding="8,2" Margin="11,0,0,0" VerticalAlignment="Center">
+                            CornerRadius="{StaticResource Radius.Pill}" Padding="8,2" Margin="11,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="5.0" FontSize="10.5" FontWeight="SemiBold" Foreground="#D9C9FF"/>
                     </Border>
                 </StackPanel>
@@ -133,16 +132,16 @@
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Style="{StaticResource CaptionButton}" Click="OnMinimizeClick" ToolTip="Minimize"
                             AutomationProperties.Name="Minimize">
-                        <TextBlock Text="&#xE921;" FontSize="11"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                        <TextBlock Text="{StaticResource Icon.Minimize}" Style="{StaticResource GlyphXs}"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                     </Button>
                     <Button Style="{StaticResource CaptionButton}" Click="OnMaximizeRestoreClick" ToolTip="Maximize"
                             AutomationProperties.Name="Maximize">
                         <Grid>
-                            <TextBlock Text="&#xE922;" FontSize="11"
-                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets">
+                            <TextBlock Text="{StaticResource Icon.Maximize}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphXs}">
                                         <Setter Property="Visibility" Value="Visible"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
@@ -152,10 +151,10 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBlock Text="&#xE923;" FontSize="11"
-                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets">
+                            <TextBlock Text="{StaticResource Icon.Restore}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphXs}">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
@@ -169,8 +168,8 @@
                     </Button>
                     <Button Style="{StaticResource CloseCaptionButton}" Click="OnCloseClick" ToolTip="Close"
                             AutomationProperties.Name="Close" Margin="0,0,8,0">
-                        <TextBlock Text="&#xE8BB;" FontSize="11"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+                        <TextBlock Text="{StaticResource Icon.Close}" Style="{StaticResource GlyphXs}"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -216,10 +215,12 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <Border x:Name="IconChipHost" Width="34" Height="34" CornerRadius="10"
+                                        <Border x:Name="IconChipHost"
+                                                Width="{StaticResource IconChipSize}" Height="{StaticResource IconChipSize}"
+                                                CornerRadius="{StaticResource Radius.Tile}"
                                                 Background="#22FFFFFF" HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding Glyph}"
-                                                       Style="{StaticResource GlyphIcon}" FontSize="17"
+                                                       Style="{StaticResource GlyphIcon}"
                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
@@ -230,7 +231,7 @@
                                                    Visibility="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
                                         <!-- Cart badge pill -->
                                         <Border Grid.Column="2" Background="{StaticResource AccentGradient}"
-                                                CornerRadius="999" Padding="7,1.5" VerticalAlignment="Center"
+                                                CornerRadius="{StaticResource Radius.Pill}" Padding="7,1.5" VerticalAlignment="Center"
                                                 Margin="8,0,2,0"
                                                 Visibility="{Binding BadgeCount, Converter={StaticResource CountToVis}}">
                                             <TextBlock Text="{Binding BadgeCount}" FontSize="10.5" FontWeight="Bold"
@@ -251,7 +252,7 @@
                         <StackPanel Grid.Row="2" Margin="14,0,14,14"
                                     Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}">
                             <Separator Style="{StaticResource Divider}" Margin="8,4,8,10"/>
-                            <Border Background="#1FFFFFFF" CornerRadius="12" Padding="14,10">
+                            <Border Background="#1FFFFFFF" CornerRadius="{StaticResource Radius.Card}" Padding="14,10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>

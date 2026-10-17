@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using DigitalCenter.ViewModels;
 using DigitalCenter.ViewModels.Services;
 
@@ -21,15 +20,6 @@ public partial class LibraryPage : UserControl
         if (ViewModel is { } vm)
         {
             vm.SelectedTab = LibraryTab.Genres;
-        }
-    }
-
-    /// <summary>A single click on a poster card opens the details screen.</summary>
-    private void OnCardClick(object sender, MouseButtonEventArgs e)
-    {
-        if (ViewModel is { } vm && (sender as FrameworkElement)?.DataContext is LibraryItemViewModel item)
-        {
-            vm.OpenDetailsCommand.Execute(item);
         }
     }
 

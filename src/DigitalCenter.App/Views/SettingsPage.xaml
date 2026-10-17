@@ -31,20 +31,20 @@
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Configuration" Style="{StaticResource EyebrowText}"/>
                 <TextBlock Text="Settings" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/>
-                <TextBlock Text="The single place to configure the default Watch Folder and application preferences."
+                <TextBlock Text="Application preferences: library roots, metadata and artwork, file operations, USB copying and naming. The Watch Folder is managed in the Management workspace."
                            Style="{StaticResource SubText}" Margin="0,5,0,0"/>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                         Command="{Binding DiscardChangesCommand}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                         <TextBlock Text="Discard Changes"/>
                     </StackPanel>
                 </Button>
                 <Button Command="{Binding SaveCommand}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                        <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                         <TextBlock Text="Save Settings"/>
                     </StackPanel>
                 </Button>
@@ -63,49 +63,42 @@
                      VerticalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Settings}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Settings}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="General" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Library}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Library}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="Library" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphIcon}" FontSize="17"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Watch Folder" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </ListBoxItem>
-                <ListBoxItem>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Cloud}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Cloud}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="Metadata" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Copy}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Copy}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="File Operations" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Font}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Font}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="Naming &amp; Organization" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
                 <ListBoxItem>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}" FontSize="17"
+                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         <TextBlock Text="Application" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -138,7 +131,7 @@
                                     <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Top"
                                             Command="{Binding OpenDataFolderCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Open data folder"/>
                                         </StackPanel>
                                     </Button>
@@ -167,14 +160,14 @@
                                     <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                             Command="{Binding BrowseMoviesRootCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Browse…"/>
                                         </StackPanel>
                                     </Button>
                                     <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                             Command="{Binding OpenMoviesRootCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Open"/>
                                         </StackPanel>
                                     </Button>
@@ -191,14 +184,14 @@
                                     <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                             Command="{Binding BrowseSeriesRootCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Browse…"/>
                                         </StackPanel>
                                     </Button>
                                     <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                             Command="{Binding OpenSeriesRootCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Open"/>
                                         </StackPanel>
                                     </Button>
@@ -209,57 +202,8 @@
                         </Border>
                     </StackPanel>
 
-                    <!-- ===================== Watch Folder ===================== -->
-                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=2}">
-                        <Border Style="{StaticResource CardBorder}">
-                            <StackPanel>
-                                <TextBlock Text="Default Watch Folder" Style="{StaticResource SectionTitle}"/>
-                                <TextBlock Text="DigitalCenter monitors exactly one Watch Folder. It must be outside both library roots."
-                                           Style="{StaticResource SubText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding WatchFolderPath, UpdateSourceTrigger=PropertyChanged}"/>
-                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                                            Command="{Binding BrowseWatchFolderCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
-                                            <TextBlock Text="Browse…"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-
-                                <Separator Style="{StaticResource Divider}"/>
-
-                                <CheckBox Content="Start monitoring with the application" IsChecked="{Binding WatchFolderEnabled}"
-                                          Style="{StaticResource ToggleSwitch}" Margin="0,6,0,0"/>
-                                <CheckBox Content="Scan the Watch Folder when the application starts" IsChecked="{Binding ScanOnStartup}"
-                                          Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"/>
-                                <CheckBox Content="Include subfolders" IsChecked="{Binding WatchFolderIncludeSubfolders}"
-                                          Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"/>
-
-                                <TextBlock Text="File-stability delay (seconds a file's size must stay unchanged)" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding StabilityDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="130"
-                                         HorizontalAlignment="Left"/>
-
-                                <TextBlock Text="Minimum match confidence" Style="{StaticResource FieldLabel}"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <Slider Minimum="0.30" Maximum="0.95" Value="{Binding MinimumMatchConfidence}"
-                                            Width="240" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding MinimumMatchConfidence, StringFormat={}{0:P0}}"
-                                               Style="{StaticResource SubText}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                               FontWeight="SemiBold" MinWidth="44"/>
-                                </StackPanel>
-                                <TextBlock Text="Candidates below this score are marked “No Match”; the file stays in place."
-                                           Style="{StaticResource CaptionText}" Margin="0,7,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-
                     <!-- ===================== Metadata ===================== -->
-                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=3}">
+                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=2}">
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <TextBlock Text="TMDb" Style="{StaticResource SectionTitle}"/>
@@ -269,11 +213,11 @@
                                     <Button Style="{StaticResource SecondaryButton}"
                                             Command="{Binding TestTmdbCommand}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Cloud}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Cloud}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Test connection"/>
                                         </StackPanel>
                                     </Button>
-                                    <Border Style="{StaticResource StatusPill}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                    <Border Style="{StaticResource StatusChip}" Margin="12,0,0,0" VerticalAlignment="Center"
                                             Background="{StaticResource PrimaryDimBrush}">
                                         <TextBlock Text="{Binding TmdbConfigured, StringFormat=Token configured: {0}}"
                                                    FontSize="11.5" FontWeight="SemiBold"/>
@@ -295,10 +239,28 @@
                                            Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
+
+                        <!-- Matching policy stays here (it is a metadata rule);
+                             the Watch Folder path and its monitoring live in Management. -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Automatic matching" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="Minimum match confidence" Style="{StaticResource FieldLabel}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Minimum="0.30" Maximum="0.95" Value="{Binding MinimumMatchConfidence}"
+                                            Width="240" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding MinimumMatchConfidence, StringFormat={}{0:P0}}"
+                                               Style="{StaticResource SubText}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                               FontWeight="SemiBold" MinWidth="44"/>
+                                </StackPanel>
+                                <TextBlock Text="Candidates below this score are marked “No Match”; the file stays in place. The Watch Folder itself — its path and the monitoring switches — is managed in the Management workspace."
+                                           Style="{StaticResource CaptionText}" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- ===================== File Operations ===================== -->
-                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=4}">
+                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=3}">
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <TextBlock Text="File operations" Style="{StaticResource SectionTitle}"/>
@@ -316,7 +278,7 @@
                     </StackPanel>
 
                     <!-- ===================== Naming & Organization ===================== -->
-                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=5}">
+                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=4}">
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <TextBlock Text="Naming &amp; organization" Style="{StaticResource SectionTitle}"/>
@@ -339,7 +301,7 @@
                     </StackPanel>
 
                     <!-- ===================== Application (maintenance) ===================== -->
-                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=6}">
+                    <StackPanel Visibility="{Binding SelectedIndex, ElementName=CategoryList, Converter={StaticResource IndexIs}, ConverterParameter=5}">
                         <views:MaintenancePage DataContext="{Binding Maintenance}"/>
                     </StackPanel>
 

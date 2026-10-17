@@ -10,12 +10,12 @@
         <conv:InverseBoolConverter x:Key="InverseBool"/>
         <conv:StatusKeyToBrushConverter x:Key="StatusBrush"/>
 
-        <!-- Status pill tinted by the row's status key (Ok/Bad/Active/Pending/Neutral) -->
-        <Style x:Key="RowStatusPill" TargetType="Border">
+        <!-- Row status chip tinted by the row's status key (Ok/Bad/Active/Pending/
+             Neutral). Based on the shared StatusChip so long statuses such as
+             "Awaiting destination" keep a rectangular background instead of the
+             oval a 999 px radius produced. -->
+        <Style x:Key="RowStatusChip" TargetType="Border" BasedOn="{StaticResource StatusChip}">
             <Setter Property="Background" Value="#1FFFFFFF"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="999"/>
             <Setter Property="Padding" Value="10,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -24,6 +24,7 @@
 
     <Grid Margin="26,20,26,20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -40,13 +41,13 @@
                 <TextBlock Text="Management" Style="{StaticResource EyebrowText}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                     <Border Style="{StaticResource IconTile}">
-                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphIcon}" FontSize="20"
+                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphMedium}"
                                    Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
                         <TextBlock Text="Watch Folder" Style="{StaticResource PageTitle}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}"
                                        Foreground="{StaticResource FaintTextBrush}" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding WatchPathDisplay}" Style="{StaticResource SubText}" Margin="7,0,0,0"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="640"
@@ -56,7 +57,7 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <Border Style="{StaticResource StatusPill}" Margin="0,0,12,0" VerticalAlignment="Center"
+                <Border Style="{StaticResource StatusChip}" Margin="0,0,12,0" VerticalAlignment="Center"
                         Background="{StaticResource PrimaryDimBrush}">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -107,25 +108,96 @@
                         Command="{Binding RescanNowCommand}"
                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                         <TextBlock Text="Rescan Now"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource SecondaryButton}" Command="{Binding OpenWatchFolderCommand}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
-                        <TextBlock Text="Open Folder"/>
                     </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
 
+        <!-- ======= Watch Folder configuration: the ONE place it is managed =======
+             Path + monitoring switches live here only; Settings has no Watch
+             Folder state left, so there is a single saved path and a single
+             monitoring state. Saving a new path never moves media and never
+             erases catalog or import records. -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="18,16" Margin="0,16,0,0">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}"
+                               Foreground="{StaticResource PrimaryBrush}" Margin="0,0,9,0"/>
+                    <TextBlock Text="Watch Folder" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource StatusChip}" Margin="12,0,0,0" VerticalAlignment="Center"
+                            Background="{StaticResource PrimaryDimBrush}"
+                            Visibility="{Binding HasWatchFolderChanges, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Unsaved changes" FontSize="11.5" FontWeight="SemiBold"/>
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="DigitalCenter monitors exactly one Watch Folder, and this workspace is the only place it is configured. It must be an existing folder outside both library roots."
+                           Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding WatchFolderPath, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="Watch Folder path"
+                             ToolTip="Absolute path of the single default Watch Folder"/>
+                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            Command="{Binding BrowseWatchFolderCommand}" ToolTip="Browse for the Watch Folder">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Browse…"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                            Command="{Binding OpenWatchFolderCommand}" ToolTip="Open the saved Watch Folder in Windows Explorer">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Open in Explorer"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding SaveWatchFolderCommand}"
+                            IsEnabled="{Binding HasWatchFolderChanges}"
+                            AutomationProperties.Name="Save Watch Folder"
+                            ToolTip="Save the path and the monitoring switches">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
+                            <TextBlock Text="Save Watch Folder"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <WrapPanel Margin="0,14,0,0">
+                    <CheckBox Content="Start monitoring with the application" IsChecked="{Binding WatchFolderEnabled}"
+                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
+                    <CheckBox Content="Scan on startup" IsChecked="{Binding ScanOnStartup}"
+                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
+                    <CheckBox Content="Include subfolders" IsChecked="{Binding IncludeSubfolders}"
+                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="File-stability delay (seconds)" Style="{StaticResource CaptionText}"
+                                   VerticalAlignment="Center" Margin="0,0,9,0"/>
+                        <TextBox Text="{Binding StabilityDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="72"
+                                 AutomationProperties.Name="File-stability delay in seconds"/>
+                    </StackPanel>
+                    <Button Style="{StaticResource GhostButton}" Margin="18,0,0,6"
+                            Command="{Binding DiscardWatchFolderChangesCommand}"
+                            IsEnabled="{Binding HasWatchFolderChanges}">
+                        <TextBlock Text="Discard changes"/>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
         <!-- ============ Statistics ============ -->
-        <UniformGrid Grid.Row="1" Rows="1" Columns="6" Margin="0,18,0,0">
+        <UniformGrid Grid.Row="2" Rows="1" Columns="6" Margin="0,16,0,0">
             <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Total detected" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -135,7 +207,7 @@
             <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Check}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.Check}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource OkBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Imported" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -146,7 +218,7 @@
             <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Awaiting destination" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -157,7 +229,7 @@
             <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="No match" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -168,7 +240,7 @@
             <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Skipped" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -178,7 +250,7 @@
             <Border Style="{StaticResource StatCard}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphSmall}" FontSize="12"
+                        <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphXs}"
                                    Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Failed" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -188,11 +260,11 @@
             </Border>
         </UniformGrid>
 
-        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="4,12,0,2"
+        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="4,12,0,2"
                    TextTrimming="CharacterEllipsis"/>
 
         <!-- ============ Activity list + file preview ============ -->
-        <Grid Grid.Row="3" Margin="0,8,0,0">
+        <Grid Grid.Row="4" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="7*"/>
                 <ColumnDefinition Width="14"/>
@@ -208,7 +280,7 @@
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" Padding="18,14,18,10">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphIcon}" FontSize="16"
+                            <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphIcon}"
                                        Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
                             <TextBlock Text="Recent Activity" Style="{StaticResource SectionTitle}" Margin="10,0,0,0"
                                        VerticalAlignment="Center"/>
@@ -267,7 +339,7 @@
                                         <TextBlock Text="{Binding MatchSummary}" Style="{StaticResource SubText}" FontSize="11.5"
                                                    Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
-                                    <Border Grid.Column="2" Style="{StaticResource RowStatusPill}">
+                                    <Border Grid.Column="2" Style="{StaticResource RowStatusChip}">
                                         <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
                                                    Foreground="{Binding StatusKey, Converter={StaticResource StatusBrush}}"/>
                                     </Border>
@@ -284,7 +356,7 @@
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="260"
                                 Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisInverted}}">
                         <Border Style="{StaticResource EmptyMedallion}">
-                            <TextBlock Text="{StaticResource Icon.OpenFile}" Style="{StaticResource GlyphLarge}" FontSize="26"
+                            <TextBlock Text="{StaticResource Icon.OpenFile}" Style="{StaticResource GlyphLarge}"
                                        Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Select an activity row to preview the file."
@@ -301,10 +373,10 @@
                             <TextBlock Text="{Binding PreviewSourcePath}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                                        TextWrapping="Wrap"/>
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <Border Style="{StaticResource StatusPill}" Padding="9,3">
+                                <Border Style="{StaticResource StatusChip}" Padding="9,3">
                                     <TextBlock Text="{Binding PreviewSizeText}" FontSize="11" FontWeight="SemiBold"/>
                                 </Border>
-                                <Border Style="{StaticResource StatusPill}" Padding="9,3" Margin="7,0,0,0">
+                                <Border Style="{StaticResource StatusChip}" Padding="9,3" Margin="7,0,0,0">
                                     <TextBlock Text="{Binding PreviewTypeText}" FontSize="11" FontWeight="SemiBold"/>
                                 </Border>
                             </StackPanel>
@@ -329,7 +401,7 @@
                                 <Button Command="{Binding ConfirmMoveCommand}" HorizontalAlignment="Stretch"
                                         IsEnabled="{Binding CanConfirmSelected}">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" FontSize="13" Margin="0,0,9,0"/>
+                                        <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
                                         <TextBlock Text="Move to Library"/>
                                     </StackPanel>
                                 </Button>
@@ -343,7 +415,7 @@
                                             Command="{Binding ChooseDestinationCommand}"
                                             IsEnabled="{Binding CanChooseDestination}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Choose Destination…"/>
                                         </StackPanel>
                                     </Button>
@@ -351,7 +423,7 @@
                                             Command="{Binding SkipFileCommand}"
                                             IsEnabled="{Binding CanSkipSelected}">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                                             <TextBlock Text="Skip File"/>
                                         </StackPanel>
                                     </Button>
