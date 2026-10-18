@@ -88,11 +88,14 @@ public partial class LibraryViewModel : ObservableObject
     [ObservableProperty]
     public partial string SearchText { get; set; }
 
+    // Initialized here (not in the constructor) so the combos start on their
+    // "all" entry instead of showing an empty selection, and so no change
+    // callback fires while the view model is still being built.
     [ObservableProperty]
-    public partial string SelectedYear { get; set; }
+    public partial string SelectedYear { get; set; } = "All years";
 
     [ObservableProperty]
-    public partial string SelectedLanguage { get; set; }
+    public partial string SelectedLanguage { get; set; } = "All languages";
 
     [ObservableProperty]
     public partial int SortIndex { get; set; }
@@ -174,7 +177,7 @@ public partial class LibraryViewModel : ObservableObject
         try
         {
             await Task.Delay(350, ct);
-            await RefreshCoreAsync();
+            await RefreshSafeAsync();
         }
         catch (OperationCanceledException)
         {
@@ -182,17 +185,42 @@ public partial class LibraryViewModel : ObservableObject
         }
     }
 
+    private bool _refreshRunning;
+    private bool _refreshQueued;
+
+    /// <summary>
+    /// The single entry point for a library reload. Overlapping reloads are
+    /// coalesced instead of running at the same time: two passes clearing and
+    /// refilling <see cref="Items"/> concurrently is what produced doubled rows,
+    /// a lost selection and duplicated year/language filter entries.
+    /// </summary>
     public async Task RefreshSafeAsync()
     {
+        if (_refreshRunning)
+        {
+            _refreshQueued = true;
+            return;
+        }
+
+        _refreshRunning = true;
         try
         {
-            LoadError = string.Empty;
-            await RefreshCoreAsync();
+            do
+            {
+                _refreshQueued = false;
+                LoadError = string.Empty;
+                await RefreshCoreAsync();
+            }
+            while (_refreshQueued);
         }
         catch (Exception ex)
         {
             _logger.Error("Loading the library failed.", ex);
             LoadError = ex.Message;
+        }
+        finally
+        {
+            _refreshRunning = false;
         }
     }
 
@@ -244,22 +272,59 @@ public partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>The category the year/language options were loaded for.</summary>
+    private MediaKind? _optionsKind;
+
+    private bool _optionsLoaded;
+
+    /// <summary>
+    /// Fills the year and language filters for the CURRENT category. They used
+    /// to be loaded once and then never again, so switching between Movies and
+    /// Series kept offering the other category's years and languages (stale
+    /// filter options that could only produce an empty grid).
+    /// </summary>
     private async Task EnsureFilterOptionsAsync()
     {
-        if (YearOptions.Count == 1 && LanguageOptions.Count == 1)
+        var kind = KindOrNull();
+        if (_optionsLoaded && _optionsKind == kind)
         {
-            var years = await _queryService.GetDistinctYearsAsync(KindOrNull());
-            var languages = await _queryService.GetDistinctLanguagesAsync(KindOrNull());
+            return;
+        }
 
-            foreach (var year in years)
-            {
-                YearOptions.Add(year.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            }
+        var years = await _queryService.GetDistinctYearsAsync(kind);
+        var languages = await _queryService.GetDistinctLanguagesAsync(kind);
 
-            foreach (var language in languages)
-            {
-                LanguageOptions.Add(language);
-            }
+        var selectedYear = SelectedYear;
+        var selectedLanguage = SelectedLanguage;
+
+        YearOptions.Clear();
+        YearOptions.Add("All years");
+        foreach (var year in years)
+        {
+            YearOptions.Add(year.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        LanguageOptions.Clear();
+        LanguageOptions.Add("All languages");
+        foreach (var language in languages)
+        {
+            LanguageOptions.Add(language);
+        }
+
+        _optionsKind = kind;
+        _optionsLoaded = true;
+
+        // A selection that the new category does not have falls back to "all"
+        // instead of leaving the combo empty (which would silently filter
+        // everything away).
+        if (selectedYear is null || !YearOptions.Contains(selectedYear))
+        {
+            SelectedYear = "All years";
+        }
+
+        if (selectedLanguage is null || !LanguageOptions.Contains(selectedLanguage))
+        {
+            SelectedLanguage = "All languages";
         }
     }
 

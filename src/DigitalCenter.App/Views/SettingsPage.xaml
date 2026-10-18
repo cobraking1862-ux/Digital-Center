@@ -16,7 +16,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Margin="26,20,26,20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -28,11 +28,17 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="Configuration" Style="{StaticResource EyebrowText}"/>
-                <TextBlock Text="Settings" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/>
-                <TextBlock Text="Application preferences: library roots, metadata and artwork, file operations, USB copying and naming. The Watch Folder is managed in the Management workspace."
-                           Style="{StaticResource SubText}" Margin="0,5,0,0"/>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Border Style="{StaticResource IconTile}">
+                    <TextBlock Text="{StaticResource Icon.Settings}" Style="{StaticResource GlyphMedium}"
+                               Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
+                    <TextBlock Text="Configuration" Style="{StaticResource EyebrowText}"/>
+                    <TextBlock Text="Settings" Style="{StaticResource PageTitle}" Margin="0,4,0,0"/>
+                    <TextBlock Text="Application preferences: library roots, metadata and artwork, file operations, USB copying and naming. The Watch Folder is managed in the Management workspace."
+                               Style="{StaticResource SubText}" Margin="0,5,0,0" MaxWidth="720" TextWrapping="Wrap"/>
+                </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
@@ -240,21 +246,17 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Matching policy stays here (it is a metadata rule);
-                             the Watch Folder path and its monitoring live in Management. -->
+                        <!-- The confidence threshold is a fixed safeguard now:
+                             SettingsService validates it (0.30-0.95) and
+                             MetadataMatcher applies it, but it is no longer an
+                             editable slider on this screen. -->
                         <Border Style="{StaticResource CardBorder}" Margin="0,16,0,0">
                             <StackPanel>
                                 <TextBlock Text="Automatic matching" Style="{StaticResource SectionTitle}"/>
-                                <TextBlock Text="Minimum match confidence" Style="{StaticResource FieldLabel}"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <Slider Minimum="0.30" Maximum="0.95" Value="{Binding MinimumMatchConfidence}"
-                                            Width="240" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding MinimumMatchConfidence, StringFormat={}{0:P0}}"
-                                               Style="{StaticResource SubText}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                               FontWeight="SemiBold" MinWidth="44"/>
-                                </StackPanel>
-                                <TextBlock Text="Candidates below this score are marked “No Match”; the file stays in place. The Watch Folder itself — its path and the monitoring switches — is managed in the Management workspace."
-                                           Style="{StaticResource CaptionText}" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="Files found in the Watch Folder are matched against TMDb automatically. A candidate has to reach the configured confidence threshold before it is offered for import; anything weaker is reported as “No Match” and the file stays exactly where it is."
+                                           Style="{StaticResource SubText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="The Watch Folder itself — its path, the file-stability delay and the monitoring controls — is managed in the Management workspace."
+                                           Style="{StaticResource CaptionText}" Margin="0,10,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

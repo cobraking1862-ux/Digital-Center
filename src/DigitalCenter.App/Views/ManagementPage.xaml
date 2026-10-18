@@ -14,6 +14,14 @@
              Neutral). Based on the shared StatusChip so long statuses such as
              "Awaiting destination" keep a rectangular background instead of the
              oval a 999 px radius produced. -->
+        <!-- One metric inside the consolidated Import Summary card: a hairline
+             separates the columns without turning them into six separate cards. -->
+        <Style x:Key="SummaryMetric" TargetType="Border">
+            <Setter Property="Padding" Value="16,0,0,0"/>
+            <Setter Property="BorderThickness" Value="1,0,0,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
+        </Style>
+
         <Style x:Key="RowStatusChip" TargetType="Border" BasedOn="{StaticResource StatusChip}">
             <Setter Property="Background" Value="#1FFFFFFF"/>
             <Setter Property="Padding" Value="10,3"/>
@@ -22,7 +30,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="26,20,26,20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -75,6 +83,15 @@
                         <TextBlock Text="{Binding MonitorStatusText}" FontSize="12" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Border>
+                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                        Command="{Binding OpenWatchFolderCommand}"
+                        AutomationProperties.Name="Open Folder"
+                        ToolTip="Open the saved Watch Folder in Windows Explorer">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
+                        <TextBlock Text="Open Folder"/>
+                    </StackPanel>
+                </Button>
                 <Button x:Name="StartStopButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                         Click="OnToggleMonitoringClick" ToolTip="Start or stop Watch Folder monitoring">
                     <StackPanel Orientation="Horizontal">
@@ -116,11 +133,13 @@
         </Grid>
 
         <!-- ======= Watch Folder configuration: the ONE place it is managed =======
-             Path + monitoring switches live here only; Settings has no Watch
-             Folder state left, so there is a single saved path and a single
-             monitoring state. Saving a new path never moves media and never
-             erases catalog or import records. -->
-        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="18,16" Margin="0,16,0,0">
+             Deliberately small: the path, Browse…, Save Watch Folder and the
+             file-stability delay. The three monitoring switches are not
+             surfaced any more (their saved values keep working and are written
+             back unchanged), and the folder is opened from the single
+             "Open Folder" button in the header above. Saving a new path never
+             moves media and never erases catalog or import records. -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,16,0,0">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}"
@@ -140,7 +159,6 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox Text="{Binding WatchFolderPath, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Watch Folder path"
@@ -152,17 +170,10 @@
                             <TextBlock Text="Browse…"/>
                         </StackPanel>
                     </Button>
-                    <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                            Command="{Binding OpenWatchFolderCommand}" ToolTip="Open the saved Watch Folder in Windows Explorer">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                            <TextBlock Text="Open in Explorer"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding SaveWatchFolderCommand}"
+                    <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding SaveWatchFolderCommand}"
                             IsEnabled="{Binding HasWatchFolderChanges}"
                             AutomationProperties.Name="Save Watch Folder"
-                            ToolTip="Save the path and the monitoring switches">
+                            ToolTip="Save the Watch Folder path. Nothing is moved and no record is deleted.">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
                             <TextBlock Text="Save Watch Folder"/>
@@ -170,95 +181,76 @@
                     </Button>
                 </Grid>
 
-                <WrapPanel Margin="0,14,0,0">
-                    <CheckBox Content="Start monitoring with the application" IsChecked="{Binding WatchFolderEnabled}"
-                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
-                    <CheckBox Content="Scan on startup" IsChecked="{Binding ScanOnStartup}"
-                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
-                    <CheckBox Content="Include subfolders" IsChecked="{Binding IncludeSubfolders}"
-                              Style="{StaticResource ToggleSwitch}" Margin="0,0,26,6"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                        <TextBlock Text="File-stability delay (seconds)" Style="{StaticResource CaptionText}"
-                                   VerticalAlignment="Center" Margin="0,0,9,0"/>
-                        <TextBox Text="{Binding StabilityDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="72"
-                                 AutomationProperties.Name="File-stability delay in seconds"/>
-                    </StackPanel>
-                    <Button Style="{StaticResource GhostButton}" Margin="18,0,0,6"
-                            Command="{Binding DiscardWatchFolderChangesCommand}"
-                            IsEnabled="{Binding HasWatchFolderChanges}">
-                        <TextBlock Text="Discard changes"/>
-                    </Button>
-                </WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                    <TextBlock Text="File-stability delay (seconds)" Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Center" Margin="0,0,9,0"/>
+                    <TextBox Text="{Binding StabilityDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="72"
+                             VerticalContentAlignment="Center"
+                             AutomationProperties.Name="File-stability delay in seconds"
+                             ToolTip="A file must keep its size for this many seconds before it is picked up"/>
+                    <TextBlock Text="A new file is only picked up once its size stops changing, so files still being copied are never imported half-finished."
+                               Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="16,0,0,0"
+                               Foreground="{StaticResource FaintTextBrush}"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 
-        <!-- ============ Statistics ============ -->
-        <UniformGrid Grid.Row="2" Rows="1" Columns="6" Margin="0,16,0,0">
-            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Total detected" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding TotalCount}" Style="{StaticResource StatValue}" Margin="0,8,0,0"/>
+        <!-- ====== Import summary: ONE consolidated card (six metrics) ====== -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="{StaticResource CardPaddingCompact}" Margin="0,16,0,0">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphSmall}"
+                               Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Import Summary" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ImportSummary}" Style="{StaticResource CaptionText}" Margin="14,0,0,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
-            </Border>
-            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Check}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource OkBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Imported" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding ImportedCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource OkBrush}"
-                               Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Awaiting destination" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding AwaitingCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource PrimaryBrush}"
-                               Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Search}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="No match" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding NoMatchCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource WarnBrush}"
-                               Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource StatCard}" Margin="0,0,12,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource SubTextBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Skipped" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding SkippedCount}" Style="{StaticResource StatValue}" Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-            <Border Style="{StaticResource StatCard}">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center"/>
-                        <TextBlock Text="Failed" Style="{StaticResource CaptionText}" Margin="7,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding FailedCount}" Style="{StaticResource StatValue}" Foreground="{StaticResource DangerBrush}"
-                               Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
-        </UniformGrid>
+                <UniformGrid Rows="1" Columns="6" Margin="0,14,0,0">
+                    <Border Style="{StaticResource SummaryMetric}" BorderThickness="0" Padding="0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TotalCount}" Style="{StaticResource StatValue}"/>
+                            <TextBlock Text="Total Detected" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SummaryMetric}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding ImportedCount}" Style="{StaticResource StatValue}"
+                                       Foreground="{StaticResource OkBrush}"/>
+                            <TextBlock Text="Imported" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SummaryMetric}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding AwaitingCount}" Style="{StaticResource StatValue}"
+                                       Foreground="{StaticResource PrimaryBrush}"/>
+                            <TextBlock Text="Awaiting Destination" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SummaryMetric}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding NoMatchCount}" Style="{StaticResource StatValue}"
+                                       Foreground="{StaticResource WarnBrush}"/>
+                            <TextBlock Text="No Match" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SummaryMetric}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SkippedCount}" Style="{StaticResource StatValue}"
+                                       Foreground="{StaticResource SubTextBrush}"/>
+                            <TextBlock Text="Skipped" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource SummaryMetric}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding FailedCount}" Style="{StaticResource StatValue}"
+                                       Foreground="{StaticResource DangerBrush}"/>
+                            <TextBlock Text="Failed" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+            </StackPanel>
+        </Border>
 
         <TextBlock Grid.Row="3" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="4,12,0,2"
                    TextTrimming="CharacterEllipsis"/>
@@ -278,7 +270,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Padding="18,14,18,10">
+                    <Border Grid.Row="0" Padding="{StaticResource CardHeaderPadding}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphIcon}"
                                        Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
@@ -351,7 +343,7 @@
             </Border>
 
             <!-- File preview -->
-            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="18">
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}">
                 <Grid>
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="260"
                                 Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisInverted}}">

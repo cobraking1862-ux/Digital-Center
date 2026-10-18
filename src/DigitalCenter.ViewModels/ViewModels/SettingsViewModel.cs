@@ -56,8 +56,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string SeriesRoot { get; set; }
 
     // ---------------------------------------------------------- metadata
-    /// <summary>Auto-match threshold for the Watch Folder import (matching policy, not monitoring).</summary>
-    [ObservableProperty] public partial double MinimumMatchConfidence { get; set; }
+    // MinimumMatchConfidence is deliberately not editable here any more: the
+    // threshold is a fixed matching safeguard (validated 0.30-0.95 by
+    // SettingsService and applied by MetadataMatcher). It is read from and
+    // written back to settings.json untouched, so a value configured by an
+    // earlier version keeps working.
 
     [ObservableProperty] public partial bool DownloadPosters { get; set; }
     [ObservableProperty] public partial bool DownloadBackdrops { get; set; }
@@ -90,7 +93,6 @@ public partial class SettingsViewModel : ObservableObject
         var settings = _settingsService.Load();
         MoviesRoot = settings.MoviesRoot ?? string.Empty;
         SeriesRoot = settings.SeriesRoot ?? string.Empty;
-        MinimumMatchConfidence = settings.MinimumMatchConfidence;
         DownloadPosters = settings.DownloadPosters;
         DownloadBackdrops = settings.DownloadBackdrops;
         DownloadCastProfiles = settings.DownloadCastProfiles;
@@ -119,7 +121,6 @@ public partial class SettingsViewModel : ObservableObject
     {
         settings.MoviesRoot = NullIfEmpty(MoviesRoot);
         settings.SeriesRoot = NullIfEmpty(SeriesRoot);
-        settings.MinimumMatchConfidence = MinimumMatchConfidence;
         settings.DownloadPosters = DownloadPosters;
         settings.DownloadBackdrops = DownloadBackdrops;
         settings.DownloadCastProfiles = DownloadCastProfiles;

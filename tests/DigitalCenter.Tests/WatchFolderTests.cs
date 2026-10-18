@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DigitalCenter.Core.Models;
 using DigitalCenter.Core.Services;
 using Xunit;
@@ -131,5 +132,67 @@ public sealed class WatchFolderTests : IDisposable
     {
         var result = await _env.WatchFolder.ScanOnceAsync(Path.Combine(_env.Root, "does-not-exist"));
         Assert.Equal(0, result.FilesSeen);
+    }
+
+    /// <summary>
+    /// A pass waits for the stability window ONCE for the whole folder instead of
+    /// once per file: four new files used to keep the scan (and the dashboard
+    /// behind it) busy for four windows, which looked like a frozen rescan.
+    /// </summary>
+    [Fact]
+    public async Task SeveralNewFiles_Share_One_Stability_Window()
+    {
+        for (var i = 1; i <= 4; i++)
+        {
+            await File.WriteAllTextAsync(Path.Combine(_env.WatchDir, $"Batch.Movie.{2000 + i}.mkv"), "abc");
+        }
+
+        var previous = _env.WatchFolder.StabilityDelay;
+        _env.WatchFolder.StabilityDelay = TimeSpan.FromMilliseconds(250);
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _env.WatchFolder.ScanOnceAsync(_env.WatchDir);
+            stopwatch.Stop();
+
+            Assert.Equal(4, result.FilesSeen);
+            Assert.Equal(4, result.NewPending);
+            Assert.Equal(0, result.Unstable);
+            // Per-file waiting would need at least 4 x 250 ms = 1000 ms.
+            Assert.True(
+                stopwatch.ElapsedMilliseconds < 3 * 250,
+                $"One shared stability window expected, took {stopwatch.ElapsedMilliseconds} ms.");
+        }
+        finally
+        {
+            _env.WatchFolder.StabilityDelay = previous;
+        }
+
+        await using var db = await _env.Factory.CreateDbContextAsync();
+        Assert.Equal(4, db.MetadataImportLogs.Count());
+    }
+
+    /// <summary>
+    /// The poll loop and "Rescan Now" must never walk the folder at the same
+    /// time: two overlapping passes used to race for the same files and could
+    /// both fire metadata lookups for them. The scan gate serialises them, so
+    /// each file ends up with exactly one import log.
+    /// </summary>
+    [Fact]
+    public async Task Concurrent_Rescans_Detect_Each_File_Once()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_env.WatchDir, "Race.Movie.2021.mkv"), "abc");
+        await File.WriteAllTextAsync(Path.Combine(_env.WatchDir, "Race.Show.S01E02.mkv"), "abc");
+
+        var results = await Task.WhenAll(
+            _env.WatchFolder.RescanOnceAsync(_env.WatchDir),
+            _env.WatchFolder.RescanOnceAsync(_env.WatchDir));
+
+        Assert.Equal(2, results.Sum(r => r.NewPending));
+        Assert.Equal(2, results.Sum(r => r.AlreadyKnown));
+
+        await using var db = await _env.Factory.CreateDbContextAsync();
+        Assert.Equal(2, db.MetadataImportLogs.Count());
+        Assert.Equal(2, db.MetadataImportLogs.Select(l => l.SourcePath).Distinct().Count());
     }
 }

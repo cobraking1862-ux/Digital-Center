@@ -126,22 +126,29 @@
     <SolidColorBrush x:Key="ControlPressedBrush" Color="#2A2438"/>
 
     <!-- ===================================================== corner geometry
-         ONE scale for the whole application: every card, control, input, icon
-         container and artwork frame takes its radius from these tokens, so no
-         screen can drift into its own geometry and nothing is a pill by
-         accident. Radius.Pill is reserved for the shapes that are meant to be
-         pills (selected navigation tabs, small category chips, switch tracks,
-         progress and scrollbar thumbs, the empty-state medallion). -->
+         ONE rectangular scale for the whole application: every card, control,
+         input, tab, chip, badge, icon container and artwork frame takes its
+         radius from these tokens, so no screen can drift into its own geometry.
+         Nothing is a capsule: the old 999 px "pill" radius is gone, and the
+         largest radius in the application (Radius.Card, 10 px) is well below
+         half of the smallest control height, so no element can read as an oval
+         whatever its content is. -->
     <CornerRadius x:Key="Radius.None">0</CornerRadius>
-    <CornerRadius x:Key="Radius.Xs">3</CornerRadius>
-    <CornerRadius x:Key="Radius.Sm">6</CornerRadius>
-    <CornerRadius x:Key="Radius.Control">8</CornerRadius>
-    <CornerRadius x:Key="Radius.Tile">10</CornerRadius>
-    <CornerRadius x:Key="Radius.Art">10</CornerRadius>
-    <CornerRadius x:Key="Radius.ArtBottom">0,0,10,10</CornerRadius>
-    <CornerRadius x:Key="Radius.Card">12</CornerRadius>
-    <CornerRadius x:Key="Radius.Popup">12</CornerRadius>
-    <CornerRadius x:Key="Radius.Pill">999</CornerRadius>
+    <CornerRadius x:Key="Radius.Xs">2</CornerRadius>
+    <CornerRadius x:Key="Radius.Sm">4</CornerRadius>
+    <CornerRadius x:Key="Radius.Control">6</CornerRadius>
+    <CornerRadius x:Key="Radius.Tile">8</CornerRadius>
+    <CornerRadius x:Key="Radius.Art">8</CornerRadius>
+    <CornerRadius x:Key="Radius.ArtBottom">0,0,8,8</CornerRadius>
+    <CornerRadius x:Key="Radius.Card">10</CornerRadius>
+    <CornerRadius x:Key="Radius.Popup">10</CornerRadius>
+
+    <!-- Layout metrics: every screen uses the same outer margin and the same
+         card padding, so pages line up with each other when you switch. -->
+    <Thickness x:Key="PageMargin">28,20,28,20</Thickness>
+    <Thickness x:Key="CardPadding">20</Thickness>
+    <Thickness x:Key="CardPaddingCompact">16</Thickness>
+    <Thickness x:Key="CardHeaderPadding">20,16,20,12</Thickness>
 
     <!-- Control metrics: one height/padding scale. Buttons keep a 34 px
          minimum height with an 8 px radius, so a short label can never turn
@@ -195,6 +202,13 @@
 
     <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
         <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Title of a nested area (a settings category, the metadata editor):
+         between SectionTitle and PageTitle, and the same everywhere. -->
+    <Style x:Key="SubPageTitle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+        <Setter Property="FontSize" Value="20"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
@@ -619,8 +633,8 @@
         <Setter Property="Background" Value="#23FFFFFF"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
-        <Setter Property="Padding" Value="9,2.5"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Xs}"/>
+        <Setter Property="Padding" Value="9,3"/>
     </Style>
 
     <Style x:Key="MiniChipText" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
@@ -643,7 +657,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Pill}"
+                            CornerRadius="{StaticResource Radius.Sm}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
@@ -693,7 +707,6 @@
     </Style>
 
     <!-- Legacy key kept as an alias so existing screens do not break -->
-    <Style x:Key="StatusPill" TargetType="Border" BasedOn="{StaticResource StatusChip}"/>
 
     <Style x:Key="StatusDot" TargetType="Ellipse">
         <Setter Property="Width" Value="9"/>
@@ -719,15 +732,16 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Border x:Name="Track"
-                                Width="42" Height="22" CornerRadius="{StaticResource Radius.Pill}"
+                                Width="42" Height="22" CornerRadius="{StaticResource Radius.Sm}"
                                 Background="#33FFFFFF"
                                 BorderBrush="{StaticResource BorderHighBrush}"
                                 BorderThickness="1">
-                            <Ellipse x:Name="Knob"
-                                     Width="14" Height="14"
-                                     Fill="{StaticResource SubTextBrush}"
-                                     HorizontalAlignment="Left"
-                                     Margin="3,0,0,0"/>
+                            <Border x:Name="Knob"
+                                    Width="14" Height="14"
+                                    CornerRadius="{StaticResource Radius.Xs}"
+                                    Background="{StaticResource SubTextBrush}"
+                                    HorizontalAlignment="Left"
+                                    Margin="3,0,0,0"/>
                         </Border>
                         <ContentPresenter Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0"
                                           RecognizesAccessKey="True"/>
@@ -737,7 +751,7 @@
                             <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentGradient}"/>
                             <Setter TargetName="Track" Property="BorderBrush" Value="Transparent"/>
                             <Setter TargetName="Track" Property="Effect" Value="{StaticResource ShadowAccent}"/>
-                            <Setter TargetName="Knob" Property="Fill" Value="White"/>
+                            <Setter TargetName="Knob" Property="Background" Value="White"/>
                             <Setter TargetName="Knob" Property="Margin" Value="23,0,0,0"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -987,7 +1001,7 @@
                                 <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
-                                            <Border Height="5" CornerRadius="{StaticResource Radius.Pill}"
+                                            <Border Height="5" CornerRadius="{StaticResource Radius.Xs}"
                                                     Background="{StaticResource AccentGradientCyan}"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
@@ -997,7 +1011,7 @@
                                 <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
-                                            <Border Height="5" CornerRadius="{StaticResource Radius.Pill}"
+                                            <Border Height="5" CornerRadius="{StaticResource Radius.Xs}"
                                                     Background="#26FFFFFF"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
@@ -1007,11 +1021,12 @@
                                 <Thumb Width="17" Height="17" Focusable="False">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Ellipse Fill="White" Stroke="{StaticResource PrimaryBrush}" StrokeThickness="3">
-                                                <Ellipse.Effect>
+                                            <Border Width="15" Height="15" CornerRadius="{StaticResource Radius.Xs}"
+                                                    Background="White" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="3">
+                                                <Border.Effect>
                                                     <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.6" Color="#7C3AED"/>
-                                                </Ellipse.Effect>
-                                            </Ellipse>
+                                                </Border.Effect>
+                                            </Border>
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>
@@ -1031,7 +1046,7 @@
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
     </Style>
 
-    <!-- Maintenance/Reports section tabs: pill segments on a glass track -->
+    <!-- Maintenance/Reports section tabs: rectangular segments -->
     <Style TargetType="TabControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -1045,7 +1060,7 @@
                 <ControlTemplate TargetType="TabItem">
                     <Border x:Name="Chrome"
                             Background="Transparent"
-                            CornerRadius="{StaticResource Radius.Pill}"
+                            CornerRadius="{StaticResource Radius.Sm}"
                             Padding="16,7"
                             Margin="0,0,6,0">
                         <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -1085,7 +1100,7 @@
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Pill}" Margin="2.5,0"
+                                            <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Xs}" Margin="2.5,0"
                                                     Cursor="Hand"/>
                                         </ControlTemplate>
                                     </Thumb.Template>
@@ -1114,7 +1129,7 @@
                                         <Thumb>
                                             <Thumb.Template>
                                                 <ControlTemplate TargetType="Thumb">
-                                                    <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Pill}" Margin="0,2.5"
+                                                    <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Xs}" Margin="0,2.5"
                                                             Cursor="Hand"/>
                                                 </ControlTemplate>
                                             </Thumb.Template>
@@ -1171,7 +1186,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
-        <Setter Property="Padding" Value="20"/>
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
         <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
     </Style>
 
@@ -1181,7 +1196,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
-        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Padding" Value="{StaticResource CardPaddingCompact}"/>
     </Style>
 
     <!-- Floating glass panel (level 3, details/preview side rails) -->
@@ -1190,19 +1205,13 @@
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Popup}"/>
-        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Padding" Value="{StaticResource CardPaddingCompact}"/>
         <Setter Property="Effect" Value="{StaticResource ShadowPanel}"/>
     </Style>
 
     <!-- Stat tile with an icon chip and accent value -->
-    <Style x:Key="StatCard" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
-        <Setter Property="Padding" Value="16,14"/>
-        <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
-    </Style>
+    <!-- StatCard is gone: the Management dashboard now shows ONE consolidated
+         Import Summary card (CardBorder) instead of six separate tiles. -->
 
     <!-- ============================================================= posters -->
     <Style x:Key="PosterPlaceholder" TargetType="Border">
@@ -1237,11 +1246,11 @@
         <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
-    <!-- Empty-state medallion: ringed circle holding one large glyph -->
+    <!-- Empty-state medallion: ringed rounded square holding one large glyph -->
     <Style x:Key="EmptyMedallion" TargetType="Border">
         <Setter Property="Width" Value="84"/>
         <Setter Property="Height" Value="84"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Tile}"/>
         <Setter Property="Background" Value="{StaticResource PrimaryDimBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -1258,9 +1267,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid>
-                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Pill}"/>
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Xs}"/>
                         <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}"
-                                CornerRadius="{StaticResource Radius.Pill}" HorizontalAlignment="Left"/>
+                                CornerRadius="{StaticResource Radius.Xs}" HorizontalAlignment="Left"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -1288,7 +1297,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Separator">
-                    <Border Background="{TemplateBinding Background}" Height="1" CornerRadius="1"/>
+                    <Border Background="{TemplateBinding Background}" Height="1"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -1307,13 +1316,14 @@
         <Setter Property="FontSize" Value="11.5"/>
     </Style>
 
-    <!-- Segmented top navigation: radio pills inside a glass capsule track -->
-    <Style x:Key="CapsuleTrack" TargetType="Border">
+    <!-- Segmented navigation: rectangular radio segments inside a rectangular
+         glass track (renamed from CapsuleTrack — nothing is a capsule any more) -->
+    <Style x:Key="SegmentedTrack" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource InputBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Pill}"/>
-        <Setter Property="Padding" Value="5"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}"/>
+        <Setter Property="Padding" Value="4"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
 
@@ -1328,7 +1338,7 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="Chrome"
                             Background="Transparent"
-                            CornerRadius="{StaticResource Radius.Pill}"
+                            CornerRadius="{StaticResource Radius.Sm}"
                             Padding="18,8">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                           RecognizesAccessKey="True"/>
