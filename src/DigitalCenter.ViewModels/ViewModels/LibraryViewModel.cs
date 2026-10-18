@@ -9,9 +9,16 @@ using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.ViewModels;
 
-/// <summary>The four top-navigation destinations of the main library.</summary>
+/// <summary>The categories of the library screen.</summary>
 public enum LibraryTab
 {
+    /// <summary>
+    /// The Home dashboard: Movies and TV Series are loaded and shown together,
+    /// so landing on Home displays the collection without touching a category
+    /// button first.
+    /// </summary>
+    All,
+
     Movies,
     Series,
     Collections,
@@ -34,6 +41,7 @@ public partial class LibraryViewModel : ObservableObject
     private readonly LibraryQueryService _queryService;
     private readonly UsbCopyService _copyService;
     private readonly SettingsService _settingsService;
+    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly IAppLogger _logger;
 
@@ -41,12 +49,14 @@ public partial class LibraryViewModel : ObservableObject
         LibraryQueryService queryService,
         UsbCopyService copyService,
         SettingsService settingsService,
+        ActivityFeed activity,
         IDialogService dialogs,
         IAppLogger logger)
     {
         _queryService = queryService;
         _copyService = copyService;
         _settingsService = settingsService;
+        _activity = activity;
         _dialogs = dialogs;
         _logger = logger;
 
@@ -74,6 +84,12 @@ public partial class LibraryViewModel : ObservableObject
     public IReadOnlyList<string> SortOptionsSource { get; }
 
     public ObservableCollection<LibraryItemViewModel> Items { get; } = [];
+
+    /// <summary>Movies shown on the Home dashboard (newest first, capped).</summary>
+    public ObservableCollection<LibraryItemViewModel> HomeMovies { get; } = [];
+
+    /// <summary>TV Series shown on the Home dashboard (newest first, capped).</summary>
+    public ObservableCollection<LibraryItemViewModel> HomeSeries { get; } = [];
 
     public ObservableCollection<string> YearOptions { get; }
 
@@ -113,14 +129,44 @@ public partial class LibraryViewModel : ObservableObject
     public partial LibraryItemViewModel? SelectedItem { get; set; }
 
     [ObservableProperty]
+    public partial int HomeMovieTotal { get; set; }
+
+    [ObservableProperty]
+    public partial int HomeSeriesTotal { get; set; }
+
+    [ObservableProperty]
     public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
     public partial string LoadError { get; set; } = string.Empty;
 
-    public bool HasNoItems => !IsLoading && Items.Count == 0 && LoadError.Length == 0;
+    public bool HasNoItems => !IsLoading && Items.Count == 0 && !HasHomeItems && LoadError.Length == 0;
+
+    /// <summary>True on the Home dashboard (Movies + TV Series shown together).</summary>
+    public bool IsHomeTab => SelectedTab == LibraryTab.All;
+
+    public bool HasHomeMovies => HomeMovies.Count > 0;
+
+    public bool HasHomeSeries => HomeSeries.Count > 0;
+
+    public bool HasHomeItems => HomeMovies.Count > 0 || HomeSeries.Count > 0;
+
+    /// <summary>How many movies the dashboard shows out of the matching total.</summary>
+    public string HomeMovieSummary => HomeMovieTotal <= HomeMovies.Count
+        ? $"{HomeMovieTotal} title(s)"
+        : $"{HomeMovies.Count} of {HomeMovieTotal} title(s)";
+
+    public string HomeSeriesSummary => HomeSeriesTotal <= HomeSeries.Count
+        ? $"{HomeSeriesTotal} title(s)"
+        : $"{HomeSeries.Count} of {HomeSeriesTotal} title(s)";
 
     public bool IsCollectionsTab => SelectedTab == LibraryTab.Collections;
+
+    /// <summary>
+    /// The single-category poster grid is shown only off the Home dashboard and
+    /// off Collections (which have their own content).
+    /// </summary>
+    public bool IsCategoryGridVisible => !IsHomeTab && !IsCollectionsTab;
 
     public bool IsGenresTab => SelectedTab == LibraryTab.Genres;
 
@@ -142,11 +188,24 @@ public partial class LibraryViewModel : ObservableObject
             _ = LoadGenreChipsAsync();
         }
 
+        OnPropertyChanged(nameof(IsHomeTab));
         OnPropertyChanged(nameof(IsCollectionsTab));
+        OnPropertyChanged(nameof(IsCategoryGridVisible));
         OnPropertyChanged(nameof(IsGenresTab));
         OnPropertyChanged(nameof(HasGenres));
+        _activity.Publish($"Browsing {TabLabel(value)}.", ActivityKind.Navigation);
         _ = RefreshSafeAsync();
     }
+
+    /// <summary>The wording used in the activity feed for a category.</summary>
+    private static string TabLabel(LibraryTab tab) => tab switch
+    {
+        LibraryTab.Movies => "Movies",
+        LibraryTab.Series => "TV Series",
+        LibraryTab.Collections => "Collections",
+        LibraryTab.Genres => "genres",
+        _ => "the Home dashboard"
+    };
 
     partial void OnSelectedYearChanged(string value) => _ = RefreshSafeAsync();
 
@@ -156,12 +215,26 @@ public partial class LibraryViewModel : ObservableObject
 
     partial void OnSelectedGenreChanged(string? value) => _ = RefreshSafeAsync();
 
-    /// <summary>Keeps exactly one card selected and mirrors the state onto the rows.</summary>
+    /// <summary>
+    /// Keeps exactly one card selected and mirrors the state onto the rows —
+    /// including the two Home dashboard sections, whose cards are separate
+    /// instances of the same titles.
+    /// </summary>
     partial void OnSelectedItemChanged(LibraryItemViewModel? value)
     {
         foreach (var item in Items)
         {
             item.IsSelected = ReferenceEquals(item, value);
+        }
+
+        foreach (var item in HomeMovies)
+        {
+            item.IsSelected = value is not null && item.Id == value.Id;
+        }
+
+        foreach (var item in HomeSeries)
+        {
+            item.IsSelected = value is not null && item.Id == value.Id;
         }
     }
 
@@ -177,6 +250,10 @@ public partial class LibraryViewModel : ObservableObject
         try
         {
             await Task.Delay(350, ct);
+            var term = SearchText?.Trim();
+            _activity.Publish(
+                term is { Length: > 0 } ? $"Searching the library for “{term}”." : "Search cleared.",
+                ActivityKind.Navigation);
             await RefreshSafeAsync();
         }
         catch (OperationCanceledException)
@@ -217,6 +294,7 @@ public partial class LibraryViewModel : ObservableObject
         {
             _logger.Error("Loading the library failed.", ex);
             LoadError = ex.Message;
+            _activity.Publish($"Loading the library failed: {ex.Message}", ActivityKind.Error);
         }
         finally
         {
@@ -233,14 +311,33 @@ public partial class LibraryViewModel : ObservableObject
         SetGenreChips(genres);
     }
 
+    /// <summary>How many titles each Home dashboard section shows.</summary>
+    private const int HomeSectionSize = 12;
+
     private async Task RefreshCoreAsync()
     {
         if (IsCollectionsTab)
         {
             Items.Clear();
+            HomeMovies.Clear();
+            HomeSeries.Clear();
             TotalMatchesText = string.Empty;
+            RaiseHomeState();
             return; // The view shows the collections notice; no grid content.
         }
+
+        if (IsHomeTab)
+        {
+            // The dashboard loads BOTH categories in one go: landing on Home
+            // shows Movies and TV Series immediately, no category click needed.
+            Items.Clear();
+            await LoadHomeSectionsAsync();
+            return;
+        }
+
+        HomeMovies.Clear();
+        HomeSeries.Clear();
+        RaiseHomeState();
 
         var filter = BuildFilter();
         IsLoading = true;
@@ -283,6 +380,73 @@ public partial class LibraryViewModel : ObservableObject
     /// Series kept offering the other category's years and languages (stale
     /// filter options that could only produce an empty grid).
     /// </summary>
+    /// <summary>
+    /// Fills the two Home dashboard sections with the current search/filter/sort
+    /// applied to each category, newest first, capped at
+    /// <see cref="HomeSectionSize"/> so the dashboard stays scannable (each
+    /// section header offers "Show all").
+    /// </summary>
+    private async Task LoadHomeSectionsAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            var filter = BuildFilter() with { SortBy = "Created", SortDescending = true, MaxResults = HomeSectionSize };
+            var moviesTask = _queryService.QueryAsync(filter with { Type = MediaKind.Movie });
+            var seriesTask = _queryService.QueryAsync(filter with { Type = MediaKind.Series });
+            await Task.WhenAll(moviesTask, seriesTask);
+
+            var movies = moviesTask.Result;
+            var series = seriesTask.Result;
+
+            // Keep the current selection across the rebuild (by title id).
+            var selectedId = SelectedItem?.Id;
+
+            Fill(HomeMovies, movies.Items);
+            Fill(HomeSeries, series.Items);
+
+            HomeMovieTotal = movies.TotalMatches;
+            HomeSeriesTotal = series.TotalMatches;
+            OnPropertyChanged(nameof(HomeMovieSummary));
+            OnPropertyChanged(nameof(HomeSeriesSummary));
+
+            TotalMatchesText = $"{movies.TotalMatches} movie(s) · {series.TotalMatches} series";
+
+            SelectedItem = selectedId is { } id
+                ? HomeMovies.FirstOrDefault(item => item.Id == id) ?? HomeSeries.FirstOrDefault(item => item.Id == id)
+                : null;
+
+            RaiseHomeState();
+            await EnsureFilterOptionsAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static void Fill(ObservableCollection<LibraryItemViewModel> target, IEnumerable<LibraryPageItem> rows)
+    {
+        target.Clear();
+        foreach (var row in rows)
+        {
+            target.Add(new LibraryItemViewModel(row));
+        }
+    }
+
+    private void RaiseHomeState()
+    {
+        OnPropertyChanged(nameof(HasHomeMovies));
+        OnPropertyChanged(nameof(HasHomeSeries));
+        OnPropertyChanged(nameof(HasHomeItems));
+        OnPropertyChanged(nameof(HasNoItems));
+    }
+
+    /// <summary>Shows every movie / series (leaves the dashboard for that category).</summary>
+    public void ShowAllMovies() => SelectedTab = LibraryTab.Movies;
+
+    public void ShowAllSeries() => SelectedTab = LibraryTab.Series;
+
     private async Task EnsureFilterOptionsAsync()
     {
         var kind = KindOrNull();
@@ -410,11 +574,18 @@ public partial class LibraryViewModel : ObservableObject
                     ? $"'{item.Title}' is already in the USB cart."
                     : $"'{item.Title}' has no registered files to copy.";
 
+            _activity.Publish(
+                result.Queued > 0
+                    ? $"{item.TypeDisplay} “{item.Title}” added to the cart successfully ({result.Queued} file(s))."
+                    : StatusText,
+                result.Queued > 0 ? ActivityKind.Cart : ActivityKind.Warning);
+
             CartChanged?.Invoke();
         }
         catch (Exception ex)
         {
             _logger.Error("Adding a title to the USB cart failed.", ex);
+            _activity.Publish($"Adding “{item.Title}” to the cart failed: {ex.Message}", ActivityKind.Error);
             _dialogs.Error("USB Cart", $"The title could not be added to the cart: {ex.Message}");
         }
     }

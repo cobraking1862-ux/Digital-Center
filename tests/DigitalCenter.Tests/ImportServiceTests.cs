@@ -427,4 +427,33 @@ public sealed class ImportServiceTests : IDisposable
         Assert.Equal(ImportStatuses.Imported, recovered.Status);
         Assert.Single(await verify.MediaFiles.ToListAsync());
     }
+
+    // ---------- consolidated activity reporting (sidebar feed) ----------
+
+    [Fact]
+    public async Task Automatic_Matching_Reports_Its_Batch()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_env.WatchDir, "Reported.Movie.2005.mkv"), "abc");
+        await _env.WatchFolder.ScanOnceAsync(_env.WatchDir);
+
+        var reported = new List<string>();
+        _env.Imports.ActivityReported += message => reported.Add(message);
+
+        await _env.Imports.MatchPendingAsync();
+
+        Assert.Contains(reported, m => m.StartsWith("Downloading metadata for 1 pending file"));
+        Assert.Contains(reported, m => m.StartsWith("Metadata matching finished:"));
+    }
+
+    [Fact]
+    public async Task Automatic_Matching_Stays_Silent_Without_Work()
+    {
+        var reported = new List<string>();
+        _env.Imports.ActivityReported += message => reported.Add(message);
+
+        var changed = await _env.Imports.MatchPendingAsync();
+
+        Assert.Equal(0, changed);
+        Assert.Empty(reported);
+    }
 }

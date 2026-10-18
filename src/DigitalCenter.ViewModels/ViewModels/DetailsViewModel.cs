@@ -107,6 +107,7 @@ public partial class DetailsViewModel : ObservableObject
     private readonly UsbCopyService _copyService;
     private readonly IDialogService _dialogs;
     private readonly IAppLogger _logger;
+    private readonly ActivityFeed _activity;
     private readonly int _titleId;
 
     private MediaTitle? _entity;
@@ -127,9 +128,11 @@ public partial class DetailsViewModel : ObservableObject
         PosterCache posters,
         SettingsService settingsService,
         UsbCopyService copyService,
+        ActivityFeed activity,
         IDialogService dialogs,
         IAppLogger logger)
     {
+        _activity = activity;
         _titleId = titleId;
         _factory = factory;
         _tmdb = tmdb;
@@ -196,6 +199,14 @@ public partial class DetailsViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         await LoadEntityAsync();
+
+        if (_entity is not null)
+        {
+            var year = YearDisplay is { Length: > 0 } y && y != "—" ? $" ({y})" : string.Empty;
+            _activity.Publish(
+                $"Opened {(IsSeries ? "Series" : "Movie")} “{Title}”{year}.",
+                ActivityKind.Navigation);
+        }
     }
 
     private async Task LoadEntityAsync()
@@ -402,6 +413,12 @@ public partial class DetailsViewModel : ObservableObject
             : result.AlreadyQueued > 0
                 ? "Already in the USB cart."
                 : "This title has no registered files to copy.";
+
+        _activity.Publish(
+            result.Queued > 0
+                ? $"{(IsSeries ? "Series" : "Movie")} “{Title}” added to the cart successfully ({result.Queued} file(s))."
+                : StatusText,
+            result.Queued > 0 ? ActivityKind.Cart : ActivityKind.Warning);
     }
 
     [RelayCommand]
@@ -685,12 +702,14 @@ public partial class DetailsViewModel : ObservableObject
             Saved = true;
             IsEditing = false;
             StatusText = "Metadata saved.";
+            _activity.Publish($"Metadata saved for “{Title}”.", ActivityKind.Success);
             SavedChanges?.Invoke();
             await LoadEntityAsync();
         }
         catch (Exception ex)
         {
             _logger.Error("Saving metadata failed.", ex);
+            _activity.Publish($"Saving metadata for “{Title}” failed: {ex.Message}", ActivityKind.Error);
             _dialogs.Error("Edit metadata", $"The change could not be saved: {ex.Message}");
         }
     }
@@ -715,6 +734,7 @@ public partial class DetailsViewModel : ObservableObject
         }
 
         IsBusy = true;
+        _activity.Publish($"Downloading metadata for “{Title}” from TMDb …", ActivityKind.Background);
         try
         {
             var metadata = IsSeries
@@ -724,6 +744,7 @@ public partial class DetailsViewModel : ObservableObject
             if (metadata is null)
             {
                 StatusText = "TMDb returned no data for this id.";
+                _activity.Publish(StatusText, ActivityKind.Warning);
                 return;
             }
 
@@ -762,6 +783,7 @@ public partial class DetailsViewModel : ObservableObject
             StatusText = skipped.Count > 0
                 ? $"Metadata refreshed; your manual edits were kept ({string.Join(", ", skipped)})."
                 : "Metadata refreshed from TMDb.";
+            _activity.Publish(StatusText, ActivityKind.Success);
             Saved = true;
             SavedChanges?.Invoke();
             await LoadEntityAsync();
@@ -769,10 +791,12 @@ public partial class DetailsViewModel : ObservableObject
         catch (Exception ex) when (ex is TmdbRequestException or TmdbNotConfiguredException)
         {
             StatusText = $"The TMDb refresh failed: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Warning);
         }
         catch (Exception ex)
         {
             _logger.Error("TMDb refresh failed.", ex);
+            _activity.Publish($"Refreshing “{Title}” from TMDb failed: {ex.Message}", ActivityKind.Error);
             StatusText = $"The TMDb refresh failed: {ex.Message}";
         }
         finally

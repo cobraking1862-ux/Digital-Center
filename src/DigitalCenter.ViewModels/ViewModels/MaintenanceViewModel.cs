@@ -65,6 +65,7 @@ public sealed class DuplicateGroupRow
 
 public partial class MaintenanceViewModel : ObservableObject
 {
+    private readonly ActivityFeed _activity;
     private readonly AppPaths _paths;
     private readonly SettingsService _settingsService;
     private readonly LibraryScanner _scanner;
@@ -80,10 +81,12 @@ public partial class MaintenanceViewModel : ObservableObject
         LibraryScanner scanner,
         BackupService backupService,
         MaintenanceService maintenance,
+        ActivityFeed activity,
         IDialogService dialogs,
         IAppLogger logger,
         IAppControl appControl)
     {
+        _activity = activity;
         _paths = paths;
         _settingsService = settingsService;
         _scanner = scanner;
@@ -127,9 +130,33 @@ public partial class MaintenanceViewModel : ObservableObject
 
     public bool HasDuplicates => Duplicates.Count > 0;
 
-    partial void OnScanSummaryChanged(string value) => OnPropertyChanged(nameof(HasScanSummary));
+    partial void OnScanSummaryChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasScanSummary));
+        Publish(value, ActivityKind.Success);
+    }
 
-    partial void OnReportSummaryChanged(string value) => OnPropertyChanged(nameof(HasReportSummary));
+    partial void OnReportSummaryChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasReportSummary));
+        Publish(value, ActivityKind.Success);
+    }
+
+    /// <summary>
+    /// Reports a result in the consolidated activity feed (first line only — the
+    /// full text stays on the screen where it belongs).
+    /// </summary>
+    private void Publish(string value, ActivityKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var firstLine = value.Split('
+')[0].Trim().TrimEnd('·', '—', ':', ' ');
+        _activity.Publish(firstLine.Length == 0 ? value.Trim() : firstLine, kind);
+    }
 
     partial void OnIsBusyChanged(bool value)
     {
@@ -206,6 +233,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Library scan failed.", ex);
             _dialogs.Error("Scan", $"The scan failed: {ex.Message}");
+            _activity.Publish($"Library scan failed. ({ex.Message})", ActivityKind.Error);
             ProgressText = string.Empty;
         }
         finally
@@ -229,6 +257,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Backup failed.", ex);
             _dialogs.Error("Backup", $"The backup failed: {ex.Message}");
+            _activity.Publish($"Backup failed. ({ex.Message})", ActivityKind.Error);
         }
     }
 
@@ -266,6 +295,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Restore failed.", ex);
             _dialogs.Error("Restore", $"The restore failed: {ex.Message}");
+            _activity.Publish($"Restore failed. ({ex.Message})", ActivityKind.Error);
         }
     }
 
@@ -307,6 +337,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Missing-file report failed.", ex);
             _dialogs.Error("Reports", $"The missing-file report failed: {ex.Message}");
+            _activity.Publish($"Missing-file report failed. ({ex.Message})", ActivityKind.Error);
         }
         finally
         {
@@ -336,6 +367,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Duplicate report failed.", ex);
             _dialogs.Error("Reports", $"The duplicate report failed: {ex.Message}");
+            _activity.Publish($"Duplicate report failed. ({ex.Message})", ActivityKind.Error);
         }
         finally
         {
@@ -360,6 +392,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("Search index rebuild failed.", ex);
             _dialogs.Error("Search index", $"The index could not be rebuilt: {ex.Message}");
+            _activity.Publish($"Search index rebuild failed. ({ex.Message})", ActivityKind.Error);
         }
         finally
         {
@@ -398,6 +431,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("CSV export failed.", ex);
             _dialogs.Error("Export", $"The export failed: {ex.Message}");
+            _activity.Publish($"CSV export failed. ({ex.Message})", ActivityKind.Error);
         }
         finally
         {
@@ -443,6 +477,7 @@ public partial class MaintenanceViewModel : ObservableObject
         {
             _logger.Error("CSV import failed.", ex);
             _dialogs.Error("Import", $"The import failed: {ex.Message}");
+            _activity.Publish($"CSV import failed. ({ex.Message})", ActivityKind.Error);
         }
         finally
         {

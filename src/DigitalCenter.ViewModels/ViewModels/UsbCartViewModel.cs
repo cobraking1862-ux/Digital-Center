@@ -46,6 +46,7 @@ public sealed partial class CartItemViewModel : ObservableObject
 /// </summary>
 public partial class UsbCartViewModel : ObservableObject
 {
+    private readonly ActivityFeed _activity;
     private readonly UsbCopyService _copyService;
     private readonly IDbContextFactory<DigitalCenter.Core.Data.DigitalCenterDbContext> _dbFactory;
     private readonly IDriveProbe _drives;
@@ -59,10 +60,12 @@ public partial class UsbCartViewModel : ObservableObject
         IDbContextFactory<DigitalCenter.Core.Data.DigitalCenterDbContext> dbFactory,
         IDriveProbe drives,
         SettingsService settingsService,
+        ActivityFeed activity,
         IDialogService dialogs,
         IAppLogger logger,
         IUiDispatcher uiDispatcher)
     {
+        _activity = activity;
         _copyService = copyService;
         _dbFactory = dbFactory;
         _drives = drives;
@@ -306,6 +309,9 @@ public partial class UsbCartViewModel : ObservableObject
         var free = _drives.GetFreeSpace(SelectedDrive.Root);
         if (required > free)
         {
+            _activity.Publish(
+                $"USB copy blocked: {UiFormat.FormatBytes(required)} needed but only {UiFormat.FormatBytes(free)} free on '{SelectedDrive.Root}'.",
+                ActivityKind.Warning);
             _dialogs.Error("USB Cart",
                 $"Not enough space on '{SelectedDrive.Root}': {UiFormat.FormatBytes(required)} needed, {UiFormat.FormatBytes(free)} free.");
             return;
@@ -313,6 +319,14 @@ public partial class UsbCartViewModel : ObservableObject
 
         IsRunning = true;
         ResultSummaryText = string.Empty;
+        _activity.Publish(
+            $"Moving file to USB: {CartItems.Count} title(s), {UiFormat.FormatBytes(required)} → {destinationRoot}",
+            ActivityKind.FileOperation);
+
+        // The file currently reported in the activity feed, so one entry is
+        // published per file instead of one per progress report.
+        var lastReportedFile = string.Empty;
+
         // The copy service already throttles its reports; this guard keeps a
         // burst of identical reports from re-rendering the progress bar.
         var progress = new Progress<CopyProgressReport>(report =>
@@ -321,6 +335,14 @@ public partial class UsbCartViewModel : ObservableObject
             var text = report.CurrentFileName is null
                 ? report.Message
                 : $"{report.CompletedFiles + 1}/{report.TotalFiles} · {report.CurrentFileName} ({report.CurrentFilePercent:0}%)";
+
+            if (report.CurrentFileName is { Length: > 0 } name && name != lastReportedFile)
+            {
+                lastReportedFile = name;
+                _activity.Publish(
+                    $"Moving file to USB ({report.CompletedFiles + 1}/{report.TotalFiles}): {name}",
+                    ActivityKind.FileOperation);
+            }
 
             if (Math.Abs(overall - OverallPercent) < 0.05 && text == ProgressText)
             {
@@ -346,10 +368,17 @@ public partial class UsbCartViewModel : ObservableObject
             var summary = await _copyService.RunAsync(options, progress);
             ResultSummaryText = summary.ToString();
             StatusText = summary.WasCancelled ? "Copy cancelled." : "Copy finished.";
+            _activity.Publish(
+                summary.WasCancelled
+                    ? $"USB copy cancelled: {summary.Completed} copied, {summary.ReturnedToQueue} still queued."
+                    : $"USB copy finished: {summary.Completed} copied, {summary.Skipped} skipped, {summary.Failed} failed " +
+                      $"({UiFormat.FormatBytes(summary.BytesCopied)} in {summary.Duration.TotalSeconds:0.0} s).",
+                summary.Failed > 0 ? ActivityKind.Warning : ActivityKind.Success);
         }
         catch (Exception ex)
         {
             _logger.Error("USB copy run failed.", ex);
+            _activity.Publish($"USB copy failed: {ex.Message}", ActivityKind.Error);
             _dialogs.Error("USB Cart", $"The copy run failed: {ex.Message}");
             StatusText = $"Copy failed: {ex.Message}";
         }
@@ -370,6 +399,7 @@ public partial class UsbCartViewModel : ObservableObject
     {
         _copyService.Cancel();
         StatusText = "Cancelling after the current chunk…";
+        _activity.Publish("Cancelling the USB copy after the current chunk…", ActivityKind.Warning);
     }
 
     private bool CanModifyCart() => !IsRunning;
@@ -384,6 +414,10 @@ public partial class UsbCartViewModel : ObservableObject
 
         var removed = await RemoveTitleJobsAsync(item.TitleId);
         StatusText = removed > 0 ? $"'{item.TitleDisplay}' removed from the cart." : StatusText;
+        if (removed > 0)
+        {
+            _activity.Publish(StatusText, ActivityKind.Cart);
+        }
         await RefreshCartAsync();
     }
 
@@ -408,6 +442,7 @@ public partial class UsbCartViewModel : ObservableObject
         await db.SaveChangesAsync();
 
         StatusText = "Cart cleared.";
+        _activity.Publish("USB cart cleared.", ActivityKind.Cart);
         await RefreshCartAsync();
     }
 

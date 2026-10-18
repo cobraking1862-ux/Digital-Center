@@ -25,18 +25,21 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
     private readonly ITmdbMetadataProvider _tmdb;
+    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly AppPaths _paths;
 
     public SettingsViewModel(
         SettingsService settingsService,
         ITmdbMetadataProvider tmdb,
+        ActivityFeed activity,
         IDialogService dialogs,
         AppPaths paths,
         MaintenanceViewModel maintenance)
     {
         _settingsService = settingsService;
         _tmdb = tmdb;
+        _activity = activity;
         _dialogs = dialogs;
         _paths = paths;
         Maintenance = maintenance;
@@ -205,10 +208,12 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         StatusText = "Testing the TMDb connection…";
+        _activity.Publish("Testing the TMDb connection…", ActivityKind.Background);
         var reachable = await _tmdb.TestConnectionAsync();
         StatusText = reachable
             ? "TMDb connection OK."
             : "TMDb could not be reached (offline, or the token is invalid). The rest of the app keeps working.";
+        _activity.Publish(StatusText, reachable ? ActivityKind.Success : ActivityKind.Warning);
     }
 
     [RelayCommand]
@@ -219,6 +224,7 @@ public partial class SettingsViewModel : ObservableObject
         if (issues.Count > 0)
         {
             StatusText = "Settings were not saved — fix the highlighted problems first.";
+            _activity.Publish($"Settings not saved: {string.Join(" ", issues)}", ActivityKind.Warning);
             _dialogs.Error("Invalid settings", string.Join(Environment.NewLine, issues));
             return;
         }
@@ -230,10 +236,12 @@ public partial class SettingsViewModel : ObservableObject
             _settingsService.Update(ApplyTo);
             StatusText = "Settings saved. Changing paths never moves files or modifies library records. " +
                          "The Watch Folder is managed in the Management workspace.";
+            _activity.Publish("Settings saved successfully.", ActivityKind.Success);
         }
         catch (Exception ex)
         {
             StatusText = $"Settings could not be saved: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Error);
             _dialogs.Error("Settings", StatusText);
         }
     }
@@ -243,6 +251,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         LoadFromService();
         StatusText = "Changes discarded — the last saved settings are shown.";
+        _activity.Publish(StatusText, ActivityKind.System);
     }
 
     private static string? NullIfEmpty(string? text) =>
