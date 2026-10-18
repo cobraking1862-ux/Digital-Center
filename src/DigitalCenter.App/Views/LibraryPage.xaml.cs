@@ -23,7 +23,10 @@ public partial class LibraryPage : UserControl
     /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (ViewModel is { Items.Count: 0 } vm && !vm.IsLoading)
+        // "Nothing loaded yet" differs per tab: the Home dashboard keeps its
+        // rows in HomeMovies/HomeSeries, the category tabs in Items.
+        if (ViewModel is { IsLoading: false } vm
+            && (vm.IsHomeTab ? !vm.HasHomeItems : vm.Items.Count == 0))
         {
             _ = vm.RefreshSafeAsync();
         }
