@@ -19,8 +19,12 @@ public sealed record PersonRow(int PersonId, string Name, string Role, string? C
     public string RoleDisplay => Character is { Length: > 0 } && Role == "Actor" ? Character : Role;
 }
 
-/// <summary>One episode row inside a season block of the details screen.</summary>
-public sealed record EpisodeRow(int EpisodeId, int EpisodeNumber, string Title, string FileSummary)
+/// <summary>
+/// One episode row inside a season block of the details screen.
+/// <see cref="HasFile"/> drives the visual split between episodes that are
+/// actually on disk and episodes that are only known from metadata.
+/// </summary>
+public sealed record EpisodeRow(int EpisodeId, int EpisodeNumber, string Title, string FileSummary, bool HasFile)
 {
     public string EpisodeLabel => $"E{EpisodeNumber:00}";
 }
@@ -28,6 +32,17 @@ public sealed record EpisodeRow(int EpisodeId, int EpisodeNumber, string Title, 
 public sealed record SeasonRow(int SeasonNumber, ObservableCollection<EpisodeRow> Episodes)
 {
     public string SeasonHeaderText => $"Season {SeasonNumber:00}";
+
+    public int EpisodeCount => Episodes.Count;
+
+    public int AvailableCount => Episodes.Count(e => e.HasFile);
+
+    /// <summary>Season header summary: how much of the season is really here.</summary>
+    public string AvailabilityText => EpisodeCount == 0
+        ? "No episodes"
+        : AvailableCount == EpisodeCount
+            ? $"Complete · {EpisodeCount} episode(s)"
+            : $"{AvailableCount} of {EpisodeCount} episode(s) available";
 }
 
 public sealed record MediaFileRow(int FileId, string FilePath, string SizeText, bool Exists)
@@ -296,11 +311,16 @@ public partial class DetailsViewModel : ObservableObject
                     var size = episode.Files.Sum(f => f.FileSize);
                     var summary = episode.Files.Count switch
                     {
-                        0 => "no file",
-                        1 => $"1 file · {UiFormat.FormatBytes(size)}",
-                        _ => $"{episode.Files.Count} files · {UiFormat.FormatBytes(size)}"
+                        0 => "Not in library",
+                        1 => $"In library · 1 file · {UiFormat.FormatBytes(size)}",
+                        _ => $"In library · {episode.Files.Count} files · {UiFormat.FormatBytes(size)}"
                     };
-                    rows.Add(new EpisodeRow(episode.Id, episode.EpisodeNumber, episode.Title ?? $"Episode {episode.EpisodeNumber}", summary));
+                    rows.Add(new EpisodeRow(
+                        episode.Id,
+                        episode.EpisodeNumber,
+                        episode.Title ?? $"Episode {episode.EpisodeNumber}",
+                        summary,
+                        episode.Files.Count > 0));
 
                     // A series title itself carries no media files — they hang
                     // off its episodes. List them here too so the details screen

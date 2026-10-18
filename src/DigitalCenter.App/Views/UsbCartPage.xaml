@@ -22,7 +22,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid Margin="26,20,26,20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="18"/>
@@ -52,7 +52,7 @@
                             <TextBlock Text="USB Cart" Style="{StaticResource PageTitle}"/>
                             <Border Background="{StaticResource PrimaryDimBrush}"
                                     BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Pill}" Padding="10,3" Margin="12,4,0,0" VerticalAlignment="Center">
+                                    CornerRadius="{StaticResource Radius.Xs}" Padding="10,3" Margin="12,4,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding CartCount, StringFormat={}{0} item(s)}" FontSize="11"
                                            FontWeight="SemiBold" Foreground="{StaticResource BodySoftBrush}"/>
                             </Border>
@@ -214,7 +214,7 @@
                 <StackPanel>
 
                     <!-- USB drive -->
-                    <Border Style="{StaticResource CardBorder}" Padding="18">
+                    <Border Style="{StaticResource CardBorder}">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{StaticResource Icon.HardDrive}" Style="{StaticResource GlyphIcon}"
@@ -248,7 +248,7 @@
                     </Border>
 
                     <!-- Cart summary -->
-                    <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,14,0,0">
+                    <Border Style="{StaticResource CardBorder}" Margin="0,14,0,0">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}"
@@ -284,7 +284,7 @@
                     </Border>
 
                     <!-- Copy options -->
-                    <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,14,0,0">
+                    <Border Style="{StaticResource CardBorder}" Margin="0,14,0,0">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{StaticResource Icon.Settings}" Style="{StaticResource GlyphIcon}"
@@ -305,7 +305,7 @@
                     </Border>
 
                     <!-- Run -->
-                    <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,14,0,0">
+                    <Border Style="{StaticResource CardBorder}" Margin="0,14,0,0">
                         <StackPanel>
                             <Button Command="{Binding StartCopyCommand}" HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal">

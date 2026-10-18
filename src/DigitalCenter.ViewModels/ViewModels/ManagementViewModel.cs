@@ -130,15 +130,23 @@ public partial class ManagementViewModel : ObservableObject
     /// <summary>The saved Watch Folder path, so unsaved edits can be detected.</summary>
     private string _savedWatchFolderPath = string.Empty;
 
+    /// <summary>The saved file-stability delay, so unsaved edits can be detected.</summary>
+    private int _savedStabilityDelaySeconds = 8;
+
     partial void OnWatchFolderPathChanged(string value) => UpdateWatchFolderDirtyState();
     partial void OnWatchFolderEnabledChanged(bool value) => UpdateWatchFolderDirtyState();
     partial void OnScanOnStartupChanged(bool value) => UpdateWatchFolderDirtyState();
     partial void OnIncludeSubfoldersChanged(bool value) => UpdateWatchFolderDirtyState();
     partial void OnStabilityDelaySecondsChanged(int value) => UpdateWatchFolderDirtyState();
 
+    /// <summary>
+    /// "Save Watch Folder" is enabled as soon as anything in this card differs
+    /// from the saved configuration — the path or the stability delay.
+    /// </summary>
     private void UpdateWatchFolderDirtyState() =>
         HasWatchFolderChanges =
-            !string.Equals(WatchFolderPath.Trim(), _savedWatchFolderPath, StringComparison.OrdinalIgnoreCase);
+            !string.Equals(WatchFolderPath.Trim(), _savedWatchFolderPath, StringComparison.OrdinalIgnoreCase) ||
+            StabilityDelaySeconds != _savedStabilityDelaySeconds;
     [ObservableProperty] public partial string DestinationPreviewText { get; set; }
     [ObservableProperty] public partial string ImportSummary { get; set; }
     [ObservableProperty] public partial bool IsBusy { get; set; }
@@ -189,10 +197,47 @@ public partial class ManagementViewModel : ObservableObject
         ScanOnStartup = settings.ScanOnStartup;
         IncludeSubfolders = settings.WatchFolderIncludeSubfolders;
         StabilityDelaySeconds = Math.Clamp(settings.StabilityDelaySeconds, 2, 600);
+        _savedStabilityDelaySeconds = StabilityDelaySeconds;
         HasWatchFolderChanges = false;
     }
 
+    /// <summary>True while a dashboard refresh is running on the UI thread.</summary>
+    private bool _refreshRunning;
+
+    /// <summary>Set when another refresh was requested while one was running.</summary>
+    private bool _refreshAgain;
+
+    /// <summary>
+    /// Refreshes the dashboard, coalescing bursts. A watch-folder event, a
+    /// navigation and a finished rescan can all land within a few milliseconds;
+    /// instead of rebuilding the same rows three times (which is what made the
+    /// screen look frozen) the running pass is simply repeated once at the end.
+    /// </summary>
     public async Task RefreshAsync()
+    {
+        if (_refreshRunning)
+        {
+            _refreshAgain = true;
+            return;
+        }
+
+        _refreshRunning = true;
+        try
+        {
+            do
+            {
+                _refreshAgain = false;
+                await RefreshCoreAsync();
+            }
+            while (_refreshAgain);
+        }
+        finally
+        {
+            _refreshRunning = false;
+        }
+    }
+
+    private async Task RefreshCoreAsync()
     {
         var settings = _settingsService.Load();
         var configured = !string.IsNullOrWhiteSpace(settings.WatchFolderPath);
@@ -203,10 +248,8 @@ public partial class ManagementViewModel : ObservableObject
         MonitorStatusText = IsMonitoring
             ? $"Monitoring active{(_watchFolder.CurrentPath is { } p ? $" · {p}" : string.Empty)}"
             : !configured
-                ? "No Watch Folder configured"
-                : settings.WatchFolderEnabled
-                    ? "Monitoring stopped"
-                    : "Automatic monitoring is off";
+                ? "No Watch Folder configured — choose and save one below"
+                : "Monitoring stopped — press Start Monitoring to watch the folder now";
 
         try
         {
@@ -368,6 +411,7 @@ public partial class ManagementViewModel : ObservableObject
             });
 
             _savedWatchFolderPath = (settings.WatchFolderPath ?? string.Empty).Trim();
+            _savedStabilityDelaySeconds = stability;
             HasWatchFolderChanges = false;
 
             // Apply immediately: the single monitor follows the saved path.
@@ -392,14 +436,6 @@ public partial class ManagementViewModel : ObservableObject
             StatusText = $"The Watch Folder could not be saved: {ex.Message}";
             _dialogs.Error("Watch Folder", StatusText);
         }
-    }
-
-    /// <summary>Restores the saved Watch Folder values, discarding unsaved edits.</summary>
-    [RelayCommand]
-    private void DiscardWatchFolderChanges()
-    {
-        LoadWatchFolderSettings();
-        StatusText = "Changes discarded — the saved Watch Folder configuration is shown.";
     }
 
     [RelayCommand]
@@ -448,9 +484,16 @@ public partial class ManagementViewModel : ObservableObject
         try
         {
             _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
-            var scan = await _watchFolder.RescanConfiguredAsync();
-            StatusText = $"Rescan finished: {scan.NewPending} new file(s), {scan.AlreadyKnown} known, " +
-                         $"{scan.UnsupportedLogged} unsupported, {scan.Unstable} still being written.";
+            StatusText = $"Scanning '{settings.WatchFolderPath}' …";
+
+            // The whole pass (enumeration, stability window, TMDb matching) runs
+            // on the thread pool so the window keeps repainting while it works.
+            var scan = await Task.Run(() => _watchFolder.RescanConfiguredAsync());
+
+            StatusText = scan.NewPending == 0 && scan.Unstable == 0
+                ? $"Rescan finished: nothing new in '{settings.WatchFolderPath}' ({scan.AlreadyKnown} already known)."
+                : $"Rescan finished: {scan.NewPending} new file(s), {scan.AlreadyKnown} known, " +
+                  $"{scan.UnsupportedLogged} unsupported, {scan.Unstable} still being written.";
             await RefreshAsync();
         }
         catch (Exception ex)
@@ -521,9 +564,13 @@ public partial class ManagementViewModel : ObservableObject
         }
 
         var id = SelectedItem.Id;
+        IsBusy = true;
+        StatusText = "Importing the selected file …";
         try
         {
-            var outcome = await _imports.ConfirmImportAsync(id);
+            // The move is real file I/O (copy, hash, delete): keep it off the UI
+            // thread so the dashboard stays responsive during an import.
+            var outcome = await Task.Run(() => _imports.ConfirmImportAsync(id));
             if (outcome.Success)
             {
                 StatusText = $"Imported: {outcome.Message}";
@@ -538,6 +585,10 @@ public partial class ManagementViewModel : ObservableObject
         {
             _logger.Error("Confirming the import failed.", ex);
             StatusText = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
 
         await RefreshAsync();

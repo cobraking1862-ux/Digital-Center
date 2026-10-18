@@ -16,7 +16,7 @@
 
         <StackPanel Grid.Row="0" Margin="2,0,0,12">
             <TextBlock Text="Tools &amp; data" Style="{StaticResource EyebrowText}"/>
-            <TextBlock Text="Application" Style="{StaticResource PageTitle}" FontSize="24" Margin="0,4,0,0"/>
+            <TextBlock Text="Application" Style="{StaticResource SubPageTitle}" Margin="0,4,0,0"/>
         </StackPanel>
 
         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">

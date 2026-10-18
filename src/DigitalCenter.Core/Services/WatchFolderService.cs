@@ -42,6 +42,26 @@ public sealed class WatchFolderService : IDisposable
     private Task? _loopTask;
     private readonly Lock _lifecycleLock = new();
 
+    /// <summary>
+    /// One scan at a time. The poll loop, "Rescan Now" and the startup scan all
+    /// funnel through this gate, so the same folder is never walked twice at
+    /// once (which produced duplicate detection passes, duplicate TMDb lookups
+    /// and conflicting folder operations).
+    /// </summary>
+    private readonly SemaphoreSlim _scanGate = new(1, 1);
+
+    private DateTime _lastAutomaticMatchUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// Minimum time between two AUTOMATIC metadata-match passes. Detection runs
+    /// on every poll, but matching calls TMDb: while files sit unmatched
+    /// (typically because TMDb is unreachable) the automatic pass backs off
+    /// instead of re-requesting the same lookups every few seconds. Newly
+    /// detected files are always matched immediately, and an explicit
+    /// "Rescan Now" always matches.
+    /// </summary>
+    public TimeSpan AutomaticMatchInterval { get; set; } = TimeSpan.FromMinutes(5);
+
     public WatchFolderService(
         IDbContextFactory<DigitalCenterDbContext> factory,
         FilenameParser parser,
@@ -155,7 +175,7 @@ public sealed class WatchFolderService : IDisposable
         {
             try
             {
-                await RescanOnceAsync(watchFolder, token);
+                await AutomaticPassAsync(watchFolder, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -196,9 +216,43 @@ public sealed class WatchFolderService : IDisposable
     /// </summary>
     public async Task<WatchScanResult> RescanOnceAsync(string watchFolder, CancellationToken ct = default)
     {
-        var result = await ScanOnceAsync(watchFolder, ct);
-        await _imports.MatchPendingAsync(ct);
-        return result;
+        await _scanGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var result = await ScanOnceAsync(watchFolder, ct).ConfigureAwait(false);
+            _lastAutomaticMatchUtc = DateTime.UtcNow;
+            await _imports.MatchPendingAsync(ct).ConfigureAwait(false);
+            return result;
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// The automatic (poll-loop) pass: detection every time, metadata matching
+    /// only when something new appeared or the back-off interval has elapsed.
+    /// </summary>
+    private async Task<WatchScanResult> AutomaticPassAsync(string watchFolder, CancellationToken ct)
+    {
+        await _scanGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var result = await ScanOnceAsync(watchFolder, ct).ConfigureAwait(false);
+
+            if (result.NewPending > 0 || DateTime.UtcNow - _lastAutomaticMatchUtc >= AutomaticMatchInterval)
+            {
+                _lastAutomaticMatchUtc = DateTime.UtcNow;
+                await _imports.MatchPendingAsync(ct).ConfigureAwait(false);
+            }
+
+            return result;
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
     }
 
     public async Task<WatchScanResult> ScanOnceAsync(string watchFolder, CancellationToken ct = default)
@@ -220,6 +274,9 @@ public sealed class WatchFolderService : IDisposable
         var db = await _factory.CreateDbContextAsync(ct);
         try
         {
+            // Pass 1 walks the folder once and snapshots every new media file.
+            var candidates = new List<Candidate>();
+
             foreach (var path in Directory.EnumerateFiles(watchFolder, "*", options))
             {
                 ct.ThrowIfCancellationRequested();
@@ -272,46 +329,61 @@ public sealed class WatchFolderService : IDisposable
                     continue;
                 }
 
-                if (!await IsFileStableAsync(fullPath, ct))
+                var info = new FileInfo(fullPath);
+                candidates.Add(new Candidate(fullPath, fileName, parsed, info.Length, info.LastWriteTimeUtc));
+            }
+
+            if (candidates.Count > 0)
+            {
+                // ONE stability window for the whole pass. Waiting per file made
+                // a folder with several new files take (files x delay) before
+                // anything reached the UI, which looked like a frozen scan.
+                await Task.Delay(StabilityDelay, ct).ConfigureAwait(false);
+
+                foreach (var candidate in candidates)
                 {
-                    result = result with
+                    ct.ThrowIfCancellationRequested();
+
+                    if (!await IsUnchangedAndReadableAsync(candidate, ct).ConfigureAwait(false))
                     {
-                        Unstable = result.Unstable + 1,
-                        UnstableFiles = [.. result.UnstableFiles, fullPath]
-                    };
-                    _logger?.Info($"Watch Folder file not yet stable, will retry later: '{fileName}'.");
-                    continue;
-                }
+                        result = result with
+                        {
+                            Unstable = result.Unstable + 1,
+                            UnstableFiles = [.. result.UnstableFiles, candidate.Path]
+                        };
+                        _logger?.Info($"Watch Folder file not yet stable, will retry later: '{candidate.FileName}'.");
+                        continue;
+                    }
 
-                db.MetadataImportLogs.Add(new MetadataImportLog
-                {
-                    SourceFile = fileName,
-                    SourcePath = fullPath,
-                    Status = ImportStatuses.Pending,
-                    Stage = ImportStages.Detected,
-                    FileSize = new FileInfo(fullPath).Length,
-                    IsSeries = parsed.IsSeries,
-                    ParsedTitle = parsed.Title,
-                    ParsedYear = parsed.Year,
-                    ParsedSeason = parsed.Season,
-                    ParsedEpisode = parsed.Episode,
-                    MetadataSource = "WatchFolder",
-                    Timestamp = DateTime.UtcNow
-                });
+                    db.MetadataImportLogs.Add(new MetadataImportLog
+                    {
+                        SourceFile = candidate.FileName,
+                        SourcePath = candidate.Path,
+                        Status = ImportStatuses.Pending,
+                        Stage = ImportStages.Detected,
+                        FileSize = candidate.Size,
+                        IsSeries = candidate.Parsed.IsSeries,
+                        ParsedTitle = candidate.Parsed.Title,
+                        ParsedYear = candidate.Parsed.Year,
+                        ParsedSeason = candidate.Parsed.Season,
+                        ParsedEpisode = candidate.Parsed.Episode,
+                        MetadataSource = "WatchFolder",
+                        Timestamp = DateTime.UtcNow
+                    });
 
-                try
-                {
-                    await db.SaveChangesAsync(ct);
-                    result = result with { NewPending = result.NewPending + 1 };
-                    _logger?.Info($"Watch Folder detected new file: '{fileName}' (series={parsed.IsSeries}).");
-                }
-                catch (DbUpdateException ex)
-                {
-                    // Concurrent detection (two poll passes racing) can hit the
-                    // unique SourcePath index; that is not an error. Drop the
-                    // failed entry from the tracker and continue the pass.
-                    _logger?.Warn($"Watch Folder entry for '{fileName}' could not be added (likely already known): {ex.InnerException?.Message ?? ex.Message}");
-                    db.ChangeTracker.Clear();
+                    try
+                    {
+                        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                        result = result with { NewPending = result.NewPending + 1 };
+                        _logger?.Info($"Watch Folder detected new file: '{candidate.FileName}' (series={candidate.Parsed.IsSeries}).");
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        // The unique SourcePath index already holds this file
+                        // (an earlier pass won the race); that is not an error.
+                        _logger?.Warn($"Watch Folder entry for '{candidate.FileName}' could not be added (likely already known): {ex.InnerException?.Message ?? ex.Message}");
+                        db.ChangeTracker.Clear();
+                    }
                 }
             }
         }
@@ -328,32 +400,33 @@ public sealed class WatchFolderService : IDisposable
         return result;
     }
 
-    /// <summary>Size must stay identical across two checks and the file must be readable.</summary>
-    private async Task<bool> IsFileStableAsync(string path, CancellationToken ct)
+    /// <summary>A new media file waiting for the shared stability window.</summary>
+    private sealed record Candidate(string Path, string FileName, ParsedFileName Parsed, long Size, DateTime WrittenUtc);
+
+    /// <summary>
+    /// Stability check against the snapshot taken before the shared delay: the
+    /// size and the write time must be unchanged, the file must not be empty and
+    /// it must be readable (open, read a byte, close). A file that is still
+    /// being written is reported unstable and picked up by a later pass.
+    /// </summary>
+    private async Task<bool> IsUnchangedAndReadableAsync(Candidate candidate, CancellationToken ct)
     {
+        if (candidate.Size <= 0)
+        {
+            return false;
+        }
+
         try
         {
-            var first = new FileInfo(path);
-            if (!first.Exists || first.Length == 0)
+            var current = new FileInfo(candidate.Path);
+            if (!current.Exists || current.Length != candidate.Size || current.LastWriteTimeUtc != candidate.WrittenUtc)
             {
                 return false;
             }
 
-            var firstSize = first.Length;
-            var firstWrite = first.LastWriteTimeUtc;
-
-            await Task.Delay(StabilityDelay, ct);
-
-            var second = new FileInfo(path);
-            if (!second.Exists || second.Length != firstSize || second.LastWriteTimeUtc != firstWrite)
-            {
-                return false;
-            }
-
-            // Accessibility probe: open, read a byte, close.
-            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+            await using var stream = new FileStream(candidate.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
             var buffer = new byte[1];
-            return await stream.ReadAsync(buffer, ct) >= 0;
+            return await stream.ReadAsync(buffer, ct).ConfigureAwait(false) >= 0;
         }
         catch (OperationCanceledException)
         {

@@ -134,13 +134,17 @@ public partial class MainViewModel : ObservableObject
 
     public DetailsViewModel? Details { get; private set; }
 
-    partial void OnSelectedNavItemChanged(NavItem value)
+    partial void OnSelectedNavItemChanged(NavItem value) => ApplyNav(value);
+
+    /// <summary>Puts a destination on screen and loads it (one place only).</summary>
+    private void ApplyNav(NavItem value)
     {
         Details = null;
         CurrentPage = value.Page;
+        OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IsShowingDetails));
 
-        switch (CurrentPage)
+        switch (value.Page)
         {
             case LibraryViewModel:
                 _ = Library.RefreshSafeAsync();
@@ -151,6 +155,28 @@ public partial class MainViewModel : ObservableObject
             case ManagementViewModel:
                 _ = Management.OnNavigatedToAsync();
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Navigates to a destination from a click on the sidebar. Clicking the row
+    /// that is ALREADY selected has to work as well: while the details screen is
+    /// open the selection never changes, so the ListBox raises no
+    /// SelectionChanged and the click used to do nothing at all — the user had
+    /// to pick another destination and come back to see the library again.
+    /// </summary>
+    public void NavigateTo(NavItem item)
+    {
+        if (!ReferenceEquals(item, SelectedNavItem))
+        {
+            SelectedNavItem = item;   // raises OnSelectedNavItemChanged -> ApplyNav
+            return;
+        }
+
+        if (!ReferenceEquals(CurrentPage, item.Page))
+        {
+            // Same destination, another screen on top (the details page).
+            ApplyNav(item);
         }
     }
 
@@ -174,15 +200,39 @@ public partial class MainViewModel : ObservableObject
         _ = Details.InitializeAsync();
     }
 
+    /// <summary>
+    /// Returns from the details screen to the selected destination and reloads
+    /// it, so metadata edits, an added cart item or a completed import are
+    /// visible immediately — no extra click on another destination needed.
+    /// </summary>
     public void CloseDetails()
     {
+        if (Details is null)
+        {
+            return;
+        }
+
         Details = null;
         CurrentPage = SelectedNavItem.Page;
         OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IsShowingDetails));
+
+        switch (SelectedNavItem.Page)
+        {
+            case LibraryViewModel:
+                _ = Library.RefreshSafeAsync();
+                break;
+            case UsbCartViewModel:
+                _ = UsbCart.RefreshCartAsync();
+                break;
+            case ManagementViewModel:
+                _ = Management.RefreshAsync();
+                break;
+        }
     }
 
-    public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
+    /// <summary>Flips the navigation rail and reports the new state.</summary>
+    public bool ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
 
     /// <summary>
     /// Called once at startup for the initial screen loads. Watch Folder
@@ -192,7 +242,11 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public async Task InitializeAsync()
     {
-        _ = Library.RefreshSafeAsync();
-        await UsbCart.RefreshCartAsync();
+        // The two loads are independent, so they run together; both are awaited
+        // so the first screens are guaranteed to be filled (an empty Home grid
+        // until the user touched a filter was exactly this being skipped).
+        var library = Library.RefreshSafeAsync();
+        var cart = UsbCart.RefreshCartAsync();
+        await Task.WhenAll(library, cart);
     }
 }

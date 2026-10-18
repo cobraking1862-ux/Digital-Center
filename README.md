@@ -18,11 +18,16 @@ a TMDb token is configured.
    availability dots, details window with editable metadata and per-episode
    file overviews.
 2. **Management** — the one place the single default Watch Folder is
-   configured (path, browse, open in Explorer, start/stop monitoring, rescan,
-   file-stability delay) and where its activity is reviewed: monitoring
-   (polling + file-stability
-   checks: size must stay identical across checks and the file must be
-   readable, so half-written downloads are never imported). Every detection
+   configured and where its activity is reviewed. The workspace is deliberately
+   small: one **Open Folder** action in the header, start/stop monitoring,
+   **Rescan Now**, one **Import Summary** card (Total Detected, Imported,
+   Awaiting Destination, No Match, Skipped, Failed) and the activity list with
+   the file preview. Editing the Watch Folder itself is just the path field,
+   **Browse…**, **Save Watch Folder** and the file-stability delay. Monitoring
+   is polling + file-stability checks: the whole folder shares ONE stability
+   window per pass (size and write time must stay identical and the file must
+   be readable), so half-written downloads are never imported and a folder full
+   of new files no longer takes one delay per file. Every detection
    lands in the review list with the parsed title/year/season/episode. The
    operator sees the detected file with its parsed fields and the automatic
    TMDb match, chooses a **destination folder**, and **confirms** the import
@@ -45,8 +50,8 @@ a TMDb token is configured.
    rebuild, CSV export (RFC 4180, one row per file) and additive CSV import,
    database backup/restore with validation and safety copies.
 5. **Settings** — library roots (movies and series), metadata/artwork
-   preferences with a TMDb status indicator and connection test, the minimum
-   match confidence, file-operation defaults (clean file names, hash
+   preferences with a TMDb status indicator and connection test,
+   file-operation defaults (clean file names, hash
    verification, collision policy), USB layout and naming templates, and the
    local data folder location. The Watch Folder is deliberately **not** here:
    it is owned by Management, so there is exactly one saved path and one
@@ -63,7 +68,7 @@ a TMDb token is configured.
 | ORM              | Entity Framework Core 10 (SQLite provider)   |
 | Full-text search | SQLite FTS5 (bundled SQLite has it built in) |
 | TMDb             | Official REST API v3 via HttpClient (bearer token) |
-| Tests            | xUnit (175 test cases, all offline)          |
+| Tests            | xUnit (177 test cases, all offline)          |
 
 Note: CommunityToolkit.Mvvm is pinned to **8.4.2** — 8.4.0 source generators
 do not emit members under the .NET 10 SDK's Roslyn 5.0 compiler.
@@ -85,7 +90,7 @@ DigitalCenter.slnx
 │   ├── DigitalCenter.ViewModels/   View models (CommunityToolkit.Mvvm) + UI service interfaces
 │   └── DigitalCenter.App/          WPF application (views, DI composition root, dialogs)
 └── tests/
-    └── DigitalCenter.Tests/        Unit + integration tests (175 cases, all offline)
+    └── DigitalCenter.Tests/        Unit + integration tests (177 cases, all offline)
 ```
 
 Why three libraries: the MVVM source generator does not run inside the WPF
@@ -125,9 +130,12 @@ All application data lives under `%APPDATA%\DigitalCenter`:
 
 There is exactly **one** `settings.json` and exactly one Watch Folder. The
 Settings screen owns the library roots and the application preferences; the
-Management workspace owns `WatchFolderPath` and the monitoring switches
-(`WatchFolderEnabled`, `ScanOnStartup`, `WatchFolderIncludeSubfolders`,
-`StabilityDelaySeconds`). Both screens save through
+Management workspace owns `WatchFolderPath`, `StabilityDelaySeconds` and the
+monitoring flags (`WatchFolderEnabled`, `ScanOnStartup`,
+`WatchFolderIncludeSubfolders`). The three monitoring switches and the
+minimum-match-confidence slider are no longer surfaced in the UI — the stored
+values keep working exactly as before and are written back unchanged, so an
+existing `settings.json` stays compatible. Both screens save through
 `SettingsService.Update(load → apply → save)`, so neither can clobber the
 other's values. Validation rules: every configured path must be absolute,
 library roots must exist, and the Watch Folder must exist and must not be
@@ -237,15 +245,18 @@ Cart, Management and Settings visually identical.
 
 | Token group | Values | Used for |
 |-------------|--------|----------|
-| `Radius.Xs` / `Radius.Sm` | 3 / 6 | hairlines, small parts, **text badges and status chips** |
-| `Radius.Control` | 8 | buttons, text boxes, combo boxes, search field, nav rows |
-| `Radius.Tile` / `Radius.Art` | 10 | icon tiles and chips, posters, tooltips |
-| `Radius.Card` / `Radius.Popup` | 12 | cards, panels, stat tiles, floating panels, popups |
-| `Radius.Pill` | 999 | **reserved**: selected navigation tabs, small category chips, switch tracks, slider/scrollbar/progress thumbs, the empty-state medallion |
+| `Radius.Xs` | 2 | hairlines, counters/badges, slider · scrollbar · progress thumbs, switch knob |
+| `Radius.Sm` | 4 | tabs, segmented navigation, filter chips, episode rows, switch track |
+| `Radius.Control` | 6 | buttons, text boxes, combo boxes, search field, nav rows |
+| `Radius.Tile` / `Radius.Art` | 8 | icon tiles and chips, posters, backdrops, empty-state medallion |
+| `Radius.Card` / `Radius.Popup` | 10 | cards, panels, floating panels, popups |
 
-Pills are never used for buttons, labels or icon containers — a 999 px radius
-on a long label ("Awaiting destination") reads as a distorted oval, which is
-the bug this scale exists to prevent.
+There is **no pill radius any more** (`Radius.Pill` was removed together with
+every use of it). The largest radius in the application is 10 px, well below
+half of the smallest control height, so nothing can read as a capsule or an
+oval whatever its label is — a 999 px radius on a long label ("Awaiting
+destination") is exactly the distortion this scale exists to prevent. Only the
+small 8 px status dots stay circular; they are indicators, not containers.
 
 * **Controls vs. panels** — inputs and secondary buttons use `ControlBrush` /
   `ControlHoverBrush` / `ControlPressedBrush` and a darker, more opaque
@@ -259,6 +270,19 @@ the bug this scale exists to prevent.
   `GlyphSmall` 14, `GlyphIcon` 16, `GlyphMedium`/`NavGlyph` 20, `GlyphLarge`
   26, `GlyphHero` 34. Icon containers (`IconTile`, `IconChip`) are square with
   the tile radius.
+* **Details screen layout** — three stacked regions with no nested scrolling:
+  a fixed action bar, a fixed hero (backdrop, poster, title, overview, hero
+  actions) and one `ScrollViewer` below them holding the editor or the
+  cast / seasons / episodes / files sections. The hero never scrolls away and
+  the two regions never fight over the mouse wheel. Episodes that have local
+  files are tinted and marked; episodes that are metadata-only stay neutral.
+* **Shell navigation** — clicking a sidebar row always navigates, including the
+  row that is already selected (while the details screen is open the selection
+  does not change, so a plain `SelectionChanged` never fires). Returning from
+  the details screen reloads the destination, and library reloads are
+  coalesced: overlapping refreshes used to clear and refill the same
+  `ObservableCollection` twice, which doubled filter options and lost the
+  selection.
 * **Card activation** — `Controls/CardActivation` is the one attached
   behaviour that makes a poster card selectable: one click selects, a second
   click (or Enter/Space on the focused card) opens the details screen, and a
@@ -287,7 +311,7 @@ the bug this scale exists to prevent.
 
 ## Testing
 
-175 test cases cover the highest-risk behavior: filename parsing (movies with
+177 test cases cover the highest-risk behavior: filename parsing (movies with
 years; every supported series marker format — `S01E01`, `S01.E01`, `S01 E01`,
 `S01_E01`, `1x01`, `Season 1 Episode 1`, `E01`, folder season hints — with
 quality tags, release years and extra punctuation; ambiguous/malformed names;

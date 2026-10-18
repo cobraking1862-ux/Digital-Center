@@ -122,7 +122,7 @@
                     <TextBlock Text="DigitalCenter" Style="{StaticResource AppTitle}" Margin="11,0,0,0"
                                VerticalAlignment="Center"/>
                     <Border Background="#268B5CF6" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Pill}" Padding="8,2" Margin="11,0,0,0" VerticalAlignment="Center">
+                            CornerRadius="{StaticResource Radius.Xs}" Padding="8,3" Margin="11,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="5.0" FontSize="10.5" FontWeight="SemiBold" Foreground="#D9C9FF"/>
                     </Border>
                 </StackPanel>
@@ -202,6 +202,7 @@
                         <ListBox Grid.Row="1"
                                  ItemsSource="{Binding NavItems}"
                                  SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
+                                 PreviewMouseLeftButtonUp="OnNavRowClick"
                                  ItemContainerStyle="{StaticResource NavListBoxItem}"
                                  Background="Transparent"
                                  BorderThickness="0"
@@ -229,9 +230,9 @@
                                                    Margin="12,0,0,0"
                                                    ToolTip="{Binding Title}"
                                                    Visibility="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
-                                        <!-- Cart badge pill -->
-                                        <Border Grid.Column="2" Background="{StaticResource AccentGradient}"
-                                                CornerRadius="{StaticResource Radius.Pill}" Padding="7,1.5" VerticalAlignment="Center"
+                                        <!-- Cart badge: rectangular counter -->
+                                        <Border x:Name="CartBadge" Grid.Column="2" Background="{StaticResource AccentGradient}"
+                                                CornerRadius="{StaticResource Radius.Xs}" Padding="7,2" VerticalAlignment="Center"
                                                 Margin="8,0,2,0"
                                                 Visibility="{Binding BadgeCount, Converter={StaticResource CountToVis}}">
                                             <TextBlock Text="{Binding BadgeCount}" FontSize="10.5" FontWeight="Bold"
@@ -242,6 +243,11 @@
                                         <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                                             <Setter TargetName="IconChipHost" Property="Background" Value="{StaticResource AccentGradientSoft}"/>
                                             <Setter TargetName="IconChipHost" Property="Effect" Value="{StaticResource ShadowAccent}"/>
+                                        </DataTrigger>
+                                        <!-- Collapsed rail: only the icon fits, so the
+                                             counter hides instead of being clipped. -->
+                                        <DataTrigger Binding="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                            <Setter TargetName="CartBadge" Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>

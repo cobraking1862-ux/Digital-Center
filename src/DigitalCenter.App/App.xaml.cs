@@ -61,6 +61,12 @@ public partial class App : Application
             MainWindow = mainWindow;
             mainWindow.Show();
 
+            // Load the first screens BEFORE any maintenance work. The library
+            // grid and the cart badge must never depend on import recovery or on
+            // TMDb being reachable — waiting for that left Home empty until the
+            // user switched between Movies and Series.
+            await mainViewModel.InitializeAsync();
+
             // Complete interrupted imports in the background, then start
             // Watch Folder monitoring. Both are non-blocking for the UI.
             _ = RunStartupMaintenanceAsync(logger);
@@ -77,20 +83,49 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Background startup work. Every step has its own guard: a failed recovery
+    /// or an unreachable TMDb must not stop the steps that follow (and must
+    /// never stop the screens from loading — that already happened).
+    /// </summary>
     private async Task RunStartupMaintenanceAsync(IAppLogger logger)
     {
+        var mainViewModel = Services.GetRequiredService<MainViewModel>();
+        var importService = Services.GetRequiredService<ImportService>();
+
+        // 1. Finish imports that were interrupted by a crash or a shutdown.
         try
         {
-            var importService = Services.GetRequiredService<ImportService>();
             var report = await importService.RecoverInterruptedAsync();
             foreach (var line in report)
             {
                 logger.Info($"Recovery: {line}");
             }
 
-            // Retry automatic matching for files detected while TMDb was offline.
-            await importService.MatchPendingAsync();
+            if (report.Count > 0)
+            {
+                // Recovered rows can change the catalog: refresh what is on screen.
+                await mainViewModel.Library.RefreshSafeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error("Recovering interrupted imports failed.", ex);
+        }
 
+        // 2. Retry automatic matching for files detected while TMDb was offline.
+        try
+        {
+            await importService.MatchPendingAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.Error("Retrying automatic metadata matching failed; the files stay pending.", ex);
+        }
+
+        // 3. Start the single Watch Folder monitor — the only startup path for it.
+        try
+        {
             var settings = Services.GetRequiredService<SettingsService>().Load();
             _watchFolder = Services.GetRequiredService<WatchFolderService>();
             _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
@@ -102,15 +137,10 @@ public partial class App : Application
             {
                 logger.Info("Watch Folder monitoring not started (disabled or not configured in Management).");
             }
-
-            // Initial screen loads (library grid + the cart badge in the
-            // sidebar). Monitoring is started above and only above, so the
-            // Watch Folder has exactly one startup path.
-            await Services.GetRequiredService<MainViewModel>().InitializeAsync();
         }
         catch (Exception ex)
         {
-            logger.Error("Startup maintenance (import recovery / watch folder) failed.", ex);
+            logger.Error("Starting Watch Folder monitoring failed.", ex);
         }
     }
 
