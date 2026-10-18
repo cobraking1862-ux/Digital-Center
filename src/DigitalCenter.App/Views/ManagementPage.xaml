@@ -316,8 +316,9 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Width="206">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Width="150">
                                         <Ellipse Fill="{Binding StatusKey, Converter={StaticResource StatusBrush}}"
                                                  Width="9" Height="9" VerticalAlignment="Top" Margin="0,5,0,0"/>
                                         <StackPanel Margin="9,0,0,0">
@@ -334,6 +335,25 @@
                                     <Border Grid.Column="2" Style="{StaticResource RowStatusChip}">
                                         <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
                                                    Foreground="{Binding StatusKey, Converter={StaticResource StatusBrush}}"/>
+                                    </Border>
+
+                                    <!-- Per-file "Browse / Move": opens the folder picker and
+                                         relocates THIS file. The tooltip sits on the wrapper so it
+                                         is still readable while the button is disabled. -->
+                                    <Border Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Top"
+                                            ToolTip="{Binding MoveHint}">
+                                        <Button Style="{StaticResource SecondaryButton}"
+                                                Padding="10,5" MinHeight="30"
+                                                Command="{Binding DataContext.MoveFileCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding CanConfirm}"
+                                                AutomationProperties.Name="Browse and move this file">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}"
+                                                           Margin="0,0,7,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Browse / Move" FontSize="11.5" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                     </Border>
                                 </Grid>
                             </DataTemplate>

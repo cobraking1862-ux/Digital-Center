@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DigitalCenter.Core.Logging;
 using DigitalCenter.Core.Services;
 using DigitalCenter.ViewModels.Services;
@@ -55,6 +56,8 @@ public partial class MainViewModel : ObservableObject
         ManagementViewModel management,
         SettingsViewModel settings,
         WatchFolderService watchFolder,
+        ImportService imports,
+        ActivityFeed activity,
         IUiDispatcher uiDispatcher,
         IAppLogger logger)
     {
@@ -62,6 +65,7 @@ public partial class MainViewModel : ObservableObject
         UsbCart = usbCart;
         Management = management;
         Settings = settings;
+        Activity = activity;
         _uiDispatcher = uiDispatcher;
         _logger = logger;
 
@@ -87,21 +91,34 @@ public partial class MainViewModel : ObservableObject
             }
         };
 
+        // Background import work (automatic metadata matching) reports into the
+        // same feed as everything else.
+        imports.ActivityReported += message => activity.Publish(message, ActivityKind.Background);
+
         // Refresh the Management dashboard whenever the Watch Folder finds something.
-        watchFolder.PendingImportsChanged += () => _uiDispatcher.Post(() =>
+        watchFolder.PendingImportsChanged += () =>
         {
-            try
+            activity.Publish("Fetching files from the Watch Folder — new file(s) detected.", ActivityKind.Background);
+            _uiDispatcher.Post(() =>
             {
-                _ = Management.RefreshAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"Management refresh after watch-folder event failed: {ex.Message}");
-            }
-        });
+                try
+                {
+                    _ = Management.RefreshAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"Management refresh after watch-folder event failed: {ex.Message}");
+                    activity.Publish($"Management refresh failed: {ex.Message}", ActivityKind.Error);
+                }
+            });
+        };
 
         // A confirmed import changes the library → refresh the Home grid.
-        management.ImportCompleted += () => _uiDispatcher.Post(() => _ = Library.RefreshSafeAsync());
+        management.ImportCompleted += () => _uiDispatcher.Post(() =>
+        {
+            activity.Publish("Library changed — refreshing Home.", ActivityKind.Background);
+            _ = Library.RefreshSafeAsync();
+        });
 
         // Card clicks in the library open the details page inside the window.
         library.DetailsRequested += titleId => ShowDetails(titleId);
@@ -119,6 +136,12 @@ public partial class MainViewModel : ObservableObject
     public ManagementViewModel Management { get; }
 
     public SettingsViewModel Settings { get; }
+
+    /// <summary>
+    /// The consolidated "Current Activity &amp; Status" feed shown in the sidebar.
+    /// Every screen publishes its runtime messages here.
+    /// </summary>
+    public ActivityFeed Activity { get; }
 
     [ObservableProperty]
     public partial bool IsSidebarOpen { get; set; }
@@ -143,6 +166,8 @@ public partial class MainViewModel : ObservableObject
         CurrentPage = value.Page;
         OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IsShowingDetails));
+
+        Activity.Publish($"Browsing {value.Title}.", ActivityKind.Navigation);
 
         switch (value.Page)
         {
@@ -192,6 +217,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         Details = DetailsFactory(mediaTitleId);
+        Activity.Publish($"Opening title #{mediaTitleId} …", ActivityKind.Navigation);
         Details.CloseRequested += (_, _) => _uiDispatcher.Post(CloseDetails);
         Details.SavedChanges += () => _uiDispatcher.Post(() => _ = Library.RefreshSafeAsync());
         CurrentPage = Details;
@@ -216,6 +242,7 @@ public partial class MainViewModel : ObservableObject
         CurrentPage = SelectedNavItem.Page;
         OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IsShowingDetails));
+        Activity.Publish($"Back to {SelectedNavItem.Title}.", ActivityKind.Navigation);
 
         switch (SelectedNavItem.Page)
         {
@@ -230,6 +257,10 @@ public partial class MainViewModel : ObservableObject
                 break;
         }
     }
+
+    /// <summary>Empties the consolidated activity feed (sidebar "Clear").</summary>
+    [RelayCommand]
+    private void ClearActivity() => Activity.Clear();
 
     /// <summary>Flips the navigation rail and reports the new state.</summary>
     public bool ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
@@ -248,5 +279,9 @@ public partial class MainViewModel : ObservableObject
         var library = Library.RefreshSafeAsync();
         var cart = UsbCart.RefreshCartAsync();
         await Task.WhenAll(library, cart);
+
+        Activity.Publish(
+            $"Home loaded: {Library.HomeMovies.Count} movie(s) and {Library.HomeSeries.Count} series ready to browse.",
+            ActivityKind.Success);
     }
 }

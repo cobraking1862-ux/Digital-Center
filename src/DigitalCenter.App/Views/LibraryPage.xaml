@@ -25,6 +25,160 @@
                 <TextBlock Text="{Binding}" Foreground="{StaticResource TextBrush}"/>
             </StackPanel>
         </DataTemplate>
+        <!-- The ONE poster card: used by the Home dashboard sections and by the
+             category grid, so a card looks and behaves identically everywhere
+             (single click selects, double click / Enter opens the details). -->
+<DataTemplate x:Key="PosterCardTemplate" DataType="{x:Type vm:LibraryItemViewModel}">
+            <!-- One click selects, two clicks (or Enter/Space on the
+                 focused card) open the details screen. The shared
+                 CardActivation behaviour ignores clicks that start on an
+                 in-card control, so "Add to Cart" never navigates. -->
+            <Border x:Name="CardHost" Style="{StaticResource PosterCard}"
+                    Width="196" Height="380"
+                    Cursor="Hand"
+                    Focusable="True"
+                    ToolTip="{Binding Title}"
+                    AutomationProperties.Name="{Binding Title}"
+                    AutomationProperties.ItemType="Media title"
+                    controls:CardActivation.IsEnabled="True"
+                    controls:CardActivation.SelectCommand="{Binding DataContext.SelectItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                    controls:CardActivation.OpenCommand="{Binding DataContext.OpenDetailsCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                <Border.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1"/>
+                        <TranslateTransform x:Name="CardLift" Y="0"/>
+                    </TransformGroup>
+                </Border.RenderTransform>
+                <StackPanel>
+                    <!-- 2:3 portrait poster -->
+                    <Grid Height="272">
+                        <Border Style="{StaticResource PosterPlaceholder}">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
+                                           Foreground="#3A3450" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding Initials}" FontSize="17" FontWeight="Bold"
+                                           Foreground="#584F78" HorizontalAlignment="Center"
+                                           Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True">
+                            <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
+                                   Stretch="UniformToFill" VerticalAlignment="Top"/>
+                        </Border>
+                        <Border Style="{StaticResource TypeBadge}">
+                            <TextBlock Text="{Binding TypeDisplay}" FontSize="10" FontWeight="SemiBold"/>
+                        </Border>
+
+                        <!-- Availability dot -->
+                        <Ellipse Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Margin="0,14,14,0" Stroke="#66000000" StrokeThickness="1"
+                                 ToolTip="{Binding Availability}">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{StaticResource SubTextBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AvailabilityState}" Value="Available">
+                                            <Setter Property="Fill" Value="{StaticResource OkBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding AvailabilityState}" Value="Partial">
+                                            <Setter Property="Fill" Value="{StaticResource WarnBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding AvailabilityState}" Value="Missing">
+                                            <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+
+                        <!-- Hover scrim with the cart quick action -->
+                        <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#00000000" Offset="0.42"/>
+                                    <GradientStop Color="#D9000000" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Button Style="{StaticResource SecondaryButton}" Padding="12,6"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="9" FontSize="12"
+                                    Command="{Binding DataContext.AddToCartCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip="Add this title to the USB cart">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphXs}" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Add to Cart"/>
+                                </StackPanel>
+                            </Button>
+                        </Border>
+                    </Grid>
+
+                    <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
+                               Margin="5,10,5,0" TextTrimming="CharacterEllipsis" MaxHeight="38"
+                               TextWrapping="Wrap" ToolTip="{Binding Title}"/>
+                    <StackPanel Orientation="Horizontal" Margin="5,4,5,0">
+                        <TextBlock Text="{Binding YearDisplay}" Style="{StaticResource SubText}" FontWeight="Medium"/>
+                        <TextBlock Text="{Binding FileSummary, StringFormat= · {0}}" Style="{StaticResource CaptionText}"
+                                   Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding Genres}" Margin="5,6,5,0" ClipToBounds="True">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource GenreChip}" Margin="0,0,5,0">
+                                    <TextBlock Text="{Binding}" Style="{StaticResource MiniChipText}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <!-- Selection ring: single click only marks the card -->
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                    <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowAccent}"/>
+                </DataTrigger>
+                <Trigger SourceName="CardHost" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
+                    <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowElevated}"/>
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX"
+                                                 To="1.03" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY"
+                                                 To="1.03" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y"
+                                                 To="-4" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="HoverScrim" Storyboard.TargetProperty="Opacity"
+                                                 To="1" Duration="0:0:0.12"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX"
+                                                 To="1" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY"
+                                                 To="1" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y"
+                                                 To="0" Duration="0:0:0.12"/>
+                                <DoubleAnimation Storyboard.TargetName="HoverScrim" Storyboard.TargetProperty="Opacity"
+                                                 To="0" Duration="0:0:0.12"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
         <DataTemplate x:Key="SortComboItem">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Sort&#160;&#160;&#160;" Foreground="{StaticResource FaintTextBrush}"/>
@@ -83,6 +237,9 @@
             <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource SegmentedTrack}"
                     VerticalAlignment="Center" Margin="0,12,0,0">
                 <StackPanel Orientation="Horizontal">
+                    <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Home"
+                                 ToolTip="Movies and TV Series together"
+                                 IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=All, Mode=TwoWay}"/>
                     <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Movies"
                                  IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=Movies, Mode=TwoWay}"/>
                     <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Series"
@@ -177,8 +334,98 @@
                 </Border>
             </StackPanel>
 
-            <!-- Poster grid (grid view only, virtualized) -->
-            <Grid Visibility="{Binding IsCollectionsTab, Converter={StaticResource BoolToVisInverted}}">
+            <!-- ============ Home dashboard: Movies + TV Series ============
+                 Shown the moment Home is opened (and at launch): both
+                 categories are loaded together, so no secondary category
+                 button has to be clicked first to see the collection. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False"
+                          Visibility="{Binding IsHomeTab, Converter={StaticResource BoolToVis}}">
+                <StackPanel Margin="2,0,8,0">
+                    <!-- Movies -->
+                    <StackPanel Margin="0,0,0,26">
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Style="{StaticResource IconChip}">
+                                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphSmall}"
+                                               Foreground="{StaticResource PrimaryBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Movies" Style="{StaticResource SectionTitle}" Margin="12,0,0,0"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding HomeMovieSummary}" Style="{StaticResource CaptionText}"
+                                           Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                    Click="OnShowAllMoviesClick" ToolTip="Show every movie in its own category">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Show all movies"/>
+                                    <TextBlock Text="{StaticResource Icon.Next}" Style="{StaticResource GlyphXs}" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding HomeMovies}"
+                                      ItemTemplate="{StaticResource PosterCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <controls:VirtualizingWrapPanel ItemWidth="210" ItemHeight="396"
+                                                                    SpacingX="14" SpacingY="16"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Text="No movie matches the current search and filters."
+                                   Style="{StaticResource SubText}"
+                                   Visibility="{Binding HasHomeMovies, Converter={StaticResource BoolToVisInverted}}"/>
+                    </StackPanel>
+
+                    <!-- TV Series -->
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Style="{StaticResource IconChip}">
+                                    <TextBlock Text="{StaticResource Icon.Tv}" Style="{StaticResource GlyphSmall}"
+                                               Foreground="{StaticResource CyanBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="TV Series" Style="{StaticResource SectionTitle}" Margin="12,0,0,0"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding HomeSeriesSummary}" Style="{StaticResource CaptionText}"
+                                           Margin="12,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                    Click="OnShowAllSeriesClick" ToolTip="Show every series in its own category">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Show all series"/>
+                                    <TextBlock Text="{StaticResource Icon.Next}" Style="{StaticResource GlyphXs}" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding HomeSeries}"
+                                      ItemTemplate="{StaticResource PosterCardTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <controls:VirtualizingWrapPanel ItemWidth="210" ItemHeight="396"
+                                                                    SpacingX="14" SpacingY="16"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <TextBlock Text="No series matches the current search and filters."
+                                   Style="{StaticResource SubText}"
+                                   Visibility="{Binding HasHomeSeries, Converter={StaticResource BoolToVisInverted}}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Poster grid of ONE category (Movies / Series / Genres), virtualized -->
+            <Grid Visibility="{Binding IsCategoryGridVisible, Converter={StaticResource BoolToVis}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -205,6 +452,7 @@
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               Focusable="False">
                     <ItemsControl ItemsSource="{Binding Items}"
+                                  ItemTemplate="{StaticResource PosterCardTemplate}"
                                   ScrollViewer.CanContentScroll="True"
                                   VirtualizingPanel.IsVirtualizing="True"
                                   VirtualizingPanel.VirtualizationMode="Standard">
@@ -214,158 +462,6 @@
                                                                 SpacingX="14" SpacingY="16"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <!-- One click selects, two clicks (or Enter/Space on the
-                                     focused card) open the details screen. The shared
-                                     CardActivation behaviour ignores clicks that start on an
-                                     in-card control, so "Add to Cart" never navigates. -->
-                                <Border x:Name="CardHost" Style="{StaticResource PosterCard}"
-                                        Width="196" Height="380"
-                                        Cursor="Hand"
-                                        Focusable="True"
-                                        ToolTip="{Binding Title}"
-                                        AutomationProperties.Name="{Binding Title}"
-                                        AutomationProperties.ItemType="Media title"
-                                        controls:CardActivation.IsEnabled="True"
-                                        controls:CardActivation.SelectCommand="{Binding DataContext.SelectItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        controls:CardActivation.OpenCommand="{Binding DataContext.OpenDetailsCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                                    <Border.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1"/>
-                                            <TranslateTransform x:Name="CardLift" Y="0"/>
-                                        </TransformGroup>
-                                    </Border.RenderTransform>
-                                    <StackPanel>
-                                        <!-- 2:3 portrait poster -->
-                                        <Grid Height="272">
-                                            <Border Style="{StaticResource PosterPlaceholder}">
-                                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
-                                                               Foreground="#3A3450" HorizontalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Initials}" FontSize="17" FontWeight="Bold"
-                                                               Foreground="#584F78" HorizontalAlignment="Center"
-                                                               Margin="0,8,0,0"/>
-                                                </StackPanel>
-                                            </Border>
-                                            <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True">
-                                                <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
-                                                       Stretch="UniformToFill" VerticalAlignment="Top"/>
-                                            </Border>
-                                            <Border Style="{StaticResource TypeBadge}">
-                                                <TextBlock Text="{Binding TypeDisplay}" FontSize="10" FontWeight="SemiBold"/>
-                                            </Border>
-
-                                            <!-- Availability dot -->
-                                            <Ellipse Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                     Margin="0,14,14,0" Stroke="#66000000" StrokeThickness="1"
-                                                     ToolTip="{Binding Availability}">
-                                                <Ellipse.Style>
-                                                    <Style TargetType="Ellipse">
-                                                        <Setter Property="Fill" Value="{StaticResource SubTextBrush}"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding AvailabilityState}" Value="Available">
-                                                                <Setter Property="Fill" Value="{StaticResource OkBrush}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding AvailabilityState}" Value="Partial">
-                                                                <Setter Property="Fill" Value="{StaticResource WarnBrush}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding AvailabilityState}" Value="Missing">
-                                                                <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Ellipse.Style>
-                                            </Ellipse>
-
-                                            <!-- Hover scrim with the cart quick action -->
-                                            <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
-                                                <Border.Background>
-                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                        <GradientStop Color="#00000000" Offset="0.42"/>
-                                                        <GradientStop Color="#D9000000" Offset="1"/>
-                                                    </LinearGradientBrush>
-                                                </Border.Background>
-                                                <Button Style="{StaticResource SecondaryButton}" Padding="12,6"
-                                                        HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                                        Margin="9" FontSize="12"
-                                                        Command="{Binding DataContext.AddToCartCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        ToolTip="Add this title to the USB cart">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphXs}" Margin="0,0,7,0"/>
-                                                        <TextBlock Text="Add to Cart"/>
-                                                    </StackPanel>
-                                                </Button>
-                                            </Border>
-                                        </Grid>
-
-                                        <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
-                                                   Margin="5,10,5,0" TextTrimming="CharacterEllipsis" MaxHeight="38"
-                                                   TextWrapping="Wrap" ToolTip="{Binding Title}"/>
-                                        <StackPanel Orientation="Horizontal" Margin="5,4,5,0">
-                                            <TextBlock Text="{Binding YearDisplay}" Style="{StaticResource SubText}" FontWeight="Medium"/>
-                                            <TextBlock Text="{Binding FileSummary, StringFormat= · {0}}" Style="{StaticResource CaptionText}"
-                                                       Margin="8,0,0,0"/>
-                                        </StackPanel>
-                                        <ItemsControl ItemsSource="{Binding Genres}" Margin="5,6,5,0" ClipToBounds="True">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Style="{StaticResource GenreChip}" Margin="0,0,5,0">
-                                                        <TextBlock Text="{Binding}" Style="{StaticResource MiniChipText}"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-
-                                <DataTemplate.Triggers>
-                                    <!-- Selection ring: single click only marks the card -->
-                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                        <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                        <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowAccent}"/>
-                                    </DataTrigger>
-                                    <Trigger SourceName="CardHost" Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="CardHost" Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
-                                        <Setter TargetName="CardHost" Property="Effect" Value="{StaticResource ShadowElevated}"/>
-                                        <Trigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX"
-                                                                     To="1.03" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY"
-                                                                     To="1.03" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y"
-                                                                     To="-4" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="HoverScrim" Storyboard.TargetProperty="Opacity"
-                                                                     To="1" Duration="0:0:0.12"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.EnterActions>
-                                        <Trigger.ExitActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX"
-                                                                     To="1" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY"
-                                                                     To="1" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y"
-                                                                     To="0" Duration="0:0:0.12"/>
-                                                    <DoubleAnimation Storyboard.TargetName="HoverScrim" Storyboard.TargetProperty="Opacity"
-                                                                     To="0" Duration="0:0:0.12"/>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.ExitActions>
-                                    </Trigger>
-                                </DataTemplate.Triggers>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
             </Grid>

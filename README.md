@@ -11,7 +11,12 @@ a TMDb token is configured.
 
 ## Feature overview (complete)
 
-1. **Library** — virtualized poster grid + table view of the catalog,
+1. **Library** — **Home** shows both categories at once: the dashboard loads
+   the newest **Movies** and the newest **TV Series** in two labelled sections
+   (each with its own count and a *Show all movies* / *Show all series*
+   shortcut), so nothing has to be clicked twice to reach the collection. The
+   Movies / Series / Genres tabs then narrow the view to one category.
+   Virtualized poster grid + table view of the catalog,
    debounced free-text search (title and actor/director names via FTS5 with
    automatic LIKE fallback), type filter, sorting, multi-select (Ctrl/Shift)
    with **"Add N to USB queue"**, cached poster artwork, live file
@@ -30,7 +35,12 @@ a TMDb token is configured.
    of new files no longer takes one delay per file. Every detection
    lands in the review list with the parsed title/year/season/episode. The
    operator sees the detected file with its parsed fields and the automatic
-   TMDb match, chooses a **destination folder**, and **confirms** the import
+   TMDb match. **Every row has its own Browse / Move button**: it opens the
+   standard folder picker for that one file and, as soon as a destination is
+   chosen, moves that file (metadata + artwork + catalog row included).
+   Cancelling the picker changes nothing, and a row without a reliable match
+   explains why it cannot be moved instead of guessing a destination.
+   The preview pane still allows choosing a **destination folder** and **confirming** the import
    (full metadata + poster + move into the library) or **skips** it (the file
    stays in the Watch Folder). Files without a reliable match are marked
    "No Match" and left untouched. Every decision is
@@ -49,7 +59,17 @@ a TMDb token is configured.
    multiple locations, multiple versions per title/episode), FTS5 index
    rebuild, CSV export (RFC 4180, one row per file) and additive CSV import,
    database backup/restore with validation and safety copies.
-5. **Settings** — library roots (movies and series), metadata/artwork
+5. **Current Activity & Status** — one consolidated runtime feed in the
+   sidebar. Navigation (*Browsing Movies*, *Opened Movie “Title”*), cart work
+   (*Movie added to cart successfully*, *removed from the cart*), background
+   tasks (*Downloading metadata…*, *Fetching files from the Watch Folder…*),
+   file operations (*Moving file to USB…*, *Moving file to Library…*) and
+   system events (*Settings saved successfully*, scan/backup/import results)
+   all land here instead of being scattered over the individual screens.
+   Newest entry first, colour-coded by kind, capped at 200 entries, with a
+   **Clear** action; publishing is marshalled onto the UI thread, so a
+   background service can report without touching a control.
+6. **Settings** — library roots (movies and series), metadata/artwork
    preferences with a TMDb status indicator and connection test,
    file-operation defaults (clean file names, hash
    verification, collision policy), USB layout and naming templates, and the
@@ -68,7 +88,7 @@ a TMDb token is configured.
 | ORM              | Entity Framework Core 10 (SQLite provider)   |
 | Full-text search | SQLite FTS5 (bundled SQLite has it built in) |
 | TMDb             | Official REST API v3 via HttpClient (bearer token) |
-| Tests            | xUnit (177 test cases, all offline)          |
+| Tests            | xUnit (179 test cases, all offline)          |
 
 Note: CommunityToolkit.Mvvm is pinned to **8.4.2** — 8.4.0 source generators
 do not emit members under the .NET 10 SDK's Roslyn 5.0 compiler.
@@ -90,7 +110,7 @@ DigitalCenter.slnx
 │   ├── DigitalCenter.ViewModels/   View models (CommunityToolkit.Mvvm) + UI service interfaces
 │   └── DigitalCenter.App/          WPF application (views, DI composition root, dialogs)
 └── tests/
-    └── DigitalCenter.Tests/        Unit + integration tests (177 cases, all offline)
+    └── DigitalCenter.Tests/        Unit + integration tests (179 cases, all offline)
 ```
 
 Why three libraries: the MVVM source generator does not run inside the WPF
@@ -311,7 +331,7 @@ small 8 px status dots stay circular; they are indicators, not containers.
 
 ## Testing
 
-177 test cases cover the highest-risk behavior: filename parsing (movies with
+179 test cases cover the highest-risk behavior: filename parsing (movies with
 years; every supported series marker format — `S01E01`, `S01.E01`, `S01 E01`,
 `S01_E01`, `1x01`, `Season 1 Episode 1`, `E01`, folder season hints — with
 quality tags, release years and extra punctuation; ambiguous/malformed names;
@@ -330,7 +350,9 @@ detection (stability, growth in progress, dedupe by path), USB copying
 (skip/overwrite/rename, insufficient space, missing source, deterministic
 cancel mid-copy + resume, retry, queue persistence, space estimation
 accounting for skips, throttled progress reporting, SHA-256 verification of a
-multi-chunk copy, a job queued without a known size), maintenance (missing files,
+multi-chunk copy, a job queued without a known size), the consolidated
+activity reporting (an automatic match announces its batch and stays silent
+when there is no work), maintenance (missing files,
 duplicates, index rebuild, CSV round-trip incl. quoting) and TMDb response
 parsing from canned JSON (no network). Tests use temporary directories and
 databases; the TMDb provider is always mocked in workflow tests.

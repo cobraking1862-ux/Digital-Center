@@ -61,6 +61,8 @@ public partial class App : Application
             MainWindow = mainWindow;
             mainWindow.Show();
 
+            Services.GetRequiredService<ActivityFeed>().Publish("DigitalCenter started.", ActivityKind.System);
+
             // Load the first screens BEFORE any maintenance work. The library
             // grid and the cart badge must never depend on import recovery or on
             // TMDb being reachable — waiting for that left Home empty until the
@@ -104,6 +106,10 @@ public partial class App : Application
 
             if (report.Count > 0)
             {
+                Services.GetRequiredService<ActivityFeed>().Publish(
+                    $"Recovered {report.Count} interrupted import(s); refreshing the library.",
+                    ActivityKind.Background);
+
                 // Recovered rows can change the catalog: refresh what is on screen.
                 await mainViewModel.Library.RefreshSafeAsync();
             }
@@ -129,13 +135,16 @@ public partial class App : Application
             var settings = Services.GetRequiredService<SettingsService>().Load();
             _watchFolder = Services.GetRequiredService<WatchFolderService>();
             _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
+            var feed = Services.GetRequiredService<ActivityFeed>();
             if (settings.WatchFolderEnabled && !string.IsNullOrWhiteSpace(settings.WatchFolderPath) && !_watchFolder.IsRunning)
             {
                 _watchFolder.Start(settings.WatchFolderPath);
+                feed.Publish($"Watching '{settings.WatchFolderPath}' for new files.", ActivityKind.Background);
             }
             else
             {
                 logger.Info("Watch Folder monitoring not started (disabled or not configured in Management).");
+                feed.Publish("Watch Folder monitoring is off (start it in Management).", ActivityKind.System);
             }
         }
         catch (Exception ex)
@@ -206,6 +215,10 @@ public partial class App : Application
             sp.GetRequiredService<DatabaseInitializer>().FullTextSearchEnabled));
 
         services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
+
+        // The single consolidated activity feed every screen publishes to; the
+        // shell shows it in the sidebar ("Current Activity & Status").
+        services.AddSingleton<ActivityFeed>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAppControl, AppControl>();
 

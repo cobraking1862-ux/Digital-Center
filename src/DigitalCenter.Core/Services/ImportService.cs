@@ -106,6 +106,13 @@ public sealed class ImportService
     // ------------------------------------------------------------- matching
 
     /// <summary>
+    /// Raised while background import work runs, so the shell can report it in
+    /// the ONE consolidated activity feed. Core stays UI-free: subscribers
+    /// decide where a message is shown.
+    /// </summary>
+    public event Action<string>? ActivityReported;
+
+    /// <summary>
     /// Runs the automatic match for every Pending import log. Called by the
     /// Watch Folder pass, the "Rescan Now" action and application startup, so
     /// files detected while TMDb was offline are retried automatically.
@@ -119,6 +126,13 @@ public sealed class ImportService
             .OrderBy(l => l.Id)
             .ToListAsync(ct);
 
+        if (pending.Count == 0)
+        {
+            return 0;
+        }
+
+        ActivityReported?.Invoke($"Downloading metadata for {pending.Count} pending file(s) …");
+
         var changed = 0;
         foreach (var log in pending)
         {
@@ -128,6 +142,9 @@ public sealed class ImportService
                 changed++;
             }
         }
+
+        ActivityReported?.Invoke(
+            $"Metadata matching finished: {changed} of {pending.Count} file(s) matched.");
 
         return changed;
     }

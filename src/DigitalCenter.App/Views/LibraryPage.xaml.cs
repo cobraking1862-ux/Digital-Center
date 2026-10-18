@@ -38,6 +38,18 @@ public partial class LibraryPage : UserControl
         }
     }
 
+    /// <summary>Home dashboard shortcut: every movie in its own category.</summary>
+    private void OnShowAllMoviesClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.ShowAllMovies();
+    }
+
+    /// <summary>Home dashboard shortcut: every series in its own category.</summary>
+    private void OnShowAllSeriesClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.ShowAllSeries();
+    }
+
     /// <summary>Clears the search box (the ✕ affordance inside the field).</summary>
     private void OnClearSearchClick(object sender, RoutedEventArgs e)
     {

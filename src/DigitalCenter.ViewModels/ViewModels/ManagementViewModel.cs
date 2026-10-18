@@ -43,6 +43,11 @@ public sealed class ActivityItemViewModel
         CanConfirm = log.Status is ImportStatuses.Matched or ImportStatuses.Approved;
         CanSkip = log.Status is ImportStatuses.Matched or ImportStatuses.Pending or ImportStatuses.NoMatch;
         IsAwaitingDestination = log.Status == ImportStatuses.Matched;
+        MoveHint = CanConfirm
+            ? "Browse for a folder and move this file into it"
+            : log.Status is ImportStatuses.Pending or ImportStatuses.NoMatch
+                ? $"Needs a metadata match before it can be moved (status: {StatusText})"
+                : $"Cannot be moved in this state (status: {StatusText})";
     }
 
     public int Id { get; }
@@ -62,6 +67,9 @@ public sealed class ActivityItemViewModel
     public bool CanConfirm { get; }
     public bool CanSkip { get; }
     public bool IsAwaitingDestination { get; }
+
+    /// <summary>Tooltip of the per-row "Browse / Move" button.</summary>
+    public string MoveHint { get; }
 
     /// <summary>The backing log row (refreshed by the view model when the selection changes).</summary>
     public MetadataImportLog Log { get; internal set; } = null!;
@@ -83,6 +91,7 @@ public partial class ManagementViewModel : ObservableObject
     private readonly WatchFolderService _watchFolder;
     private readonly ImportService _imports;
     private readonly SettingsService _settingsService;
+    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly IAppLogger _logger;
 
@@ -93,12 +102,14 @@ public partial class ManagementViewModel : ObservableObject
         WatchFolderService watchFolder,
         ImportService imports,
         SettingsService settingsService,
+        ActivityFeed activity,
         IDialogService dialogs,
         IAppLogger logger)
     {
         _watchFolder = watchFolder;
         _imports = imports;
         _settingsService = settingsService;
+        _activity = activity;
         _dialogs = dialogs;
         _logger = logger;
 
@@ -297,6 +308,7 @@ public partial class ManagementViewModel : ObservableObject
         {
             _logger.Error("Refreshing the Management dashboard failed.", ex);
             StatusText = $"Refresh failed: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Error);
         }
     }
 
@@ -427,6 +439,7 @@ public partial class ManagementViewModel : ObservableObject
 
             StatusText = $"Watch Folder saved: {settings.WatchFolderPath ?? "(none)"}. " +
                          "Existing files, import history and catalog records were left untouched.";
+            _activity.Publish(StatusText, ActivityKind.Success);
             _logger.Info($"Watch Folder path saved: '{settings.WatchFolderPath ?? "(none)"}'.");
             _ = RefreshAsync();
         }
@@ -434,6 +447,7 @@ public partial class ManagementViewModel : ObservableObject
         {
             _logger.Error("Saving the Watch Folder failed.", ex);
             StatusText = $"The Watch Folder could not be saved: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Error);
             _dialogs.Error("Watch Folder", StatusText);
         }
     }
@@ -452,6 +466,7 @@ public partial class ManagementViewModel : ObservableObject
         {
             _watchFolder.Stop();
             StatusText = "Monitoring stopped.";
+            _activity.Publish("Watch Folder monitoring stopped.", ActivityKind.System);
         }
         else
         {
@@ -464,6 +479,7 @@ public partial class ManagementViewModel : ObservableObject
             _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
             _watchFolder.Start(settings.WatchFolderPath);
             StatusText = $"Monitoring started for '{settings.WatchFolderPath}'.";
+            _activity.Publish(StatusText, ActivityKind.Background);
         }
 
         OnPropertyChanged(nameof(IsMonitoring));
@@ -485,6 +501,7 @@ public partial class ManagementViewModel : ObservableObject
         {
             _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
             StatusText = $"Scanning '{settings.WatchFolderPath}' …";
+            _activity.Publish($"Fetching files from the Watch Folder: '{settings.WatchFolderPath}' …", ActivityKind.Background);
 
             // The whole pass (enumeration, stability window, TMDb matching) runs
             // on the thread pool so the window keeps repainting while it works.
@@ -494,12 +511,14 @@ public partial class ManagementViewModel : ObservableObject
                 ? $"Rescan finished: nothing new in '{settings.WatchFolderPath}' ({scan.AlreadyKnown} already known)."
                 : $"Rescan finished: {scan.NewPending} new file(s), {scan.AlreadyKnown} known, " +
                   $"{scan.UnsupportedLogged} unsupported, {scan.Unstable} still being written.";
+            _activity.Publish(StatusText, scan.NewPending > 0 ? ActivityKind.Success : ActivityKind.Background);
             await RefreshAsync();
         }
         catch (Exception ex)
         {
             _logger.Error("Rescan failed.", ex);
             StatusText = $"Rescan failed: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Error);
         }
         finally
         {
@@ -518,6 +537,86 @@ public partial class ManagementViewModel : ObservableObject
         }
 
         _dialogs.OpenInExplorer(settings.WatchFolderPath);
+    }
+
+    /// <summary>
+    /// The per-row "Browse / Move" action: opens the standard folder picker for
+    /// THIS file and, once a destination is chosen, relocates that single file
+    /// into it through the normal confirmed-import pipeline (metadata, artwork,
+    /// catalog row and the move itself). Nothing happens when the picker is
+    /// cancelled, and a file without a reliable match is reported instead of
+    /// being moved somewhere it cannot be catalogued.
+    /// </summary>
+    [RelayCommand]
+    private async Task MoveFileAsync(ActivityItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        if (!item.CanConfirm)
+        {
+            StatusText = $"'{item.FileName}' cannot be moved yet — status “{item.StatusText}”. " +
+                         "A file needs a metadata match before it can be relocated into the library.";
+            _activity.Publish(StatusText, ActivityKind.Warning);
+            _dialogs.Info("Browse / Move", StatusText);
+            return;
+        }
+
+        var log = await _imports.GetLogAsync(item.Id);
+        if (log is null)
+        {
+            StatusText = $"'{item.FileName}' is no longer in the import list.";
+            _activity.Publish(StatusText, ActivityKind.Warning);
+            return;
+        }
+
+        var settings = _settingsService.Load();
+        var startFolder = log.ChosenFolder
+                          ?? _imports.GetDefaultDestinationFolder(log.IsSeries, settings)
+                          ?? (string.IsNullOrEmpty(log.SourcePath) ? null : Path.GetDirectoryName(log.SourcePath));
+
+        var folder = _dialogs.PickFolder(startFolder, $"Choose the destination folder for '{log.ParsedTitle ?? log.SourceFile}'");
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            StatusText = "No folder was chosen — the file stays where it is.";
+            return; // Cancelled: nothing is moved without an explicit choice.
+        }
+
+        SelectedItem = item;
+        IsBusy = true;
+        StatusText = $"Moving '{item.FileName}' to {folder} …";
+        _activity.Publish($"Moving file to Library: '{item.FileName}' → {folder}", ActivityKind.FileOperation);
+
+        try
+        {
+            var outcome = await Task.Run(() => _imports.ConfirmImportAsync(item.Id, folder));
+            if (outcome.Success)
+            {
+                StatusText = $"Moved into the library: {outcome.Message}";
+                _activity.Publish($"Moved '{item.FileName}' to {folder} successfully.", ActivityKind.Success);
+                ImportCompleted?.Invoke();
+            }
+            else
+            {
+                StatusText = $"Move failed: {outcome.Message}";
+                _activity.Publish($"Moving '{item.FileName}' failed: {outcome.Message}", ActivityKind.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Moving a file to a chosen folder failed.", ex);
+            StatusText = $"Move failed: {ex.Message}";
+            _activity.Publish($"Moving '{item.FileName}' failed: {ex.Message}", ActivityKind.Error);
+            _dialogs.Error("Browse / Move", StatusText);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        await RefreshAsync();
     }
 
     [RelayCommand]
@@ -547,6 +646,7 @@ public partial class ManagementViewModel : ObservableObject
             await _imports.ChooseDestinationAsync(log.Id, folder);
             DestinationPreviewText = folder;
             StatusText = $"Destination chosen: {folder}. Confirm the move when the preview looks right.";
+            _activity.Publish(StatusText, ActivityKind.FileOperation);
             await RefreshAsync();
         }
         catch (Exception ex)
@@ -566,6 +666,7 @@ public partial class ManagementViewModel : ObservableObject
         var id = SelectedItem.Id;
         IsBusy = true;
         StatusText = "Importing the selected file …";
+        _activity.Publish($"Moving file to Library: '{SelectedItem.FileName}' …", ActivityKind.FileOperation);
         try
         {
             // The move is real file I/O (copy, hash, delete): keep it off the UI
@@ -574,17 +675,20 @@ public partial class ManagementViewModel : ObservableObject
             if (outcome.Success)
             {
                 StatusText = $"Imported: {outcome.Message}";
+                _activity.Publish($"Moved into the library: {outcome.Message}", ActivityKind.Success);
                 ImportCompleted?.Invoke();
             }
             else
             {
                 StatusText = $"Import failed: {outcome.Message}";
+                _activity.Publish(StatusText, ActivityKind.Error);
             }
         }
         catch (Exception ex)
         {
             _logger.Error("Confirming the import failed.", ex);
             StatusText = $"Import failed: {ex.Message}";
+            _activity.Publish(StatusText, ActivityKind.Error);
         }
         finally
         {
@@ -604,8 +708,10 @@ public partial class ManagementViewModel : ObservableObject
 
         try
         {
+            var skipped = SelectedItem.FileName;
             await _imports.SkipAsync(SelectedItem.Id);
             StatusText = "File skipped — it stays in the Watch Folder.";
+            _activity.Publish($"Skipped '{skipped}' — the file stays in the Watch Folder.", ActivityKind.System);
         }
         catch (Exception ex)
         {
