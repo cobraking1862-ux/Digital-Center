@@ -153,8 +153,7 @@ public partial class MaintenanceViewModel : ObservableObject
             return;
         }
 
-        var firstLine = value.Split('
-')[0].Trim().TrimEnd('·', '—', ':', ' ');
+        var firstLine = value.Split('\n')[0].Trim().TrimEnd('·', '—', ':', ' ');
         _activity.Publish(firstLine.Length == 0 ? value.Trim() : firstLine, kind);
     }
 
