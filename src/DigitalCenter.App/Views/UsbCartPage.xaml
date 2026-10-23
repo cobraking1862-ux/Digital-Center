@@ -114,7 +114,7 @@
                                             <Border Style="{StaticResource PosterPlaceholder}">
                                                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                                     <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphMedium}"
-                                                               Foreground="#3A3450" HorizontalAlignment="Center"/>
+                                                               Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"/>
                                                     <TextBlock Text="No artwork" Style="{StaticResource SubText}" FontSize="10"
                                                                HorizontalAlignment="Center" Margin="0,6,0,0"/>
                                                 </StackPanel>
@@ -138,17 +138,17 @@
                                             <Border CornerRadius="{StaticResource Radius.ArtBottom}" VerticalAlignment="Bottom">
                                                 <Border.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                        <GradientStop Color="#00000000" Offset="0"/>
-                                                        <GradientStop Color="#B2000000" Offset="1"/>
+                                                        <GradientStop Color="#001B1726" Offset="0"/>
+                                                        <GradientStop Color="#CC1B1726" Offset="1"/>
                                                     </LinearGradientBrush>
                                                 </Border.Background>
                                                 <StackPanel Orientation="Horizontal" Margin="10,18,10,8">
                                                     <TextBlock Text="{StaticResource Icon.Copy}" Style="{StaticResource GlyphXs}"
-                                                               Foreground="#D9D4E8"/>
+                                                               Foreground="#F4F1FB"/>
                                                     <TextBlock Text="{Binding SizeText}" FontSize="11.5" FontWeight="SemiBold"
                                                                Foreground="White" Margin="6,0,0,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding FilesText, StringFormat= · {0}}" FontSize="10.5"
-                                                               Foreground="#B4ADCB" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                                               Foreground="#D6D0E6" Margin="6,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Border>
                                         </Grid>
@@ -341,9 +341,6 @@
                                     Visibility="{Binding ResultSummaryText, Converter={StaticResource NullToVis}}">
                                 <TextBlock Text="{Binding ResultSummaryText}" TextWrapping="Wrap" FontSize="12"/>
                             </Border>
-                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="2,10,0,0"
-                                       TextWrapping="Wrap"
-                                       Visibility="{Binding StatusText, Converter={StaticResource NullToVis}}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

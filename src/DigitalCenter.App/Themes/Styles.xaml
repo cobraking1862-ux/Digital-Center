@@ -4,126 +4,139 @@
 
     <!--
     ============================================================================
-    DigitalCenter 2026 design system — "Obsidian Aurora"
-    ========================================
-    A cinematic, layered dark experience built on Windows 11 Fluent principles:
+    DigitalCenter design system — "Aurora Light"
+    ==========================================
+    A bright, calm, high-contrast experience on Windows 11 Fluent principles:
 
-      • Canvas        obsidian graphite with violet undertones and two ambient
-                      "aurora" glows (violet top-left, cyan bottom-right) that
-                      are softly blurred once, at the window level, so no item
-                      ever pays for expensive effects.
-      • Elevation     three translucent surface levels, each outlined with a
-                      hairline light border — glass that stays readable.
-      • Accent        a violet → indigo aurora gradient with cyan highlights;
-                      a single accent family used with restraint.
-      • Shape         ONE corner-radius scale (the Radius.* tokens below):
-                      6 px small parts, 8 px controls and inputs, 10 px icon
-                      tiles and artwork, 12 px cards and panels. Pills are
-                      RESERVED for selected navigation tabs, small category
-                      chips, switch tracks, progress/scrollbar thumbs and the
-                      empty-state medallion — never for buttons, text labels,
-                      status badges or icon containers, which is what made
-                      long labels read as ovals.
-      • Type          Segoe UI Variable with tracked uppercase eyebrows and
-                      large cinematic display sizes.
-      • Icons         Segoe Fluent Icons (vector) through NAMED resources —
-                      no raw codepoints in screens, no emoji, one family, one
-                      size scale (Glyph*), square containers.
+      • Canvas        violet-tinted white with two very soft ambient glows
+                      (violet top-left, cyan bottom-right), blurred once at the
+                      window level, so no item ever pays for effects.
+      • Elevation     opaque white surfaces separated by hairline borders and
+                      soft violet-grey shadows — no translucent glass, because
+                      on a light canvas depth reads better from edges.
+      • Accent        one violet family (#6D28D9 → #5B21B6) with a dark cyan
+                      highlight (#0E7490). Accent fills stay saturated so white
+                      glyphs and labels on them keep ≥ 4.5:1 contrast.
+      • Contrast      every text token is WCAG AA or better on the surface it
+                      is used on: body #1B1726 (~16:1), secondary #554F6B
+                      (~7.6:1), tertiary #7A7490 (~4.6:1), accent #6D28D9
+                      (~7:1), cyan #0E7490 (~5:1), status colors ~4.8–6:1.
+                      The *SoftBrush status tints are the chip backgrounds that
+                      go with them.
+      • Shape         ONE rectangular radius scale (the Radius.* tokens): 2 px
+                      hairline parts, 4 px small, 6 px controls, 8 px tiles and
+                      artwork, 10 px cards. No pills anywhere — the largest
+                      radius stays well below half the smallest control height.
+      • Type          Segoe UI Variable, tracked uppercase eyebrows, large
+                      display sizes.
+      • Icons         Segoe Fluent Icons through NAMED resources (Icon.*): no
+                      raw codepoints in screens, no emoji, one family, one size
+                      scale (Glyph*), square containers.
       • Motion        short and purposeful: 120 ms taps, 180 ms hovers,
                       260 ms transitions, cubic easing.
 
-    Every color, size and shadow is a token here. Screens compose tokens;
-    they never invent their own.
+    Every color, size and shadow is a token here. Screens compose tokens; they
+    never invent their own. The few literal colors left in screens are content
+    colors — scrims and text over poster/backdrop artwork, which stay dark so
+    they remain legible over arbitrary images.
     ============================================================================
     -->
 
-    <!-- ============================================================== palette -->
+    <!-- ============================================================== palette
+         "Aurora Light": the same design language as before (violet accent,
+         cyan highlight, one rectangular geometry, Segoe Fluent glyphs) but on a
+         bright canvas. Every surface is opaque white or a violet-tinted off-white,
+         every text token is dark enough for WCAG AA on those surfaces, and the
+         accent stays saturated so white glyphs on accent fills keep their
+         contrast. Screens compose these tokens; they never invent colors. -->
 
-    <!-- Canvas: obsidian graphite with a faint violet drift -->
+    <!-- Canvas: soft violet-tinted white -->
     <LinearGradientBrush x:Key="WindowBackdrop" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#060609" Offset="0"/>
-        <GradientStop Color="#0B0A12" Offset="0.52"/>
-        <GradientStop Color="#090810" Offset="1"/>
+        <GradientStop Color="#FBFAFF" Offset="0"/>
+        <GradientStop Color="#F3F1FA" Offset="0.52"/>
+        <GradientStop Color="#F7F5FC" Offset="1"/>
     </LinearGradientBrush>
 
-    <!-- Ambient aurora glows (Mica-inspired depth; window blurs these once) -->
+    <!-- Ambient glows: barely-there violet/cyan tints on a light canvas -->
     <RadialGradientBrush x:Key="GlowTopLeft" Center="0.06,-0.04" GradientOrigin="0.06,-0.04" RadiusX="0.85" RadiusY="0.7">
-        <GradientStop Color="#6B7C3AED" Offset="0"/>
+        <GradientStop Color="#1F7C3AED" Offset="0"/>
         <GradientStop Color="#007C3AED" Offset="1"/>
     </RadialGradientBrush>
     <RadialGradientBrush x:Key="GlowBottomRight" Center="1.0,1.06" GradientOrigin="1.0,1.06" RadiusX="0.9" RadiusY="0.75">
-        <GradientStop Color="#4D0891B2" Offset="0"/>
+        <GradientStop Color="#170891B2" Offset="0"/>
         <GradientStop Color="#000891B2" Offset="1"/>
     </RadialGradientBrush>
     <RadialGradientBrush x:Key="GlowCenter" Center="0.5,0.42" GradientOrigin="0.5,0.42" RadiusX="0.6" RadiusY="0.5">
-        <GradientStop Color="#244C1D95" Offset="0"/>
+        <GradientStop Color="#0F4C1D95" Offset="0"/>
         <GradientStop Color="#004C1D95" Offset="1"/>
     </RadialGradientBrush>
 
-    <!-- Elevation surfaces (translucent obsidian glass) -->
-    <SolidColorBrush x:Key="CardBrush"        Color="#C614121F"/>
-    <SolidColorBrush x:Key="CardHoverBrush"   Color="#E61C1928"/>
-    <SolidColorBrush x:Key="CardStrongBrush"  Color="#F21D1A2B"/>
-    <SolidColorBrush x:Key="PanelBrush"       Color="#A6100E19"/>
-    <SolidColorBrush x:Key="RailBrush"        Color="#2E120F1A"/>
-    <SolidColorBrush x:Key="OverlayBrush"     Color="#D90A0912"/>
-    <SolidColorBrush x:Key="CardBackgroundHover" Color="#1F8B5CF6"/>
+    <!-- Elevation surfaces: opaque whites and tinted off-whites (no glass on a
+         light canvas — depth comes from borders and soft shadows instead) -->
+    <SolidColorBrush x:Key="CardBrush"           Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="CardHoverBrush"      Color="#FDFAFF"/>
+    <SolidColorBrush x:Key="CardStrongBrush"     Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="PanelBrush"          Color="#FCFBFE"/>
+    <SolidColorBrush x:Key="CardBackgroundHover" Color="#146D28D9"/>
 
     <LinearGradientBrush x:Key="SidebarSurface" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#EE131020" Offset="0"/>
-        <GradientStop Color="#C20E0C17" Offset="1"/>
+        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+        <GradientStop Color="#F4F1FB" Offset="1"/>
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="SidebarBackground" Color="#0E0C16"/>
-    <SolidColorBrush x:Key="WindowBackground"  Color="#07070A"/>
+    <SolidColorBrush x:Key="WindowBackground"  Color="#F3F1F9"/>
 
-    <!-- Accent: the aurora family -->
-    <SolidColorBrush x:Key="PrimaryBrush"      Color="#8B5CF6"/>
-    <SolidColorBrush x:Key="PrimaryDarkBrush"  Color="#6D28D9"/>
-    <SolidColorBrush x:Key="PrimaryDimBrush"   Color="#33232135"/>
-    <SolidColorBrush x:Key="CyanBrush"         Color="#22D3EE"/>
-    <SolidColorBrush x:Key="AccentBorderBrush" Color="#668B5CF6"/>
+    <!-- Accent: the aurora family, darkened for a light canvas -->
+    <SolidColorBrush x:Key="PrimaryBrush"      Color="#6D28D9"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush"  Color="#5B21B6"/>
+    <SolidColorBrush x:Key="PrimaryDimBrush"   Color="#146D28D9"/>
+    <SolidColorBrush x:Key="CyanBrush"         Color="#0E7490"/>
+    <SolidColorBrush x:Key="AccentBorderBrush" Color="#4D6D28D9"/>
     <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#A78BFA" Offset="0"/>
-        <GradientStop Color="#7C3AED" Offset="1"/>
+        <GradientStop Color="#6D28D9" Offset="0"/>
+        <GradientStop Color="#5B21B6" Offset="1"/>
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="AccentGradientSoft" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#7C3AED" Offset="0"/>
-        <GradientStop Color="#4C1D95" Offset="1"/>
+        <GradientStop Color="#6D28D9" Offset="1"/>
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="AccentGradientCyan" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#22D3EE" Offset="0"/>
-        <GradientStop Color="#8B5CF6" Offset="1"/>
+        <GradientStop Color="#0E7490" Offset="0"/>
+        <GradientStop Color="#6D28D9" Offset="1"/>
     </LinearGradientBrush>
 
-    <!-- Text -->
-    <SolidColorBrush x:Key="TextBrush"     Color="#F5F3FB"/>
-    <SolidColorBrush x:Key="SubTextBrush"  Color="#A9A4BE"/>
-    <SolidColorBrush x:Key="FaintTextBrush" Color="#6F6A85"/>
-    <SolidColorBrush x:Key="BodySoftBrush" Color="#CDC8DE"/>
+    <!-- Text: AA or better on every surface token above -->
+    <SolidColorBrush x:Key="TextBrush"      Color="#1B1726"/>
+    <SolidColorBrush x:Key="SubTextBrush"   Color="#554F6B"/>
+    <SolidColorBrush x:Key="FaintTextBrush" Color="#7A7490"/>
+    <SolidColorBrush x:Key="BodySoftBrush"  Color="#35304A"/>
+    <SolidColorBrush x:Key="OnAccentBrush"  Color="#FFFFFF"/>
 
     <!-- Structure -->
-    <SolidColorBrush x:Key="DividerBrush"      Color="#17FFFFFF"/>
-    <SolidColorBrush x:Key="BorderLowBrush"    Color="#1FFFFFFF"/>
-    <SolidColorBrush x:Key="BorderHighBrush"   Color="#38FFFFFF"/>
-    <SolidColorBrush x:Key="NavActiveBrush"    Color="#2E2438"/>
-    <SolidColorBrush x:Key="PosterBackground"  Color="#13111C"/>
+    <SolidColorBrush x:Key="DividerBrush"      Color="#1A1B1726"/>
+    <SolidColorBrush x:Key="BorderLowBrush"    Color="#241B1726"/>
+    <SolidColorBrush x:Key="BorderHighBrush"   Color="#3D1B1726"/>
+    <SolidColorBrush x:Key="NavActiveBrush"    Color="#EDE7FB"/>
 
-    <!-- Status -->
-    <SolidColorBrush x:Key="OkBrush"     Color="#34D399"/>
-    <SolidColorBrush x:Key="WarnBrush"   Color="#FBBF24"/>
-    <SolidColorBrush x:Key="DangerBrush" Color="#FB7185"/>
-    <SolidColorBrush x:Key="InfoBrush"   Color="#38BDF8"/>
+    <!-- Status: dark enough to read as text on white; the *Soft variants are
+         the chip/badge backgrounds that go with them. -->
+    <SolidColorBrush x:Key="OkBrush"         Color="#15803D"/>
+    <SolidColorBrush x:Key="WarnBrush"       Color="#B45309"/>
+    <SolidColorBrush x:Key="DangerBrush"     Color="#B91C1C"/>
+    <SolidColorBrush x:Key="OkSoftBrush"     Color="#E6F6EC"/>
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBEAEA"/>
 
-    <!-- Inputs: darker and more opaque than the glass they sit in, so a field
-         always reads as an inset control rather than part of the panel. -->
-    <SolidColorBrush x:Key="InputBackground"      Color="#D90C0A13"/>
-    <SolidColorBrush x:Key="InputBackgroundHover" Color="#EE131020"/>
-    <SolidColorBrush x:Key="InputBorderBrush"     Color="#33FFFFFF"/>
+    <!-- Inputs: white and crisply bordered so a field reads as an inset control -->
+    <SolidColorBrush x:Key="InputBackground"      Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="InputBackgroundHover" Color="#FCFAFF"/>
+    <SolidColorBrush x:Key="InputBorderBrush"     Color="#331B1726"/>
 
-    <!-- Control surfaces: raised against the cards/panels around them -->
-    <SolidColorBrush x:Key="ControlBrush"        Color="#332B2540"/>
-    <SolidColorBrush x:Key="ControlHoverBrush"   Color="#4D3A3358"/>
-    <SolidColorBrush x:Key="ControlPressedBrush" Color="#2A2438"/>
+    <!-- Control surfaces: tinted greys that sit quietly inside white cards -->
+    <SolidColorBrush x:Key="ControlBrush"        Color="#F2EFF9"/>
+    <SolidColorBrush x:Key="ControlHoverBrush"   Color="#E7E1F6"/>
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#DCD4F0"/>
+
+    <!-- Placeholder artwork: what an empty poster/frame looks like -->
+    <SolidColorBrush x:Key="PlaceholderGlyphBrush" Color="#B9B2CC"/>
 
     <!-- ===================================================== corner geometry
          ONE rectangular scale for the whole application: every card, control,
@@ -133,7 +146,6 @@
          largest radius in the application (Radius.Card, 10 px) is well below
          half of the smallest control height, so no element can read as an oval
          whatever its content is. -->
-    <CornerRadius x:Key="Radius.None">0</CornerRadius>
     <CornerRadius x:Key="Radius.Xs">2</CornerRadius>
     <CornerRadius x:Key="Radius.Sm">4</CornerRadius>
     <CornerRadius x:Key="Radius.Control">6</CornerRadius>
@@ -161,11 +173,9 @@
     <sys:Double x:Key="IconChipSize">34</sys:Double>
 
     <!-- ============================================================ shadows -->
-    <DropShadowEffect x:Key="ShadowCard"     BlurRadius="14" ShadowDepth="3"  Direction="270" Opacity="0.38" Color="#000000"/>
-    <DropShadowEffect x:Key="ShadowPanel"    BlurRadius="20" ShadowDepth="5"  Direction="270" Opacity="0.44" Color="#000000"/>
-    <DropShadowEffect x:Key="ShadowElevated" BlurRadius="30" ShadowDepth="9"  Direction="270" Opacity="0.52" Color="#000000"/>
-    <DropShadowEffect x:Key="ShadowAccent"   BlurRadius="22" ShadowDepth="0"  Direction="270" Opacity="0.45" Color="#7C3AED"/>
-    <DropShadowEffect x:Key="ShadowCyan"     BlurRadius="22" ShadowDepth="0"  Direction="270" Opacity="0.35" Color="#22D3EE"/>
+    <DropShadowEffect x:Key="ShadowCard"     BlurRadius="14" ShadowDepth="2"  Direction="270" Opacity="0.10" Color="#1B1726"/>
+    <DropShadowEffect x:Key="ShadowElevated" BlurRadius="30" ShadowDepth="6"  Direction="270" Opacity="0.16" Color="#1B1726"/>
+    <DropShadowEffect x:Key="ShadowAccent"   BlurRadius="18" ShadowDepth="0"  Direction="270" Opacity="0.20" Color="#6D28D9"/>
 
     <FontFamily x:Key="AppFontFamily">Segoe UI Variable Display, Segoe UI Variable Text, Segoe UI</FontFamily>
 
@@ -249,11 +259,9 @@
     <sys:String x:Key="Icon.Remove">&#xE738;</sys:String>
     <sys:String x:Key="Icon.Delete">&#xE74D;</sys:String>
     <sys:String x:Key="Icon.Check">&#xE73E;</sys:String>
-    <sys:String x:Key="Icon.Checkbox">&#xE73A;</sys:String>
     <sys:String x:Key="Icon.Back">&#xE76B;</sys:String>
     <sys:String x:Key="Icon.Next">&#xE76C;</sys:String>
     <sys:String x:Key="Icon.ChevronDown">&#xE70D;</sys:String>
-    <sys:String x:Key="Icon.ChevronUp">&#xE70E;</sys:String>
     <sys:String x:Key="Icon.Home">&#xE80F;</sys:String>
     <sys:String x:Key="Icon.Cart">&#xE7BF;</sys:String>
     <sys:String x:Key="Icon.Library">&#xE8F1;</sys:String>
@@ -266,7 +274,6 @@
     <sys:String x:Key="Icon.Film">&#xE8B6;</sys:String>
     <sys:String x:Key="Icon.Tv">&#xE7F4;</sys:String>
     <sys:String x:Key="Icon.Play">&#xE768;</sys:String>
-    <sys:String x:Key="Icon.Pause">&#xE769;</sys:String>
     <sys:String x:Key="Icon.Stop">&#xE71A;</sys:String>
     <sys:String x:Key="Icon.ExternalLink">&#xE8A7;</sys:String>
     <sys:String x:Key="Icon.Info">&#xE946;</sys:String>
@@ -276,32 +283,14 @@
     <sys:String x:Key="Icon.Copy">&#xE8C8;</sys:String>
     <sys:String x:Key="Icon.People">&#xE716;</sys:String>
     <sys:String x:Key="Icon.Person">&#xE77B;</sys:String>
-    <sys:String x:Key="Icon.Star">&#xE734;</sys:String>
-    <sys:String x:Key="Icon.Calendar">&#xE787;</sys:String>
     <sys:String x:Key="Icon.History">&#xE81C;</sys:String>
-    <sys:String x:Key="Icon.Recent">&#xE823;</sys:String>
-    <sys:String x:Key="Icon.Sort">&#xE8CB;</sys:String>
-    <sys:String x:Key="Icon.Filter">&#xE71E;</sys:String>
     <sys:String x:Key="Icon.Cloud">&#xE753;</sys:String>
-    <sys:String x:Key="Icon.Link">&#xE71B;</sys:String>
-    <sys:String x:Key="Icon.Globe">&#xE7F2;</sys:String>
     <sys:String x:Key="Icon.HardDrive">&#xEDA2;</sys:String>
     <sys:String x:Key="Icon.Diagnostic">&#xE9D9;</sys:String>
-    <sys:String x:Key="Icon.Dots">&#xE712;</sys:String>
-    <sys:String x:Key="Icon.Flag">&#xE7C1;</sys:String>
     <sys:String x:Key="Icon.OpenFile">&#xE8E5;</sys:String>
-    <sys:String x:Key="Icon.Bolt">&#xEA3F;</sys:String>
-    <sys:String x:Key="Icon.Database">&#xEC26;</sys:String>
     <sys:String x:Key="Icon.Shield">&#xEA18;</sys:String>
-    <sys:String x:Key="Icon.Video">&#xE714;</sys:String>
-    <sys:String x:Key="Icon.Photo">&#xEB9F;</sys:String>
-    <sys:String x:Key="Icon.Mute">&#xE74F;</sys:String>
     <sys:String x:Key="Icon.Font">&#xE8D2;</sys:String>
-    <sys:String x:Key="Icon.Zip">&#xE9B2;</sys:String>
     <sys:String x:Key="Icon.Sync">&#xE895;</sys:String>
-    <sys:String x:Key="Icon.MapPin">&#xE8D3;</sys:String>
-    <sys:String x:Key="Icon.Bookmarks">&#xE8A4;</sys:String>
-    <sys:String x:Key="Icon.Rename">&#xE8AC;</sys:String>
     <sys:String x:Key="Icon.Scan">&#xE8FE;</sys:String>
     <!-- Window caption glyphs: no raw codepoints anywhere in the app -->
     <sys:String x:Key="Icon.Minimize">&#xE921;</sys:String>
@@ -334,7 +323,6 @@
     <Style x:Key="GlyphHero" TargetType="TextBlock" BasedOn="{StaticResource GlyphIcon}">
         <Setter Property="FontSize" Value="34"/>
     </Style>
-    <Style x:Key="NavGlyph" TargetType="TextBlock" BasedOn="{StaticResource GlyphMedium}"/>
 
     <!-- Accent icon tile for page headers and stat cards: a SQUARE tile with the
          tile radius — never a circle or an oval. -->
@@ -370,7 +358,7 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="1" CornerRadius="{StaticResource Radius.Tile}" Padding="12,8">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.5" Color="#000000"/>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.16" Color="#1B1726"/>
                         </Border.Effect>
                         <ContentPresenter/>
                     </Border>
@@ -386,7 +374,7 @@
          properly proportioned rounded rectangle. -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentGradient}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
         <Setter Property="Padding" Value="{StaticResource ControlPadding}"/>
         <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -425,8 +413,8 @@
                             </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Chrome" Property="Background" Value="#2A2438"/>
-                            <Setter Property="Foreground" Value="#6F6A85"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource FaintTextBrush}"/>
                             <Setter TargetName="Chrome" Property="Effect" Value="{x:Null}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -498,7 +486,7 @@
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#2E2438"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlPressedBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>
@@ -511,7 +499,7 @@
 
     <!-- Danger: rose outline that fills on hover -->
     <Style x:Key="DangerButton" TargetType="Button">
-        <Setter Property="Background" Value="#26FB7185"/>
+        <Setter Property="Background" Value="{StaticResource DangerSoftBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
         <Setter Property="Padding" Value="{StaticResource ControlPadding}"/>
         <Setter Property="MinHeight" Value="{StaticResource ControlMinHeight}"/>
@@ -521,7 +509,7 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
-                            BorderBrush="#55FB7185"
+                            BorderBrush="#59B91C1C"
                             BorderThickness="1"
                             CornerRadius="{StaticResource Radius.Control}"
                             Padding="{TemplateBinding Padding}">
@@ -529,12 +517,12 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#88FB7185"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource ShadowCyan}"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource DangerBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
+                            <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource ShadowCard}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#B9433F60"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="#EBD3D3"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>
@@ -569,7 +557,7 @@
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#2E2438"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ControlPressedBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>
@@ -595,11 +583,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#26FFFFFF"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="#14000000"/>
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#19FFFFFF"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="#1F000000"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -617,7 +605,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="#E81123"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="#B0001A"/>
@@ -630,7 +618,7 @@
 
     <!-- ================================================================ chips -->
     <Style x:Key="GenreChip" TargetType="Border">
-        <Setter Property="Background" Value="#23FFFFFF"/>
+        <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Xs}"/>
@@ -670,7 +658,7 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentGradient}"/>
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent"/>
                             <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource ShadowAccent}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -684,7 +672,7 @@
          ("DOCUMENTARY") inside a 999 px radius reads as a distorted oval, so
          they take the small radius instead. -->
     <Style x:Key="TypeBadge" TargetType="Border">
-        <Setter Property="Background" Value="#CC16001A"/>
+        <Setter Property="Background" Value="#D91B1726"/>
         <Setter Property="BorderBrush" Value="#40FFFFFF"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
@@ -698,20 +686,12 @@
     <!-- Status chip: small radius (never a pill) so long statuses such as
          "Awaiting destination" keep a calm rectangular background. -->
     <Style x:Key="StatusChip" TargetType="Border">
-        <Setter Property="Background" Value="#26FFFFFF"/>
+        <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource Radius.Sm}"/>
         <Setter Property="Padding" Value="11,4"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
-    </Style>
-
-    <!-- Legacy key kept as an alias so existing screens do not break -->
-
-    <Style x:Key="StatusDot" TargetType="Ellipse">
-        <Setter Property="Width" Value="9"/>
-        <Setter Property="Height" Value="9"/>
-        <Setter Property="Fill" Value="{StaticResource SubTextBrush}"/>
     </Style>
 
     <Style x:Key="AvailabilityDot" TargetType="Ellipse">
@@ -733,7 +713,7 @@
                         </Grid.ColumnDefinitions>
                         <Border x:Name="Track"
                                 Width="42" Height="22" CornerRadius="{StaticResource Radius.Sm}"
-                                Background="#33FFFFFF"
+                                Background="#2E1B1726"
                                 BorderBrush="{StaticResource BorderHighBrush}"
                                 BorderThickness="1">
                             <Border x:Name="Knob"
@@ -930,7 +910,7 @@
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                     SnapsToDevicePixels="True">
                                 <Border.Effect>
-                                    <DropShadowEffect BlurRadius="26" ShadowDepth="7" Opacity="0.55" Color="#000000"/>
+                                    <DropShadowEffect BlurRadius="26" ShadowDepth="5" Opacity="0.18" Color="#1B1726"/>
                                 </Border.Effect>
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,5">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
@@ -964,7 +944,7 @@
                                 VerticalAlignment="Center">
                             <TextBlock x:Name="CheckGlyph" Text="{StaticResource Icon.Check}"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                       FontSize="10.5" Foreground="White"
+                                       FontSize="10.5" Foreground="{StaticResource OnAccentBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Visibility="Collapsed"/>
                         </Border>
@@ -1012,7 +992,7 @@
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
                                             <Border Height="5" CornerRadius="{StaticResource Radius.Xs}"
-                                                    Background="#26FFFFFF"/>
+                                                    Background="#1F1B1726"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
                                 </RepeatButton>
@@ -1024,7 +1004,7 @@
                                             <Border Width="15" Height="15" CornerRadius="{StaticResource Radius.Xs}"
                                                     Background="White" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="3">
                                                 <Border.Effect>
-                                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.6" Color="#7C3AED"/>
+                                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.25" Color="#6D28D9"/>
                                                 </Border.Effect>
                                             </Border>
                                         </ControlTemplate>
@@ -1069,7 +1049,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentGradient}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                             <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource ShadowAccent}"/>
                         </Trigger>
@@ -1100,7 +1080,7 @@
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Xs}" Margin="2.5,0"
+                                            <Border Background="#4D1B1726" CornerRadius="{StaticResource Radius.Xs}" Margin="2.5,0"
                                                     Cursor="Hand"/>
                                         </ControlTemplate>
                                     </Thumb.Template>
@@ -1110,7 +1090,7 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Root" Property="Background" Value="#14FFFFFF"/>
+                            <Setter TargetName="Root" Property="Background" Value="#0A000000"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -1129,7 +1109,7 @@
                                         <Thumb>
                                             <Thumb.Template>
                                                 <ControlTemplate TargetType="Thumb">
-                                                    <Border Background="#33FFFFFF" CornerRadius="{StaticResource Radius.Xs}" Margin="0,2.5"
+                                                    <Border Background="#4D1B1726" CornerRadius="{StaticResource Radius.Xs}" Margin="0,2.5"
                                                             Cursor="Hand"/>
                                                 </ControlTemplate>
                                             </Thumb.Template>
@@ -1164,14 +1144,14 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#1FFFFFFF"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="#141B1726"/>
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource NavActiveBrush}"/>
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBorderBrush}"/>
                             <Setter TargetName="Chrome" Property="BorderThickness" Value="1"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource PrimaryDarkBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -1190,24 +1170,7 @@
         <Setter Property="Effect" Value="{StaticResource ShadowCard}"/>
     </Style>
 
-    <!-- Quieter panel card (level 1) -->
-    <Style x:Key="PanelCard" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}"/>
-        <Setter Property="Padding" Value="{StaticResource CardPaddingCompact}"/>
-    </Style>
-
     <!-- Floating glass panel (level 3, details/preview side rails) -->
-    <Style x:Key="FloatingPanel" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardStrongBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Popup}"/>
-        <Setter Property="Padding" Value="{StaticResource CardPaddingCompact}"/>
-        <Setter Property="Effect" Value="{StaticResource ShadowPanel}"/>
-    </Style>
 
     <!-- Stat tile with an icon chip and accent value -->
     <!-- StatCard is gone: the Management dashboard now shows ONE consolidated
@@ -1218,8 +1181,8 @@
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#1A1626" Offset="0"/>
-                    <GradientStop Color="#100E1A" Offset="1"/>
+                    <GradientStop Color="#F1EDF9" Offset="0"/>
+                    <GradientStop Color="#E6E0F2" Offset="1"/>
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
@@ -1238,14 +1201,6 @@
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
     </Style>
 
-    <!-- Legacy key kept: alias of PosterCard -->
-    <Style x:Key="PosterCardBorder" TargetType="Border" BasedOn="{StaticResource PosterCard}"/>
-
-    <Style x:Key="PosterScrim" TargetType="Border">
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Art}"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
-    </Style>
-
     <!-- Empty-state medallion: ringed rounded square holding one large glyph -->
     <Style x:Key="EmptyMedallion" TargetType="Border">
         <Setter Property="Width" Value="84"/>
@@ -1260,7 +1215,7 @@
     <!-- ========================================================== progress -->
     <Style TargetType="ProgressBar">
         <Setter Property="Height" Value="6"/>
-        <Setter Property="Background" Value="#22FFFFFF"/>
+        <Setter Property="Background" Value="#1F1B1726"/>
         <Setter Property="Foreground" Value="{StaticResource AccentGradientCyan}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Template">
@@ -1279,9 +1234,9 @@
                 <Setter Property="Foreground">
                     <Setter.Value>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="#22D3EE" Offset="0"/>
-                            <GradientStop Color="#8B5CF6" Offset="0.5"/>
-                            <GradientStop Color="#A78BFA" Offset="1"/>
+                            <GradientStop Color="#0E7490" Offset="0"/>
+                            <GradientStop Color="#6D28D9" Offset="0.5"/>
+                            <GradientStop Color="#7C3AED" Offset="1"/>
                         </LinearGradientBrush>
                     </Setter.Value>
                 </Setter>
@@ -1303,18 +1258,7 @@
         </Setter>
     </Style>
 
-    <!-- Settings row: label + description on the left, control on the right -->
-    <Style x:Key="SettingsRow" TargetType="Border">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="0,11"/>
-        <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
-    </Style>
-
     <!-- Quiet footer/status text row -->
-    <Style x:Key="StatusBarText" TargetType="TextBlock" BasedOn="{StaticResource SubText}">
-        <Setter Property="FontSize" Value="11.5"/>
-    </Style>
 
     <!-- Segmented navigation: rectangular radio segments inside a rectangular
          glass track (renamed from CapsuleTrack — nothing is a capsule any more) -->
@@ -1345,13 +1289,13 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#1FFFFFFF"/>
+                            <Setter TargetName="Chrome" Property="Background" Value="#141B1726"/>
                             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentGradient}"/>
                             <Setter TargetName="Chrome" Property="Effect" Value="{StaticResource ShadowAccent}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                     </ControlTemplate.Triggers>

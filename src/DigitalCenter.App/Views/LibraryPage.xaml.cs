@@ -33,13 +33,6 @@ public partial class LibraryPage : UserControl
     }
 
     /// <summary>Collections tab shortcut to the genre browser.</summary>
-    private void OnBrowseGenresClick(object sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { } vm)
-        {
-            vm.SelectedTab = LibraryTab.Genres;
-        }
-    }
 
     /// <summary>Home dashboard shortcut: every movie in its own category.</summary>
     private void OnShowAllMoviesClick(object sender, RoutedEventArgs e)

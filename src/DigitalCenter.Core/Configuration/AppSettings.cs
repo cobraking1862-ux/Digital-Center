@@ -54,8 +54,21 @@ public sealed class AppSettings
     public bool FetchTrailers { get; set; } = true;
 
     // ------------------------------------------------------ file operations
-    /// <summary>Ask for the destination folder (per matched file) before moving it into the library.</summary>
-    public bool AskForDestination { get; set; } = true;
+    /// <summary>
+    /// Move a matched Watch Folder file into the library automatically, without
+    /// waiting for the operator to confirm a destination. When this is off,
+    /// matched rows stay "Awaiting destination" until they are confirmed or
+    /// moved by hand with the per-file Browse / Move button.
+    /// </summary>
+    public bool AutoImportMatchedFiles { get; set; } = true;
+
+    /// <summary>
+    /// Organize the library by the detected original language: an import lands in
+    /// "&lt;MoviesRoot|SeriesRoot&gt;\&lt;Language&gt;" and the language folder is
+    /// created when it does not exist yet. Titles without a known language go
+    /// straight into the root.
+    /// </summary>
+    public bool OrganizeLibraryByLanguage { get; set; } = true;
 
     /// <summary>Rename imported files to the clean "Title (Year)" pattern instead of keeping the release name.</summary>
     public bool CleanFilenames { get; set; } = true;

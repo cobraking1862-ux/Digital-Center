@@ -27,6 +27,13 @@ public sealed record MatchOutcome
     /// <summary>Release/first-air year of the matched entry, when the search returned one.</summary>
     public int? Year { get; init; }
 
+    /// <summary>
+    /// Original language of the matched entry ("en", "ur", ...), when the search
+    /// returned one. The Watch Folder workflow uses it to file the import under
+    /// its language without another API request.
+    /// </summary>
+    public string? OriginalLanguage { get; init; }
+
     public bool IsMatch => TmdbId.HasValue;
 
     public static MatchOutcome None(string detail) => new() { TmdbId = null, Confidence = 0, Detail = detail };
@@ -142,6 +149,7 @@ public sealed class MetadataMatcher
                         Confidence = score,
                         Title = candidate.Title,
                         Year = candidate.Year,
+                        OriginalLanguage = candidate.OriginalLanguage,
                         Detail = $"Matched '{candidate.Title}" +
                                  (candidate.Year.HasValue ? $" ({candidate.Year.Value})" : "") +
                                  $"' by title/year (confidence {score:P0})."

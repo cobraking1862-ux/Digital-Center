@@ -108,7 +108,8 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
                 element.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
                 element.TryGetProperty("poster_path", out var pp) ? pp.GetString() : null,
                 IsSeries: false,
-                ReleaseInfo: releaseDate ?? string.Empty));
+                ReleaseInfo: releaseDate ?? string.Empty,
+                OriginalLanguage: element.TryGetProperty("original_language", out var ol) ? ol.GetString() : null));
         }
 
         _logger?.Info($"TMDb movie search for '{query}' returned {list.Count} result(s).");
@@ -139,7 +140,8 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
                 element.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
                 element.TryGetProperty("poster_path", out var pp) ? pp.GetString() : null,
                 IsSeries: true,
-                ReleaseInfo: firstAirDate ?? string.Empty));
+                ReleaseInfo: firstAirDate ?? string.Empty,
+                OriginalLanguage: element.TryGetProperty("original_language", out var ol) ? ol.GetString() : null));
         }
 
         _logger?.Info($"TMDb series search for '{query}' returned {list.Count} result(s).");

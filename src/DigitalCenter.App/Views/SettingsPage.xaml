@@ -144,7 +144,6 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
-                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="6,12,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- ===================== Library ===================== -->
@@ -266,6 +265,13 @@
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <TextBlock Text="File operations" Style="{StaticResource SectionTitle}"/>
+                                <CheckBox Content="Move matched Watch Folder files into the library automatically"
+                                          IsChecked="{Binding AutoImportMatchedFiles}" Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"/>
+                                <CheckBox Content="File imports into a folder per detected language (created when it is missing)"
+                                          IsChecked="{Binding OrganizeLibraryByLanguage}" Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"/>
+                                <TextBlock Style="{StaticResource CaptionText}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Text="Detection, metadata and the move happen in one Watch Folder pass: a new file is matched on TMDb, its original language decides the sub-folder under the movies or series root, and the folder is created the first time that language appears. Turning the automatic move off leaves matched files waiting in Management, where each row can still be moved by hand."/>
+                                <Separator Style="{StaticResource Divider}"/>
                                 <CheckBox Content="Rename imported files to clean names (uses the templates below)"
                                           IsChecked="{Binding CleanFilenames}" Style="{StaticResource ToggleSwitch}" Margin="0,12,0,0"/>
                                 <CheckBox Content="Verify SHA-256 hashes after copying to USB"
@@ -273,7 +279,7 @@
                                 <TextBlock Text="When the destination file already exists" Style="{StaticResource FieldLabel}"/>
                                 <ComboBox ItemsSource="{Binding ConflictOptions}" SelectedIndex="{Binding ConflictIndex}"
                                           Width="190" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Imports never overwrite silently: every move is previewed and confirmed in Management, and collisions are resolved by the policy above."
+                                <TextBlock Text="Imports never overwrite silently: every move is planned in Management and collisions are resolved by the policy above."
                                            Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
@@ -284,7 +290,7 @@
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
                                 <TextBlock Text="Naming &amp; organization" Style="{StaticResource SectionTitle}"/>
-                                <TextBlock Text="Templates for clean file names. There is no mandatory folder hierarchy — you choose the destination folder for every import."
+                                <TextBlock Text="Templates for clean file names. The folder hierarchy is optional: with language organization on, imports are filed under the detected language, and Management still lets you pick any other destination folder for a single file."
                                            Style="{StaticResource SubText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 <TextBlock Text="Movie file-name template ({Title}, {Year})" Style="{StaticResource FieldLabel}"/>
                                 <TextBox Text="{Binding MovieFilenameTemplate, UpdateSourceTrigger=PropertyChanged}"/>

@@ -58,9 +58,10 @@
                                              Margin="0,14,0,0"
                                              Visibility="{Binding IsBusy, Converter={StaticResource BusyToVisibility}}"/>
                                 <TextBlock Text="{Binding ProgressText}"
-                                           Style="{StaticResource StatusBarText}"
+                                           Style="{StaticResource CaptionText}"
                                            Margin="0,9,0,0"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding IsBusy, Converter={StaticResource BusyToVisibility}}"/>
                                 <Border Background="{StaticResource PanelBrush}" CornerRadius="{StaticResource Radius.Tile}" Padding="12,9" Margin="0,10,0,0"
                                         Visibility="{Binding HasScanSummary, Converter={StaticResource BusyToVisibility}}">
                                     <TextBox Text="{Binding ScanSummary, Mode=OneWay}"

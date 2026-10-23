@@ -100,22 +100,22 @@
               Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
             <Border>
                 <Image Source="{Binding BackdropPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
-                       Stretch="UniformToFill" Opacity="0.5" VerticalAlignment="Center"/>
+                       Stretch="UniformToFill" Opacity="0.45" VerticalAlignment="Center"/>
             </Border>
             <Border>
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0.15,0" EndPoint="0.15,1">
-                        <GradientStop Color="#44060609" Offset="0"/>
-                        <GradientStop Color="#66060609" Offset="0.5"/>
-                        <GradientStop Color="#EE08070D" Offset="1"/>
+                        <GradientStop Color="#33FFFFFF" Offset="0"/>
+                        <GradientStop Color="#B8FFFFFF" Offset="0.5"/>
+                        <GradientStop Color="#F5FFFFFF" Offset="1"/>
                     </LinearGradientBrush>
                 </Border.Background>
             </Border>
             <Border>
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                        <GradientStop Color="#22060609" Offset="0"/>
-                        <GradientStop Color="#CC060609" Offset="1"/>
+                        <GradientStop Color="#59FFFFFF" Offset="0"/>
+                        <GradientStop Color="#F2FFFFFF" Offset="1"/>
                     </LinearGradientBrush>
                 </Border.Background>
             </Border>
@@ -128,15 +128,15 @@
 
                 <!-- Portrait poster 2:3, lifted off the backdrop -->
                 <Grid Width="200" Height="300" VerticalAlignment="Center" Margin="0,0,28,0">
-                    <Border Background="#22000000" CornerRadius="{StaticResource Radius.Art}"
+                    <Border Background="#14000000" CornerRadius="{StaticResource Radius.Art}"
                             Margin="0,12,-6,-6" Effect="{StaticResource ShadowElevated}"/>
                     <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="{StaticResource Radius.Art}">
                         <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphHero}"
-                                   Foreground="#3A3450" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
                     </Border>
                     <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True"
-                            BorderBrush="#33FFFFFF" BorderThickness="1">
+                            BorderBrush="{StaticResource BorderHighBrush}" BorderThickness="1">
                         <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
                                Stretch="UniformToFill"/>
                     </Border>
@@ -407,17 +407,17 @@
                                                 BorderBrush="{StaticResource BorderLowBrush}"
                                                 BorderThickness="1" CornerRadius="{StaticResource Radius.Card}" Padding="12">
                                             <Border.Effect>
-                                                <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.3" Color="#000000"/>
+                                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.10" Color="#1B1726"/>
                                             </Border.Effect>
                                             <StackPanel>
                                                 <Grid Width="112" Height="112" HorizontalAlignment="Center">
                                                     <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="{StaticResource Radius.Art}">
                                                         <TextBlock Text="{StaticResource Icon.Person}" Style="{StaticResource GlyphLarge}"
-                                                                   Foreground="#3A3450" HorizontalAlignment="Center"
+                                                                   Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"/>
                                                     </Border>
                                                     <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True" Width="112" Height="112"
-                                                            BorderBrush="#22FFFFFF" BorderThickness="1">
+                                                            BorderBrush="{StaticResource BorderLowBrush}" BorderThickness="1">
                                                         <Image Source="{Binding ProfilePath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
                                                                Stretch="UniformToFill"/>
                                                     </Border>
@@ -490,8 +490,8 @@
                                                     </Border>
                                                     <DataTemplate.Triggers>
                                                         <DataTrigger Binding="{Binding HasFile}" Value="True">
-                                                            <Setter TargetName="RowChrome" Property="Background" Value="#1234D399"/>
-                                                            <Setter TargetName="RowChrome" Property="BorderBrush" Value="#3334D399"/>
+                                                            <Setter TargetName="RowChrome" Property="Background" Value="{StaticResource OkSoftBrush}"/>
+                                                            <Setter TargetName="RowChrome" Property="BorderBrush" Value="#4D15803D"/>
                                                             <Setter TargetName="AvailabilityMark" Property="Background" Value="{StaticResource OkBrush}"/>
                                                             <Setter TargetName="FileSummaryText" Property="Foreground" Value="{StaticResource OkBrush}"/>
                                                         </DataTrigger>
@@ -532,26 +532,6 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-
-                <!-- ================= status / details side rail ================= -->
-                <Border Grid.Row="1" Style="{StaticResource FloatingPanel}" Margin="0,22,0,0"
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphIcon}"
-                                   Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Top"/>
-                        <StackPanel Margin="11,0,0,0">
-                            <TextBlock Text="Library status" Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource SubText}" Margin="0,5,0,0"
-                                       TextWrapping="Wrap" MaxWidth="900"/>
-                            <TextBlock Text="{Binding Files[0].FileName}" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
-                                       TextWrapping="Wrap" ToolTip="{Binding Files[0].FilePath}"
-                                       Visibility="{Binding HasFiles, Converter={StaticResource BoolToVis}}"/>
-                            <TextBlock Text="{Binding TrailerName, StringFormat=Trailer: {0}}" Style="{StaticResource CaptionText}"
-                                       Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Visibility="{Binding HasTrailer, Converter={StaticResource BoolToVis}}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
             </Grid>
         </ScrollViewer>
     </Grid>

@@ -55,9 +55,9 @@
                         <Border Style="{StaticResource PosterPlaceholder}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
-                                           Foreground="#3A3450" HorizontalAlignment="Center"/>
+                                           Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="{Binding Initials}" FontSize="17" FontWeight="Bold"
-                                           Foreground="#584F78" HorizontalAlignment="Center"
+                                           Foreground="{StaticResource FaintTextBrush}" HorizontalAlignment="Center"
                                            Margin="0,8,0,0"/>
                             </StackPanel>
                         </Border>
@@ -71,7 +71,7 @@
 
                         <!-- Availability dot -->
                         <Ellipse Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                 Margin="0,14,14,0" Stroke="#66000000" StrokeThickness="1"
+                                 Margin="0,14,14,0" Stroke="#66FFFFFF" StrokeThickness="1"
                                  ToolTip="{Binding Availability}">
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
@@ -95,8 +95,8 @@
                         <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#00000000" Offset="0.42"/>
-                                    <GradientStop Color="#D9000000" Offset="1"/>
+                                    <GradientStop Color="#001B1726" Offset="0.42"/>
+                                    <GradientStop Color="#CC1B1726" Offset="1"/>
                                 </LinearGradientBrush>
                             </Border.Background>
                             <Button Style="{StaticResource SecondaryButton}" Padding="12,6"
@@ -244,8 +244,6 @@
                                  IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=Movies, Mode=TwoWay}"/>
                     <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Series"
                                  IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=Series, Mode=TwoWay}"/>
-                    <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Collections"
-                                 IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=Collections, Mode=TwoWay}"/>
                     <RadioButton Style="{StaticResource TopNavRadio}" GroupName="LibraryTabs" Content="Genres"
                                  IsChecked="{Binding SelectedTab, Converter={StaticResource EnumToBool}, ConverterParameter=Genres, Mode=TwoWay}"/>
                 </StackPanel>
@@ -311,27 +309,6 @@
                 <TextBlock Text="Import files with the Watch Folder (Management) or scan a library root in Settings › Application."
                            Style="{StaticResource SubText}" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="520"
                            TextAlignment="Center" HorizontalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- Collections notice -->
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                        Visibility="{Binding IsCollectionsTab, Converter={StaticResource BoolToVis}}">
-                <Border Style="{StaticResource CardBorder}" Padding="28" MaxWidth="520">
-                    <StackPanel>
-                        <Border Style="{StaticResource EmptyMedallion}">
-                            <TextBlock Text="{StaticResource Icon.Library}" Style="{StaticResource GlyphLarge}"
-                                       Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Collections" FontSize="21" FontWeight="SemiBold" Margin="0,18,0,0"
-                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="Franchise grouping is planned for a future release. Browse by genre in the meantime."
-                                   Style="{StaticResource SubText}" Margin="0,8,0,0" HorizontalAlignment="Center"
-                                   TextWrapping="Wrap" TextAlignment="Center"/>
-                        <Button Content="Browse by genre" Style="{StaticResource SecondaryButton}" Margin="0,20,0,0"
-                                HorizontalAlignment="Center"
-                                Click="OnBrowseGenresClick"/>
-                    </StackPanel>
-                </Border>
             </StackPanel>
 
             <!-- ============ Home dashboard: Movies + TV Series ============
@@ -467,9 +444,5 @@
             </Grid>
         </Grid>
 
-        <!-- Transient status -->
-        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}"
-                   VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,4,4"
-                   TextTrimming="CharacterEllipsis" MaxWidth="560"/>
     </Grid>
 </UserControl>

@@ -222,6 +222,7 @@ public sealed class WatchFolderService : IDisposable
             var result = await ScanOnceAsync(watchFolder, ct).ConfigureAwait(false);
             _lastAutomaticMatchUtc = DateTime.UtcNow;
             await _imports.MatchPendingAsync(ct).ConfigureAwait(false);
+            await _imports.AutoOrganizeAsync(ct).ConfigureAwait(false);
             return result;
         }
         finally
@@ -245,6 +246,11 @@ public sealed class WatchFolderService : IDisposable
             {
                 _lastAutomaticMatchUtc = DateTime.UtcNow;
                 await _imports.MatchPendingAsync(ct).ConfigureAwait(false);
+
+                // Self-organizing: a file that just matched is moved into the
+                // library (under its detected language) in the same pass, unless
+                // the operator asked to confirm destinations by hand.
+                await _imports.AutoOrganizeAsync(ct).ConfigureAwait(false);
             }
 
             return result;
