@@ -166,7 +166,6 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Text="Library" Style="{StaticResource EyebrowText}"
@@ -233,7 +232,7 @@
                              background work (Watch Folder, TMDb), file moves and
                              system events all land here instead of being
                              scattered over the individual screens. -->
-                        <Border Grid.Row="2" Margin="14,6,14,0"
+                        <Border Grid.Row="2" Margin="14,6,14,14"
                                 Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}">
                             <StackPanel>
                                 <Separator Style="{StaticResource Divider}" Margin="8,0,8,10"/>
@@ -343,26 +342,6 @@
                                 </Border>
                             </StackPanel>
                         </Border>
-
-                        <!-- Footer: version card -->
-                        <StackPanel Grid.Row="3" Margin="14,0,14,14"
-                                    Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}">
-                            <Separator Style="{StaticResource Divider}" Margin="8,4,8,10"/>
-                            <Border Background="{StaticResource ControlBrush}" CornerRadius="{StaticResource Radius.Card}" Padding="14,10">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="DigitalCenter" FontSize="11.5" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Aurora Light · 5.0.0" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <Ellipse Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center"
-                                             Fill="{StaticResource AccentGradientCyan}"/>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
                     </Grid>
                 </Border>
 

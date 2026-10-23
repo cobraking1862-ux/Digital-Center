@@ -21,13 +21,12 @@ public enum LibraryTab
 
     Movies,
     Series,
-    Collections,
     Genres
 }
 
 /// <summary>
 /// Home screen: grid-only library with portrait poster cards. The top
-/// navigation selects Movies / Series / Collections / Genres; the subbar
+/// navigation selects Movies / Series / Genres; the subbar
 /// offers year, language and sorting; the search box on the right is the only
 /// other header control.
 ///
@@ -160,13 +159,8 @@ public partial class LibraryViewModel : ObservableObject
         ? $"{HomeSeriesTotal} title(s)"
         : $"{HomeSeries.Count} of {HomeSeriesTotal} title(s)";
 
-    public bool IsCollectionsTab => SelectedTab == LibraryTab.Collections;
-
-    /// <summary>
-    /// The single-category poster grid is shown only off the Home dashboard and
-    /// off Collections (which have their own content).
-    /// </summary>
-    public bool IsCategoryGridVisible => !IsHomeTab && !IsCollectionsTab;
+    /// <summary>The poster grid is shown on every tab except the Home dashboard.</summary>
+    public bool IsCategoryGridVisible => !IsHomeTab;
 
     public bool IsGenresTab => SelectedTab == LibraryTab.Genres;
 
@@ -189,7 +183,6 @@ public partial class LibraryViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(IsHomeTab));
-        OnPropertyChanged(nameof(IsCollectionsTab));
         OnPropertyChanged(nameof(IsCategoryGridVisible));
         OnPropertyChanged(nameof(IsGenresTab));
         OnPropertyChanged(nameof(HasGenres));
@@ -202,7 +195,6 @@ public partial class LibraryViewModel : ObservableObject
     {
         LibraryTab.Movies => "Movies",
         LibraryTab.Series => "TV Series",
-        LibraryTab.Collections => "Collections",
         LibraryTab.Genres => "genres",
         _ => "the Home dashboard"
     };
@@ -316,16 +308,6 @@ public partial class LibraryViewModel : ObservableObject
 
     private async Task RefreshCoreAsync()
     {
-        if (IsCollectionsTab)
-        {
-            Items.Clear();
-            HomeMovies.Clear();
-            HomeSeries.Clear();
-            TotalMatchesText = string.Empty;
-            RaiseHomeState();
-            return; // The view shows the collections notice; no grid content.
-        }
-
         if (IsHomeTab)
         {
             // The dashboard loads BOTH categories in one go: landing on Home

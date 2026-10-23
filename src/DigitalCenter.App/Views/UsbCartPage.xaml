@@ -341,9 +341,6 @@
                                     Visibility="{Binding ResultSummaryText, Converter={StaticResource NullToVis}}">
                                 <TextBlock Text="{Binding ResultSummaryText}" TextWrapping="Wrap" FontSize="12"/>
                             </Border>
-                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="2,10,0,0"
-                                       TextWrapping="Wrap"
-                                       Visibility="{Binding StatusText, Converter={StaticResource NullToVis}}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

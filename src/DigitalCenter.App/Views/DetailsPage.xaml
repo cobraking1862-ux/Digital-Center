@@ -532,26 +532,6 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-
-                <!-- ================= status / details side rail ================= -->
-                <Border Grid.Row="1" Style="{StaticResource FloatingPanel}" Margin="0,22,0,0"
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphIcon}"
-                                   Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Top"/>
-                        <StackPanel Margin="11,0,0,0">
-                            <TextBlock Text="Library status" Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource SubText}" Margin="0,5,0,0"
-                                       TextWrapping="Wrap" MaxWidth="900"/>
-                            <TextBlock Text="{Binding Files[0].FileName}" Style="{StaticResource CaptionText}" Margin="0,6,0,0"
-                                       TextWrapping="Wrap" ToolTip="{Binding Files[0].FilePath}"
-                                       Visibility="{Binding HasFiles, Converter={StaticResource BoolToVis}}"/>
-                            <TextBlock Text="{Binding TrailerName, StringFormat=Trailer: {0}}" Style="{StaticResource CaptionText}"
-                                       Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Visibility="{Binding HasTrailer, Converter={StaticResource BoolToVis}}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
             </Grid>
         </ScrollViewer>
     </Grid>

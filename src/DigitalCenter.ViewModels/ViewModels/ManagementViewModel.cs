@@ -185,7 +185,6 @@ public partial class ManagementViewModel : ObservableObject
     [ObservableProperty] public partial bool PreviewIsMedia { get; set; }
     [ObservableProperty] public partial bool CanConfirmSelected { get; set; }
     [ObservableProperty] public partial bool CanSkipSelected { get; set; }
-    [ObservableProperty] public partial bool CanChooseDestination { get; set; }
 
     public bool IsMonitoring => _watchFolder.IsRunning;
 
@@ -349,14 +348,12 @@ public partial class ManagementViewModel : ObservableObject
                 DestinationPreviewText = preview.DestinationFolder;
                 PreviewTargetText = preview.PlannedTargetPath;
                 PreviewHasTarget = true;
-                CanChooseDestination = true;
             }
             else
             {
                 PreviewTargetText = log.TargetPath ?? string.Empty;
                 PreviewHasTarget = !string.IsNullOrEmpty(PreviewTargetText);
                 DestinationPreviewText = log.ChosenFolder ?? defaultFolder ?? string.Empty;
-                CanChooseDestination = log.Status == ImportStatuses.Matched;
             }
 
             CanConfirmSelected = log.Status is ImportStatuses.Matched or ImportStatuses.Approved;
@@ -617,42 +614,6 @@ public partial class ManagementViewModel : ObservableObject
         }
 
         await RefreshAsync();
-    }
-
-    [RelayCommand]
-    private async Task ChooseDestinationAsync()
-    {
-        if (SelectedItem is null)
-        {
-            return;
-        }
-
-        var log = await _imports.GetLogAsync(SelectedItem.Id);
-        if (log is null || log.Status != ImportStatuses.Matched)
-        {
-            return;
-        }
-
-        var settings = _settingsService.Load();
-        var startFolder = log.ChosenFolder ?? _imports.GetDefaultDestinationFolder(log.IsSeries, settings) ?? log.SourcePath;
-        var folder = _dialogs.PickFolder(startFolder, $"Choose the destination folder for '{log.ParsedTitle ?? log.SourceFile}'");
-        if (folder is null)
-        {
-            return; // The file keeps waiting; nothing is moved without a choice.
-        }
-
-        try
-        {
-            await _imports.ChooseDestinationAsync(log.Id, folder);
-            DestinationPreviewText = folder;
-            StatusText = $"Destination chosen: {folder}. Confirm the move when the preview looks right.";
-            _activity.Publish(StatusText, ActivityKind.FileOperation);
-            await RefreshAsync();
-        }
-        catch (Exception ex)
-        {
-            _dialogs.Error("Destination", ex.Message);
-        }
     }
 
     [RelayCommand]

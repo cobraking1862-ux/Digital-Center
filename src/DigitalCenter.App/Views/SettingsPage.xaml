@@ -144,7 +144,6 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
-                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="6,12,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
 
                     <!-- ===================== Library ===================== -->

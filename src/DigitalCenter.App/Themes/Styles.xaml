@@ -174,7 +174,6 @@
 
     <!-- ============================================================ shadows -->
     <DropShadowEffect x:Key="ShadowCard"     BlurRadius="14" ShadowDepth="2"  Direction="270" Opacity="0.10" Color="#1B1726"/>
-    <DropShadowEffect x:Key="ShadowPanel"    BlurRadius="20" ShadowDepth="3"  Direction="270" Opacity="0.12" Color="#1B1726"/>
     <DropShadowEffect x:Key="ShadowElevated" BlurRadius="30" ShadowDepth="6"  Direction="270" Opacity="0.16" Color="#1B1726"/>
     <DropShadowEffect x:Key="ShadowAccent"   BlurRadius="18" ShadowDepth="0"  Direction="270" Opacity="0.20" Color="#6D28D9"/>
 
@@ -292,7 +291,6 @@
     <sys:String x:Key="Icon.Shield">&#xEA18;</sys:String>
     <sys:String x:Key="Icon.Font">&#xE8D2;</sys:String>
     <sys:String x:Key="Icon.Sync">&#xE895;</sys:String>
-    <sys:String x:Key="Icon.MapPin">&#xE8D3;</sys:String>
     <sys:String x:Key="Icon.Scan">&#xE8FE;</sys:String>
     <!-- Window caption glyphs: no raw codepoints anywhere in the app -->
     <sys:String x:Key="Icon.Minimize">&#xE921;</sys:String>
@@ -1173,14 +1171,6 @@
     </Style>
 
     <!-- Floating glass panel (level 3, details/preview side rails) -->
-    <Style x:Key="FloatingPanel" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardStrongBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{StaticResource Radius.Popup}"/>
-        <Setter Property="Padding" Value="{StaticResource CardPaddingCompact}"/>
-        <Setter Property="Effect" Value="{StaticResource ShadowPanel}"/>
-    </Style>
 
     <!-- Stat tile with an icon chip and accent value -->
     <!-- StatCard is gone: the Management dashboard now shows ONE consolidated
@@ -1269,9 +1259,6 @@
     </Style>
 
     <!-- Quiet footer/status text row -->
-    <Style x:Key="StatusBarText" TargetType="TextBlock" BasedOn="{StaticResource SubText}">
-        <Setter Property="FontSize" Value="11.5"/>
-    </Style>
 
     <!-- Segmented navigation: rectangular radio segments inside a rectangular
          glass track (renamed from CapsuleTrack — nothing is a capsule any more) -->

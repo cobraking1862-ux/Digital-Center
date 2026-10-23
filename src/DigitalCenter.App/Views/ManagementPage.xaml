@@ -35,7 +35,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -252,11 +251,8 @@
             </StackPanel>
         </Border>
 
-        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="4,12,0,2"
-                   TextTrimming="CharacterEllipsis"/>
-
         <!-- ============ Activity list + file preview ============ -->
-        <Grid Grid.Row="4" Margin="0,8,0,0">
+        <Grid Grid.Row="3" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="7*"/>
                 <ColumnDefinition Width="14"/>
@@ -417,30 +413,15 @@
                                         <TextBlock Text="Move to Library"/>
                                     </StackPanel>
                                 </Button>
-                                <Grid Margin="0,9,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="9"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Stretch"
-                                            Command="{Binding ChooseDestinationCommand}"
-                                            IsEnabled="{Binding CanChooseDestination}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.MapPin}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                                            <TextBlock Text="Choose Destination…"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Column="2" Style="{StaticResource DangerButton}" HorizontalAlignment="Stretch"
-                                            Command="{Binding SkipFileCommand}"
-                                            IsEnabled="{Binding CanSkipSelected}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"
-                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                            <TextBlock Text="Skip File"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
+                                <Button Style="{StaticResource DangerButton}" HorizontalAlignment="Stretch" Margin="0,9,0,0"
+                                        Command="{Binding SkipFileCommand}"
+                                        IsEnabled="{Binding CanSkipSelected}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                        <TextBlock Text="Skip File"/>
+                                    </StackPanel>
+                                </Button>
                                 <TextBlock Text="Files without a reliable match stay in the Watch Folder untouched."
                                            Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
