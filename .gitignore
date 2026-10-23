@@ -53,3 +53,7 @@ TestResults/
 # OS
 .DS_Store
 Thumbs.db
+
+# Python tooling under tools/
+__pycache__/
+*.pyc

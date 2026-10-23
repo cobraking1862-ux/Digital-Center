@@ -169,12 +169,6 @@ public partial class MaintenanceViewModel : ObservableObject
         ImportCsvCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Called when the operator opens this page; reports are reloaded.</summary>
-    public void OnNavigatedTo()
-    {
-        ReloadBackups();
-    }
-
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {

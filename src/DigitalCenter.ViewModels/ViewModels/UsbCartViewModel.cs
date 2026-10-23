@@ -115,7 +115,6 @@ public partial class UsbCartViewModel : ObservableObject
 
     public bool HasItems => CartItems.Count > 0;
     public int CartCount => CartItems.Count;
-    public bool HasResults => ResultSummaryText.Length > 0;
 
     partial void OnIncludeFixedDrivesChanged(bool value) => RefreshDrives();
     partial void OnConflictIndexChanged(int value) => UpdateSpaceEstimate();

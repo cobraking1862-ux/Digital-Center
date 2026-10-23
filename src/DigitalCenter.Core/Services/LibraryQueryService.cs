@@ -150,26 +150,6 @@ public sealed class LibraryQueryService
     }
 
     /// <summary>
-    /// Returns the ids of all files belonging to the given titles (movies:
-    /// their files; series: the files of every episode). Used by the
-    /// "Add to USB Queue" action on the Library screen.
-    /// </summary>
-    public async Task<List<int>> GetFileIdsForTitlesAsync(IReadOnlyCollection<int> titleIds, CancellationToken ct = default)
-    {
-        if (titleIds.Count == 0)
-        {
-            return [];
-        }
-
-        await using var db = await _factory.CreateDbContextAsync(ct);
-        return await db.MediaFiles
-            .Where(f => (f.MovieTitleId != null && titleIds.Contains(f.MovieTitleId.Value)) ||
-                        (f.EpisodeId != null && titleIds.Contains(f.Episode!.Season.SeriesDetailsId)))
-            .Select(f => f.Id)
-            .ToListAsync(ct);
-    }
-
-    /// <summary>
     /// Returns the ids matching the free-text query, or null when no text
     /// filter is active. Uses FTS5 when available; otherwise LIKE across
     /// titles and people names.

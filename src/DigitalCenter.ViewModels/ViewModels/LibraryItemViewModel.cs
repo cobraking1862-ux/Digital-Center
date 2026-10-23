@@ -21,7 +21,6 @@ public sealed partial class LibraryItemViewModel : ObservableObject
         TypeDisplay = item.Type.ToString();
         PosterPath = item.PosterPath;
         Initials = UiFormat.Initials(item.Title);
-        Categories = item.Categories;
         Genres = item.Genres;
         FileSummary = item.FileCount == 1 ? "1 file" : $"{item.FileCount} files";
         SizeSummary = UiFormat.FormatBytes(item.TotalSize);
@@ -57,9 +56,7 @@ public sealed partial class LibraryItemViewModel : ObservableObject
     public string TypeDisplay { get; }
     public string? PosterPath { get; }
     public string Initials { get; }
-    public IReadOnlyList<string> Categories { get; }
     public IReadOnlyList<string> Genres { get; }
-    public string CategoriesText => Categories.Count == 0 ? "—" : string.Join(", ", Categories);
     public string GenresText => Genres.Count == 0 ? "—" : string.Join(", ", Genres);
     public string FileSummary { get; }
     public string SizeSummary { get; }
