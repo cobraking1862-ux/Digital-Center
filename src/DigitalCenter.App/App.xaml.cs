@@ -119,10 +119,17 @@ public partial class App : Application
             logger.Error("Recovering interrupted imports failed.", ex);
         }
 
-        // 2. Retry automatic matching for files detected while TMDb was offline.
+        // 2. Retry automatic matching for files detected while TMDb was offline,
+        //    then file the matched ones into the library (under their language).
         try
         {
             await importService.MatchPendingAsync();
+            var organized = await importService.AutoOrganizeAsync();
+            if (organized.Moved > 0)
+            {
+                // Files moved while the UI was starting: show the new library.
+                await mainViewModel.Library.RefreshSafeAsync();
+            }
         }
         catch (Exception ex)
         {

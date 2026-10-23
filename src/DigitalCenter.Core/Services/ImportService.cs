@@ -10,6 +10,9 @@ namespace DigitalCenter.Core.Services;
 /// <summary>Result of a completed (or failed) import confirmation.</summary>
 public sealed record ImportOutcome(bool Success, int? MediaTitleId, string? TargetPath, string Message);
 
+/// <summary>What one automatic organization pass did (see ImportService.AutoOrganizeAsync).</summary>
+public sealed record AutoOrganizeResult(int Moved, int Failed, int LeftWaiting);
+
 /// <summary>Everything the Management screen shows before the operator confirms a move.</summary>
 public sealed record ImportPreview(
     int LogId,
@@ -215,9 +218,10 @@ public sealed class ImportService
             {
                 log.IsSeries = outcome.IsSeries;
                 // TMDb metadata wins over the parsed name when it arrives. A
-                // search match already carries the catalogue title/year, so no
-                // second request is needed; only identifier matches (TMDb/IMDb
-                // tags) resolve their title here.
+                // search match already carries the catalogue title/year AND the
+                // original language, so no second request is needed; only
+                // identifier matches (TMDb/IMDb tags) resolve their title here.
+                var language = outcome.OriginalLanguage;
                 if (!string.IsNullOrWhiteSpace(outcome.Title))
                 {
                     log.ParsedTitle = outcome.Title;
@@ -242,13 +246,29 @@ public sealed class ImportService
                         {
                             log.ParsedYear = metadata.Year.Value;
                         }
+
+                        language ??= metadata.OriginalLanguage;
                     }
                 }
 
                 log.Status = ImportStatuses.Matched;
                 log.MetadataSource = "TMDb";
                 log.Note = outcome.Detail;
-                _logger?.Info($"Import matched: '{log.SourceFile}' → TMDb {outcome.TmdbId} ({outcome.Confidence:P0}).");
+
+                // When the language is known, plan the destination right away so
+                // the review list, the preview and the automatic move all agree on
+                // ONE folder: the library root for the media kind plus the folder
+                // of the detected language (created when it is missing). An
+                // explicit choice made earlier always wins, and without a known
+                // language nothing is pre-planned — the root is resolved when the
+                // move is confirmed.
+                if (!string.IsNullOrWhiteSpace(language) && string.IsNullOrWhiteSpace(log.ChosenFolder))
+                {
+                    log.ChosenFolder = GetDefaultDestinationFolder(log.IsSeries, _settings.Load(), language);
+                }
+
+                _logger?.Info($"Import matched: '{log.SourceFile}' → TMDb {outcome.TmdbId} ({outcome.Confidence:P0})" +
+                              (language is null ? "." : $", language '{language}' → '{log.ChosenFolder}'."));
             }
             else
             {
@@ -272,9 +292,35 @@ public sealed class ImportService
 
     // ------------------------------------------------------------ destination
 
-    /// <summary>Default destination folder for a matched file (movies root or series root).</summary>
-    public string? GetDefaultDestinationFolder(bool isSeries, AppSettings settings) =>
-        isSeries ? settings.SeriesRoot : settings.MoviesRoot;
+    /// <summary>
+    /// Default destination folder for a matched file: the movies or series root,
+    /// plus the sub-folder of the detected language when the library is organized
+    /// by language. A language folder that does not exist yet is created, so a
+    /// new language simply appears in the library root the first time it is seen.
+    /// Without a known language the root itself is the destination.
+    /// </summary>
+    public string? GetDefaultDestinationFolder(bool isSeries, AppSettings settings, string? languageCode = null)
+    {
+        var root = isSeries ? settings.SeriesRoot : settings.MoviesRoot;
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            return null;
+        }
+
+        if (!settings.OrganizeLibraryByLanguage)
+        {
+            return root;
+        }
+
+        var folder = LanguageFolder.Resolve(root, languageCode);
+        if (!string.Equals(folder, root, StringComparison.Ordinal))
+        {
+            Directory.CreateDirectory(folder);
+            _logger?.Info($"Library folder for language '{languageCode}' ready: '{folder}'.");
+        }
+
+        return folder;
+    }
 
     /// <summary>Records the operator's destination choice (step 6 of the workflow).</summary>
     public async Task ChooseDestinationAsync(int logId, string destinationFolder, CancellationToken ct = default)
@@ -361,7 +407,7 @@ public sealed class ImportService
         }
 
         var settings = _settings.Load();
-        var folder = destinationFolder ?? log.ChosenFolder;
+        var folder = destinationFolder ?? log.ChosenFolder ?? GetDefaultDestinationFolder(log.IsSeries, settings);
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
         {
             throw new InvalidOperationException("Choose an existing destination folder before confirming the move.");
@@ -374,6 +420,74 @@ public sealed class ImportService
         await db.SaveChangesAsync(ct); // Checkpoint: crash here → recovery re-runs the whole pipeline.
 
         return await ExecuteApprovedImportAsync(db, log, useTmdb: true, ct);
+    }
+
+    /// <summary>
+    /// Moves every matched Watch Folder file into the library without waiting for
+    /// the operator — the second half of the self-organizing Watch Folder: files
+    /// are detected, their metadata is fetched, and each one is filed under the
+    /// language it was detected in (the folder is created when it is missing).
+    /// Unmatched rows are left exactly as they are, and one failing file never
+    /// stops the rest of the pass.
+    /// </summary>
+    public async Task<AutoOrganizeResult> AutoOrganizeAsync(CancellationToken ct = default)
+    {
+        var settings = _settings.Load();
+        if (!settings.AutoImportMatchedFiles)
+        {
+            return new AutoOrganizeResult(0, 0, 0);
+        }
+
+        List<int> matched;
+        await using (var db = await _factory.CreateDbContextAsync(ct))
+        {
+            matched = await db.MetadataImportLogs
+                .Where(l => l.Status == ImportStatuses.Matched)
+                .OrderBy(l => l.Id)
+                .Select(l => l.Id)
+                .ToListAsync(ct);
+        }
+
+        if (matched.Count == 0)
+        {
+            return new AutoOrganizeResult(0, 0, 0);
+        }
+
+        ActivityReported?.Invoke($"Moving file to Library: {matched.Count} matched file(s) …");
+
+        var moved = 0;
+        var failed = 0;
+        foreach (var logId in matched)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var outcome = await ConfirmImportAsync(logId, null, ct);
+                if (outcome.Success)
+                {
+                    moved++;
+                }
+                else
+                {
+                    failed++;
+                }
+
+                ActivityReported?.Invoke(outcome.Success
+                    ? $"Moved into the library: {outcome.Message}"
+                    : $"Automatic move failed: {outcome.Message}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failed++;
+                _logger?.Error($"Automatic import of log {logId} failed.", ex);
+                ActivityReported?.Invoke($"Automatic move failed: {ex.Message}");
+            }
+        }
+
+        ActivityReported?.Invoke(
+            $"Automatic organization finished: {moved} file(s) moved into the library, {failed} failed.");
+
+        return new AutoOrganizeResult(moved, failed, matched.Count - moved - failed);
     }
 
     /// <summary>Skips a matched file; the file stays in the Watch Folder untouched.</summary>

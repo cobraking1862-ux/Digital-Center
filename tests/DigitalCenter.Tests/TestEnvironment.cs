@@ -85,7 +85,11 @@ public sealed class TestEnvironment : IDisposable
             MoviesRoot = Path.Combine(LibraryDir, "Movies"),
             SeriesRoot = Path.Combine(LibraryDir, "Series"),
             WatchFolderPath = WatchDir,
-            StabilityDelaySeconds = 2
+            StabilityDelaySeconds = 2,
+            // Tests drive the manual "match → choose → confirm" flow, so the
+            // automatic move stays off here; LanguageOrganizationTests turns it
+            // on explicitly to test the self-organizing Watch Folder.
+            AutoImportMatchedFiles = false
         });
         Directory.CreateDirectory(Path.Combine(LibraryDir, "Movies"));
         Directory.CreateDirectory(Path.Combine(LibraryDir, "Series"));

@@ -74,7 +74,12 @@ public partial class SettingsViewModel : ObservableObject
     public bool TmdbConfigured { get; }
 
     // ----------------------------------------------------- file operations
-    [ObservableProperty] public partial bool AskForDestination { get; set; }
+    /// <summary>Move matched Watch Folder files into the library without asking.</summary>
+    [ObservableProperty] public partial bool AutoImportMatchedFiles { get; set; }
+
+    /// <summary>File imports into "&lt;root&gt;\&lt;detected language&gt;", creating the folder when missing.</summary>
+    [ObservableProperty] public partial bool OrganizeLibraryByLanguage { get; set; }
+
     [ObservableProperty] public partial bool CleanFilenames { get; set; }
     [ObservableProperty] public partial int ConflictIndex { get; set; }
     [ObservableProperty] public partial bool VerifyHashes { get; set; }
@@ -100,7 +105,8 @@ public partial class SettingsViewModel : ObservableObject
         DownloadBackdrops = settings.DownloadBackdrops;
         DownloadCastProfiles = settings.DownloadCastProfiles;
         FetchTrailers = settings.FetchTrailers;
-        AskForDestination = settings.AskForDestination;
+        AutoImportMatchedFiles = settings.AutoImportMatchedFiles;
+        OrganizeLibraryByLanguage = settings.OrganizeLibraryByLanguage;
         CleanFilenames = settings.CleanFilenames;
         VerifyHashes = settings.VerifyHashes;
         UsbCopySubfolder = settings.UsbCopySubfolder;
@@ -128,7 +134,8 @@ public partial class SettingsViewModel : ObservableObject
         settings.DownloadBackdrops = DownloadBackdrops;
         settings.DownloadCastProfiles = DownloadCastProfiles;
         settings.FetchTrailers = FetchTrailers;
-        settings.AskForDestination = AskForDestination;
+        settings.AutoImportMatchedFiles = AutoImportMatchedFiles;
+        settings.OrganizeLibraryByLanguage = OrganizeLibraryByLanguage;
         settings.CleanFilenames = CleanFilenames;
         settings.UsbConflictAction = ConflictIndex switch
         {

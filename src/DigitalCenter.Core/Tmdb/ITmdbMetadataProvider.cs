@@ -9,7 +9,13 @@ public sealed record TmdbSearchCandidate(
     string? Overview,
     string? PosterPath,
     bool IsSeries,
-    string ReleaseInfo);
+    string ReleaseInfo,
+    /// <summary>
+    /// Original language as reported by the search ("en", "ur", "ko", ...). The
+    /// search response already carries it, so organizing an import by language
+    /// never costs a second request.
+    /// </summary>
+    string? OriginalLanguage = null);
 
 /// <summary>
 /// An episode entry of a season ("Poker Face", number 3). The optional TMDb
