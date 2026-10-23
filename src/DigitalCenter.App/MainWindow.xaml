@@ -43,42 +43,15 @@
         </DataTemplate>
     </Window.Resources>
 
-    <!-- ======================= aurora canvas (Mica-inspired) =================
-         Base obsidian gradient + two softly diffused accent glows + a faint
-         violet wash. Glows are plain radial gradients: diffuse by nature, so
-         no BlurEffect cost anywhere in the visual tree. -->
-    <Grid>
-        <Grid.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#060609" Offset="0"/>
-                <GradientStop Color="#0B0A12" Offset="0.52"/>
-                <GradientStop Color="#090810" Offset="1"/>
-            </LinearGradientBrush>
-        </Grid.Background>
-        <Rectangle>
-            <Rectangle.Fill>
-                <RadialGradientBrush Center="0.06,-0.04" GradientOrigin="0.06,-0.04" RadiusX="0.85" RadiusY="0.7">
-                    <GradientStop Color="#577C3AED" Offset="0"/>
-                    <GradientStop Color="#007C3AED" Offset="1"/>
-                </RadialGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
-        <Rectangle>
-            <Rectangle.Fill>
-                <RadialGradientBrush Center="1.0,1.06" GradientOrigin="1.0,1.06" RadiusX="0.9" RadiusY="0.75">
-                    <GradientStop Color="#380891B2" Offset="0"/>
-                    <GradientStop Color="#000891B2" Offset="1"/>
-                </RadialGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
-        <Rectangle>
-            <Rectangle.Fill>
-                <RadialGradientBrush Center="0.5,0.42" GradientOrigin="0.5,0.42" RadiusX="0.6" RadiusY="0.5">
-                    <GradientStop Color="#1A4C1D95" Offset="0"/>
-                    <GradientStop Color="#004C1D95" Offset="1"/>
-                </RadialGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
+    <!-- ======================= aurora canvas =================
+         Base gradient + two softly diffused accent glows + a faint violet wash,
+         all pulled from the theme tokens so the canvas always follows the
+         palette. Glows are plain radial gradients: diffuse by nature, so no
+         BlurEffect cost anywhere in the visual tree. -->
+    <Grid Background="{StaticResource WindowBackdrop}">
+        <Rectangle Fill="{StaticResource GlowTopLeft}"/>
+        <Rectangle Fill="{StaticResource GlowBottomRight}"/>
+        <Rectangle Fill="{StaticResource GlowCenter}"/>
 
         <Grid>
             <Grid.RowDefinitions>
@@ -113,7 +86,7 @@
                         <Border CornerRadius="{StaticResource Radius.Control}" Background="{StaticResource AccentGradient}"
                                 BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.5" Color="#7C3AED"/>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.22" Color="#6D28D9"/>
                             </Border.Effect>
                         </Border>
                         <TextBlock Text="{StaticResource Icon.Play}" Style="{StaticResource GlyphXs}"
@@ -121,9 +94,9 @@
                     </Grid>
                     <TextBlock Text="DigitalCenter" Style="{StaticResource AppTitle}" Margin="11,0,0,0"
                                VerticalAlignment="Center"/>
-                    <Border Background="#268B5CF6" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
+                    <Border Background="{StaticResource PrimaryDimBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
                             CornerRadius="{StaticResource Radius.Xs}" Padding="8,3" Margin="11,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="5.0" FontSize="10.5" FontWeight="SemiBold" Foreground="#D9C9FF"/>
+                        <TextBlock Text="5.0" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource PrimaryDarkBrush}"/>
                     </Border>
                 </StackPanel>
 
@@ -185,7 +158,7 @@
                 <Border x:Name="Sidebar"
                         Grid.Column="0"
                         Background="{StaticResource SidebarSurface}"
-                        BorderBrush="#1FFFFFFF"
+                        BorderBrush="{StaticResource BorderLowBrush}"
                         BorderThickness="0,0,1,0"
                         Width="248">
                     <Grid>
@@ -220,7 +193,7 @@
                                         <Border x:Name="IconChipHost"
                                                 Width="{StaticResource IconChipSize}" Height="{StaticResource IconChipSize}"
                                                 CornerRadius="{StaticResource Radius.Tile}"
-                                                Background="#22FFFFFF" HorizontalAlignment="Center">
+                                                Background="{StaticResource ControlBrush}" HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding Glyph}"
                                                        Style="{StaticResource GlyphIcon}"
                                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
@@ -283,7 +256,7 @@
                                     </Button>
                                 </Grid>
 
-                                <Border Background="#14FFFFFF" BorderBrush="{StaticResource BorderLowBrush}"
+                                <Border Background="{StaticResource ControlBrush}" BorderBrush="{StaticResource BorderLowBrush}"
                                         BorderThickness="1" CornerRadius="{StaticResource Radius.Control}"
                                         Margin="0,8,0,0" Padding="9,8" MaxHeight="186">
                                     <Grid>
@@ -375,7 +348,7 @@
                         <StackPanel Grid.Row="3" Margin="14,0,14,14"
                                     Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}">
                             <Separator Style="{StaticResource Divider}" Margin="8,4,8,10"/>
-                            <Border Background="#1FFFFFFF" CornerRadius="{StaticResource Radius.Card}" Padding="14,10">
+                            <Border Background="{StaticResource ControlBrush}" CornerRadius="{StaticResource Radius.Card}" Padding="14,10">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -383,16 +356,10 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <TextBlock Text="DigitalCenter" FontSize="11.5" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Obsidian Aurora · 5.0.0" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
+                                        <TextBlock Text="Aurora Light · 5.0.0" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
                                     </StackPanel>
-                                    <Ellipse Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center">
-                                        <Ellipse.Fill>
-                                            <RadialGradientBrush>
-                                                <GradientStop Color="#8B5CF6" Offset="0"/>
-                                                <GradientStop Color="#22D3EE" Offset="1"/>
-                                            </RadialGradientBrush>
-                                        </Ellipse.Fill>
-                                    </Ellipse>
+                                    <Ellipse Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center"
+                                             Fill="{StaticResource AccentGradientCyan}"/>
                                 </Grid>
                             </Border>
                         </StackPanel>

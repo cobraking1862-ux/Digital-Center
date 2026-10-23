@@ -55,9 +55,9 @@
                         <Border Style="{StaticResource PosterPlaceholder}">
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphLarge}"
-                                           Foreground="#3A3450" HorizontalAlignment="Center"/>
+                                           Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock Text="{Binding Initials}" FontSize="17" FontWeight="Bold"
-                                           Foreground="#584F78" HorizontalAlignment="Center"
+                                           Foreground="{StaticResource FaintTextBrush}" HorizontalAlignment="Center"
                                            Margin="0,8,0,0"/>
                             </StackPanel>
                         </Border>
@@ -71,7 +71,7 @@
 
                         <!-- Availability dot -->
                         <Ellipse Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                 Margin="0,14,14,0" Stroke="#66000000" StrokeThickness="1"
+                                 Margin="0,14,14,0" Stroke="#66FFFFFF" StrokeThickness="1"
                                  ToolTip="{Binding Availability}">
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
@@ -95,8 +95,8 @@
                         <Border x:Name="HoverScrim" CornerRadius="{StaticResource Radius.Art}" Opacity="0" IsHitTestVisible="True">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#00000000" Offset="0.42"/>
-                                    <GradientStop Color="#D9000000" Offset="1"/>
+                                    <GradientStop Color="#001B1726" Offset="0.42"/>
+                                    <GradientStop Color="#CC1B1726" Offset="1"/>
                                 </LinearGradientBrush>
                             </Border.Background>
                             <Button Style="{StaticResource SecondaryButton}" Padding="12,6"
