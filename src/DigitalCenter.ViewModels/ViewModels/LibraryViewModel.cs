@@ -256,22 +256,36 @@ public partial class LibraryViewModel : ObservableObject
 
     private bool _refreshRunning;
     private bool _refreshQueued;
+    private Task _activeRefresh = Task.CompletedTask;
 
     /// <summary>
     /// The single entry point for a library reload. Overlapping reloads are
     /// coalesced instead of running at the same time: two passes clearing and
     /// refilling <see cref="Items"/> concurrently is what produced doubled rows,
     /// a lost selection and duplicated year/language filter entries.
+    ///
+    /// Every caller receives the task for the active reload, including callers
+    /// that arrive while it is already running. Startup can therefore await this
+    /// method and know that the homepage collections have actually been
+    /// rehydrated; returning early here used to make that await a no-op.
     /// </summary>
-    public async Task RefreshSafeAsync()
+    public Task RefreshSafeAsync()
     {
         if (_refreshRunning)
         {
             _refreshQueued = true;
-            return;
+            return _activeRefresh;
         }
 
         _refreshRunning = true;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _activeRefresh = completion.Task;
+        _ = RefreshLoopAsync(completion);
+        return _activeRefresh;
+    }
+
+    private async Task RefreshLoopAsync(TaskCompletionSource completion)
+    {
         try
         {
             do
@@ -291,6 +305,7 @@ public partial class LibraryViewModel : ObservableObject
         finally
         {
             _refreshRunning = false;
+            completion.TrySetResult();
         }
     }
 

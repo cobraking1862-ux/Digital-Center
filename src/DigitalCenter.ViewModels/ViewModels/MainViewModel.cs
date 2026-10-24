@@ -49,6 +49,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IAppLogger _logger;
+    private bool _navigationReady;
 
     public MainViewModel(
         LibraryViewModel library,
@@ -77,9 +78,13 @@ public partial class MainViewModel : ObservableObject
             new NavItem("Settings", "\uE713", settings)
         ];
 
+        // Establish the initial navigation state without starting a query from
+        // the constructor. App.OnStartup explicitly awaits InitializeAsync;
+        // constructor/Loaded-triggered loads used to race that startup load.
         SelectedNavItem = NavItems[0];
         CurrentPage = library;
         IsSidebarOpen = true;
+        _navigationReady = true;
 
         // Sidebar badge: number of titles waiting in the USB cart.
         usbCart.PropertyChanged += (_, e) =>
@@ -157,7 +162,13 @@ public partial class MainViewModel : ObservableObject
 
     public DetailsViewModel? Details { get; private set; }
 
-    partial void OnSelectedNavItemChanged(NavItem value) => ApplyNav(value);
+    partial void OnSelectedNavItemChanged(NavItem value)
+    {
+        if (_navigationReady)
+        {
+            ApplyNav(value);
+        }
+    }
 
     /// <summary>Puts a destination on screen and loads it (one place only).</summary>
     private void ApplyNav(NavItem value)
