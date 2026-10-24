@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DigitalCenter.Core\DigitalCenter.Core.csproj" />
+    <ProjectReference Include="..\..\src\DigitalCenter.ViewModels\DigitalCenter.ViewModels.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -99,7 +99,7 @@ a TMDb token is configured.
 | ORM              | Entity Framework Core 10 (SQLite provider)   |
 | Full-text search | SQLite FTS5 (bundled SQLite has it built in) |
 | TMDb             | Official REST API v3 via HttpClient (bearer token) |
-| Tests            | xUnit (203 test cases, all offline)          |
+| Tests            | xUnit (204 test cases, all offline)          |
 
 Note: CommunityToolkit.Mvvm is pinned to **8.4.2** — 8.4.0 source generators
 do not emit members under the .NET 10 SDK's Roslyn 5.0 compiler.
@@ -122,7 +122,7 @@ DigitalCenter.slnx
 │   ├── DigitalCenter.ViewModels/   View models (CommunityToolkit.Mvvm) + UI service interfaces
 │   └── DigitalCenter.App/          WPF application (views, DI composition root, dialogs)
 ├── tests/
-│   └── DigitalCenter.Tests/        Unit + integration tests (203 cases, all offline)
+│   └── DigitalCenter.Tests/        Unit + integration tests (204 cases, all offline)
 └── tools/                          Offline checkers used while working on the repo
     ├── xaml_lint.py                XAML well-formedness, resource keys, glyph codepoints
     ├── csharp_literal_lint.py      unterminated string/char literals
@@ -410,7 +410,9 @@ small 8 px status dots stay circular; they are indicators, not containers.
 
 ## Testing
 
-203 test cases cover the highest-risk behavior: filename parsing (movies with
+204 test cases cover the highest-risk behavior: cold-start homepage rehydration
+(an awaited refresh joining an in-flight load cannot complete before the persisted
+movie/series cards and their filter options are populated), filename parsing (movies with
 years; every supported series marker format — `S01E01`, `S01.E01`, `S01 E01`,
 `S01_E01`, `1x01`, `Season 1 Episode 1`, `E01`, folder season hints — with
 quality tags, release years and extra punctuation; ambiguous/malformed names;

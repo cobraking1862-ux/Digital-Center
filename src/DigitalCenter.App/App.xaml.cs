@@ -59,15 +59,18 @@ public partial class App : Application
             };
 
             MainWindow = mainWindow;
-            mainWindow.Show();
 
             Services.GetRequiredService<ActivityFeed>().Publish("DigitalCenter started.", ActivityKind.System);
 
-            // Load the first screens BEFORE any maintenance work. The library
-            // grid and the cart badge must never depend on import recovery or on
-            // TMDb being reachable — waiting for that left Home empty until the
-            // user switched between Movies and Series.
+            // Rehydrate the first screens BEFORE showing the view and BEFORE any
+            // maintenance work. Showing first raised LibraryPage.Loaded, which
+            // started another refresh while this one was still running; the
+            // coalesced call then returned immediately and startup continued as
+            // though Home had loaded. InitializeAsync now owns the one startup
+            // query and its task represents the completed homepage load.
             await mainViewModel.InitializeAsync();
+
+            mainWindow.Show();
 
             // Complete interrupted imports in the background, then start
             // Watch Folder monitoring. Both are non-blocking for the UI.
