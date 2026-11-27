@@ -152,6 +152,7 @@ public sealed class ImdbLookupService
 
     public static IReadOnlyList<LookupSiteEntry> GetDefaultSites() =>
     [
+        new() { Id = DownloadWorkflowIds.BigOneSite, Name = "BollyFlix", UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}", IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-imdb", Name = "IMDb", UrlTemplate = "https://www.imdb.com/title/{imdb_id}/", IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-tmdb", Name = "TMDb", UrlTemplate = "https://www.themoviedb.org/search?query={query}", IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-justwatch", Name = "JustWatch", UrlTemplate = "https://www.justwatch.com/us/search?q={title}", IsEnabled = true, IsBuiltIn = true },
