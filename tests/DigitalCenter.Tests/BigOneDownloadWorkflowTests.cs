@@ -358,6 +358,19 @@ public sealed class BigOneDownloadWorkflowTests
     }
 
     [Fact]
+    public void LookupSiteMigration_LeavesFreshDefaultListEmptyForDefaultCatalogFallback()
+    {
+        var settings = new AppSettings { Version = 10, LookupSites = [] };
+
+        SettingsService.MigrateLegacy(settings);
+
+        Assert.Equal(11, settings.Version);
+        Assert.Empty(settings.LookupSites);
+        Assert.Contains(ImdbLookupService.GetDefaultSites(), site => site.Id == DownloadWorkflowIds.BigOneSite);
+        Assert.Contains(ImdbLookupService.GetDefaultSites(), site => site.Id == "builtin-imdb");
+    }
+
+    [Fact]
     public void LookupSiteMigration_DoesNotReAddAnIntentionallyRemovedBollyFlixSite()
     {
         var settings = new AppSettings { Version = 11, LookupSites = [] };
