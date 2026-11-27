@@ -20,12 +20,13 @@ public static class DownloadQualityTiers
     ];
 }
 
-/// <summary>Stable provider IDs for built-in authorized download workflows.</summary>
+/// <summary>Stable identifiers for explicitly assigned, implemented site workflows.</summary>
 public static class DownloadWorkflowIds
 {
     public const string None = "";
-    public const string DirectLink = "direct-link";
-    public const string MultiStepLink = "multi-step-link";
+    public const string BigOne = "big-one";
+    public const string BigOneSite = "builtin-bollyflix";
+    public const string BigOneSiteUrl = "https://new1.bollyflix.tours/";
 }
 
 /// <summary>
@@ -47,7 +48,7 @@ public sealed class DownloadSettings
     /// <summary>When true, importing a movie via Watch Folder automatically marks matching Open tickets Completed.</summary>
     public bool AutoCompleteTicketsOnImport { get; set; } = true;
 
-    /// <summary>Maps LookupSiteEntry.Id -&gt; registered workflow ProviderId.</summary>
+    /// <summary>Maps LookupSiteEntry.Id to its explicitly assigned workflow identifier.</summary>
     public Dictionary<string, string> SiteWorkflowBindings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -88,6 +89,27 @@ public sealed class DownloadSettingsService
             if (string.IsNullOrWhiteSpace(loaded.PreferredQuality))
             {
                 loaded.PreferredQuality = DownloadQualityTiers.Q1080p;
+            }
+
+            // Remove only the two retired workflow IDs. Do not migrate them to BigOne:
+            // assignments are site-specific and require an explicit operator choice.
+            var obsoleteSiteIds = loaded.SiteWorkflowBindings
+                .Where(pair => pair.Value.Equals("direct-link", StringComparison.OrdinalIgnoreCase) ||
+                               pair.Value.Equals("multi-step-link", StringComparison.OrdinalIgnoreCase))
+                .Select(pair => pair.Key)
+                .ToList();
+
+            foreach (var siteId in obsoleteSiteIds)
+            {
+                loaded.SiteWorkflowBindings.Remove(siteId);
+            }
+
+            // The file was successfully parsed, so it is safe to persist the additive
+            // compatibility cleanup. A write failure must not prevent use of loaded settings.
+            if (obsoleteSiteIds.Count > 0)
+            {
+                try { Save(loaded); }
+                catch (Exception) { /* retain the in-memory sanitized settings */ }
             }
 
             return loaded;
