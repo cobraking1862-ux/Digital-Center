@@ -54,6 +54,27 @@ public sealed class SettingsService
     /// </summary>
     public static void MigrateLegacy(AppSettings settings)
     {
+        // Version 11 adds the designated BollyFlix Lookup Site with a stable ID.
+        // Preserve every existing/custom site and do not assign BigOne automatically.
+        if (settings.Version < 11)
+        {
+            settings.LookupSites ??= [];
+            if (!settings.LookupSites.Any(site =>
+                    string.Equals(site.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase)))
+            {
+                settings.LookupSites.Insert(0, new LookupSiteEntry
+                {
+                    Id = DownloadWorkflowIds.BigOneSite,
+                    Name = "BollyFlix",
+                    UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}",
+                    IsEnabled = true,
+                    IsBuiltIn = true
+                });
+            }
+
+            settings.Version = 11;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.MoviesRoot) &&
             string.IsNullOrWhiteSpace(settings.SeriesRoot) &&
             !string.IsNullOrWhiteSpace(settings.LibraryRoot))
