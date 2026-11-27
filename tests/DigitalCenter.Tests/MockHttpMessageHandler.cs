@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 
 namespace DigitalCenter.Tests;
 
@@ -9,7 +10,13 @@ namespace DigitalCenter.Tests;
 /// </summary>
 public sealed class MockHttpMessageHandler : HttpMessageHandler
 {
-    public sealed record Response(int StatusCode, string Body, string ContentType = "text/html", string? Location = null);
+    public sealed record Response(
+        int StatusCode,
+        string Body,
+        string ContentType = "text/html",
+        string? Location = null,
+        string? FileName = null,
+        bool IsAttachment = false);
 
     private readonly Dictionary<string, Response> _routes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Response> _hostRoutes = new(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +69,14 @@ public sealed class MockHttpMessageHandler : HttpMessageHandler
         if (response.Location is not null)
         {
             message.Headers.Location = new Uri(response.Location, UriKind.RelativeOrAbsolute);
+        }
+
+        if (response.IsAttachment)
+        {
+            message.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
+            {
+                FileName = response.FileName ?? "sample-download.bin"
+            };
         }
 
         return Task.FromResult(message);
