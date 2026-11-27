@@ -5,27 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-- Multi-Step Host Workflow now follows the real download chain end-to-end: search page → movie page → `dl.fastdlserver.site` (preferred over `linksmod.top` "Download Links" mirrors) → gdflix `/file/` page → `/cloud/` page (rebuilt on `new10.gdflix.io`) → direct file handed to IDM. Previously it died after 3 hops and followed the wrong (linksmod) host.
-- `dl.fastdlserver.site/?id=...&type=file` anchors are no longer misclassified as navigation taxonomy (root path with a query is a parameterized download endpoint), which previously made them invisible as candidates.
-- Relative gdflix `/cloud/<id>/<token>` links are pinned to `new10.gdflix.io` instead of whichever mirror served the intermediate page.
-- `WorkflowHttpHelpers.FetchAsync` follows 3xx redirects itself (capped at 5), so the workflow works with `HttpClient` handlers that disable auto-redirect.
-- Download anchors without a quality label (e.g. "🚀 Google Drive") now inherit the quality tier of the `<h5>` heading above them, so the 480p/720p/1080p/2160p sections are ranked correctly.
-- `/login`, `/signin`, `/register`, `/signup` paths are ignored during hop selection so the workflow never follows a gdflix "Login To DL" button.
-- Raised `MaxHops` from 3 to 5 (the real chain needs 4) and added login/auth paths to the ignored navigation list.
-- Recreated the `tests/DigitalCenter.Tests` project with 8 xUnit tests, including a mock-HTTP end-to-end replay of the captured fastdlserver → gdflix cloud chain.
+## [14.0.0] - 2026-11-27
 
 ### Added
-- `docs/ARCHITECTURE.md` documenting the 3-layer separation, SQLite + FTS5 data flow, and core services/ViewModels.
-- `CHANGELOG.md` initialized in Keep a Changelog format.
-- `GEMINI.md` with concise AI agent instructions, layer boundaries, commands, guardrails.
-- `.geminiignore` to exclude build artifacts, binaries, and local database/cache files from AI agent context.
+- Added the built-in BollyFlix Lookup Site with stable ID `builtin-bollyflix`; BigOne is available only when explicitly assigned to this site.
+- Added the dedicated BigOne workflow for the captured BollyFlix listing, title-page quality sections, FastDLServer file-host page, and GDFlix cloud landing page.
+- Added bounded, stage-aware redirect validation, approved-host checks, cloud-origin validation, final download-response verification, and browser hand-off outcomes.
+- Added sanitized BigOne HTML fixtures derived from the four supplied page captures and focused xUnit coverage for parsing, routing, redirect safety, browser fallback, site isolation, and settings compatibility.
 
 ### Changed
-- Reorganized and hardened `.gitignore` into `.NET / Visual Studio`, `Inno Setup / Packaging`, `Local Databases & Runtime Caches`, and `OS / Editor Files` sections, removing duplicate test-result rules and ignoring `Output/`, `*.sqlite*`, `*.db*`, and `appsettings.*.json` overrides.
-- Overhauled `README.md` to reflect the current `.NET 10` codebase, 4-project solution structure, PowerShell build/test/run commands, secure TMDb configuration (`dotnet user-secrets` / `Tmdb__ReadAccessToken`), and Inno Setup packaging workflow.
+- Replaced the generic download-provider registry and crawler with an explicit site/workflow dispatcher.
+- Kept quality selection and downward fallback in `QualityPreferenceMatcher`; only FastDLServer Google Drive routes associated with their own quality section are candidates.
+- Registered BigOne with an HTTP client that disables automatic redirects so every redirect target is validated before it is requested.
+- Updated the Maintenance selector: ordinary sites are Lookup-only; the designated BollyFlix site offers Lookup-only or BigOne.
+- Preserved IDM executable configuration, confirmation-dialog hand-off, preferred quality, Watch Folder routing, ticket auto-completion, Lookup availability checks, and media-library functionality.
+
+### Removed
+- Removed `DirectLinkDownloadWorkflow`, `MultiStepLinkDownloadWorkflow`, `WorkflowHttpHelpers`, `DownloadProviderRegistry`, and the unused provider interface/plugin architecture.
+- Removed the obsolete Direct Link and Multi-Step workflow IDs/options. Existing assignments using those IDs are removed without migrating them to BigOne.
+
+### Compatibility and safety
+- Preserved `%APPDATA%\\DigitalCenter\\download-settings.json` and unrelated site assignments, including unimplemented/future workflow values. Existing IDM path, preferred quality, Watch Folder routing, and ticket auto-completion settings remain intact.
+- Malformed settings files are not overwritten during compatibility loading.
+- BigOne does not fetch Linksmod, follow Login/Instant/Telegram/GoFile alternatives, automate credentials or challenges, or treat a cloud landing page/filename as proof of a completed download.
+- BigOne returns a browser hand-off to the original BollyFlix title page whenever a stage or final destination cannot be verified.
+- No independent BigO implementation was present in the inspected repository. BigO is therefore not offered or executed; any unrelated stored assignment remains dormant.
 
 ## [1.0.0] - 2026-11-21
 
