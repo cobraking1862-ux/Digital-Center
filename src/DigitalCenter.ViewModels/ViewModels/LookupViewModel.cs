@@ -253,7 +253,7 @@ public partial class LookupViewModel : ObservableObject
         // Other persisted IDs (including stale BigOne bindings) remain non-executable.
         if (site.Id.Equals(DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) &&
             dlSettings.SiteWorkflowBindings.TryGetValue(site.Id, out var workflowId) &&
-            workflowId.Equals(DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase))
+            string.Equals(workflowId, DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase))
             return DownloadWorkflowIds.BigOne;
 
         return null;
@@ -342,7 +342,7 @@ public partial class LookupViewModel : ObservableObject
         var rows = new List<LookupCheckRowViewModel>(_enabledSites.Count);
         foreach (var site in _enabledSites)
         {
-            var row = new LookupCheckRowViewModel(site, ResolveRegisteredProviderId(site, dlSettings))
+            var row = new LookupCheckRowViewModel(site, ResolveRegisteredWorkflowId(site, dlSettings))
             {
                 Status = LookupCheckStatus.Checking,
                 Detail = "Checking in background…"
