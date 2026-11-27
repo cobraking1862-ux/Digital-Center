@@ -399,7 +399,18 @@ public sealed class BigOneDownloadWorkflow
 
     private static bool IsApprovedCloudUri(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
-        CloudHosts.Contains(uri.IdnHost) && uri.AbsolutePath.StartsWith("/cloud/", StringComparison.OrdinalIgnoreCase);
+        CloudHosts.Contains(uri.IdnHost) && IsSupportedCloudPath(uri.AbsolutePath);
+
+    private static bool IsSupportedCloudPath(string path)
+    {
+        if (!path.StartsWith("/cloud/", StringComparison.OrdinalIgnoreCase)) return false;
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 3 &&
+               segments[0].Equals("cloud", StringComparison.OrdinalIgnoreCase) &&
+               segments[1].Length > 0 &&
+               segments[2].Length > 0 &&
+               !segments.Skip(1).Any(segment => segment is "." or "..");
+    }
 
     private static bool IsApprovedFinalHost(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
