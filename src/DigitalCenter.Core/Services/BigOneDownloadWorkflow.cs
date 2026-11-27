@@ -37,10 +37,10 @@ public sealed class BigOneDownloadWorkflow
         "<h5\\b[^>]*>(?<body>.*?)</h5>",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
     private static readonly Regex HrefRegex = new(
-        "(?:^|\\s)href\\s*=\\s*['\\"](?<url>[^'\\"]+)['\\"]",
+        "(?:^|\\s)href\\s*=\\s*['\\\"](?<url>[^'\\\"]+)['\\\"]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex ClassRegex = new(
-        "(?:^|\\s)class\\s*=\\s*['\\"](?<value>[^'\\"]*)['\\"]",
+        "(?:^|\\s)class\\s*=\\s*['\\\"](?<value>[^'\\\"]*)['\\\"]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TagRegex = new("<[^>]+>", RegexOptions.Compiled);
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
@@ -53,7 +53,7 @@ public sealed class BigOneDownloadWorkflow
     private static readonly HashSet<string> FileHostHosts = new(StringComparer.OrdinalIgnoreCase)
     {
         "dl.fastdlserver.site",
-        "new10.gdfflix.io"
+        "new10.gdflix.io"
     };
 
     private static readonly HashSet<string> FinalDestinationHosts = new(StringComparer.OrdinalIgnoreCase)
