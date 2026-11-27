@@ -1,4 +1,5 @@
 using System.IO;
+using DigitalCenter.Core.Logging;
 using System.Text.Json;
 
 namespace DigitalCenter.Core.Configuration;
@@ -109,7 +110,10 @@ public sealed class DownloadSettingsService
             if (obsoleteSiteIds.Count > 0)
             {
                 try { Save(loaded); }
-                catch (Exception) { /* retain the in-memory sanitized settings */ }
+                catch (Exception ex)
+                {
+                    _logger?.Warn($"Retired download workflow assignments were removed in memory but could not be saved ({ex.GetType().Name}).");
+                }
             }
 
             return loaded;
