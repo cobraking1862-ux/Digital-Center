@@ -299,6 +299,20 @@ public sealed class BigOneDownloadWorkflowTests
     }
 
     [Fact]
+    public async Task Dispatcher_DoesNotPretendBigOIsImplemented()
+    {
+        var handler = new MockHttpMessageHandler();
+        using var http = new HttpClient(handler);
+        var dispatcher = new DownloadWorkflowDispatcher(new BigOneDownloadWorkflow(http));
+
+        var outcome = await dispatcher.ResolveForSiteAsync(
+            "another-site", "big-o", MovieRequest(MovieUrl));
+
+        Assert.Equal(DownloadResolveStatus.NotFound, outcome.Status);
+        Assert.Empty(handler.RequestedUris);
+    }
+
+    [Fact]
     public async Task Dispatcher_RejectsNonBollyFlixSourceEvenWhenSiteIdMatches()
     {
         var handler = new MockHttpMessageHandler();
@@ -339,7 +353,7 @@ public sealed class BigOneDownloadWorkflowTests
         Assert.Equal("BollyFlix", bollyFlix.Name);
         Assert.Equal("https://new1.bollyflix.tours/?s={imdb_id}", bollyFlix.UrlTemplate);
         Assert.True(bollyFlix.IsBuiltIn);
-        Assert.False(bollyFlix.IsEnabled == false && settings.LookupSites.Count == 1);
+        Assert.True(bollyFlix.IsEnabled);
         Assert.Contains(settings.LookupSites, site => site.Id == "custom-mkvcinemas" && site.UrlTemplate == "https://custom.example.test/?s={title}");
     }
 
@@ -361,6 +375,20 @@ public sealed class BigOneDownloadWorkflowTests
 
         Assert.Equal("https://new1.bollyflix.tours/?s={imdb_id}", bollyFlix.UrlTemplate);
         Assert.True(bollyFlix.IsBuiltIn);
+    }
+
+    [Fact]
+    public void IdmArguments_PreserveTheConfirmationDialogAndAreNotSilent()
+    {
+        var args = IdmLauncherService.BuildIdmArguments(
+            new Uri("https://downloads.example.test/sample.mkv"),
+            @"D:\Movies\Watch",
+            "sample.mkv");
+
+        Assert.Contains("/d \"https://downloads.example.test/sample.mkv\"", args);
+        Assert.Contains("/p \"D:\\Movies\\Watch\"", args);
+        Assert.Contains("/f \"sample.mkv\"", args);
+        Assert.DoesNotContain("/n", args);
     }
 
     [Fact]
