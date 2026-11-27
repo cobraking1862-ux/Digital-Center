@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Version>14.0.0</Version>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>DigitalCenter.Core</RootNamespace>
     <Description>DigitalCenter domain, data access and services (platform-independent).</Description>
