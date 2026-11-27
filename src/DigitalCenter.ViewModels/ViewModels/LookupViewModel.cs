@@ -38,10 +38,10 @@ public sealed class LookupResultRowViewModel
 /// <summary>Per-site background availability check and optional one-click download row shown in Lookup.</summary>
 public sealed partial class LookupCheckRowViewModel : ObservableObject
 {
-    public LookupCheckRowViewModel(LookupSiteEntry site, string? providerId = null)
+    public LookupCheckRowViewModel(LookupSiteEntry site, string? workflowId = null)
     {
         Site = site;
-        ProviderId = string.IsNullOrWhiteSpace(providerId) ? null : providerId.Trim();
+        WorkflowId = string.IsNullOrWhiteSpace(workflowId) ? null : workflowId.Trim();
         Status = LookupCheckStatus.Pending;
         Detail = "Ready to check";
         CheckedUrl = string.Empty;
@@ -51,12 +51,13 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
     public LookupSiteEntry Site { get; }
     public string SiteId => Site.Id;
     public string SiteName => Site.Name;
-    public string? ProviderId { get; }
-    public bool HasDownloadProvider => !string.IsNullOrWhiteSpace(ProviderId);
+    public string? WorkflowId { get; }
+    public bool HasDownloadWorkflow => !string.IsNullOrWhiteSpace(WorkflowId);
 
     [ObservableProperty] public partial LookupCheckStatus Status { get; set; }
     [ObservableProperty] public partial string Detail { get; set; }
     [ObservableProperty] public partial string CheckedUrl { get; set; }
+    [ObservableProperty] public partial string BrowserFallbackUrl { get; set; }
     [ObservableProperty] public partial long ElapsedMs { get; set; }
     [ObservableProperty] public partial bool IsResolvingDownload { get; set; }
     [ObservableProperty] public partial bool NeedsBrowserAttention { get; set; }
@@ -79,10 +80,10 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
     public bool IsChecking => Status == LookupCheckStatus.Checking;
 
     /// <summary>Show the Open button on every checked row so interactive or blocked sites can be opened in one click.</summary>
-    public bool CanOpen => !string.IsNullOrWhiteSpace(CheckedUrl);
+    public bool CanOpen => !string.IsNullOrWhiteSpace(BrowserFallbackUrl) || !string.IsNullOrWhiteSpace(CheckedUrl);
 
     /// <summary>Show the Download button only when this site has a registered workflow provider and a checked URL.</summary>
-    public bool CanDownload => HasDownloadProvider && !string.IsNullOrWhiteSpace(CheckedUrl) && !IsResolvingDownload;
+    public bool CanDownload => HasDownloadWorkflow && !string.IsNullOrWhiteSpace(CheckedUrl) && !IsResolvingDownload;
 
     public bool HasDownloadStatus => !string.IsNullOrWhiteSpace(DownloadStatusText);
 
@@ -115,6 +116,8 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanDownload));
     }
 
+    partial void OnBrowserFallbackUrlChanged(string value) => OnPropertyChanged(nameof(CanOpen));
+
     partial void OnIsResolvingDownloadChanged(bool value)
     {
         OnPropertyChanged(nameof(CanDownload));
@@ -137,7 +140,7 @@ public partial class LookupViewModel : ObservableObject
     private readonly TicketService _ticketService;
     private readonly SettingsService _settingsService;
     private readonly DownloadSettingsService _downloadSettings;
-    private readonly DownloadProviderRegistry _providerRegistry;
+    private readonly DownloadWorkflowDispatcher _workflowDispatcher;
     private readonly IdmLauncherService _idmLauncher;
     private readonly IDialogService _dialogs;
     private readonly IUiDispatcher _uiDispatcher;
@@ -157,6 +160,7 @@ public partial class LookupViewModel : ObservableObject
         AppPaths paths,
         IDialogService dialogs,
         IUiDispatcher uiDispatcher,
+        DownloadWorkflowDispatcher workflowDispatcher,
         IAppLogger logger,
         ActivityFeedService activityFeed)
     {
@@ -164,7 +168,7 @@ public partial class LookupViewModel : ObservableObject
         _ticketService = ticketService;
         _settingsService = settingsService;
         _downloadSettings = new DownloadSettingsService(paths);
-        _providerRegistry = DownloadProviderRegistry.CreateDefault(logger: logger);
+        _workflowDispatcher = workflowDispatcher;
         _idmLauncher = new IdmLauncherService(logger);
         _dialogs = dialogs;
         _uiDispatcher = uiDispatcher;
@@ -242,13 +246,14 @@ public partial class LookupViewModel : ObservableObject
         }
     }
 
-    private string? ResolveRegisteredProviderId(LookupSiteEntry site, DownloadSettings dlSettings)
+    private static string? ResolveRegisteredWorkflowId(LookupSiteEntry site, DownloadSettings dlSettings)
     {
-        if (dlSettings.SiteWorkflowBindings.TryGetValue(site.Id, out var pid) &&
-            _providerRegistry.HasProvider(pid))
-        {
-            return pid;
-        }
+        // BigOne assignments are effective only for the stable built-in BollyFlix ID.
+        // Other persisted IDs (including stale BigOne bindings) remain non-executable.
+        if (site.Id.Equals(DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) &&
+            dlSettings.SiteWorkflowBindings.TryGetValue(site.Id, out var workflowId) &&
+            workflowId.Equals(DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase))
+            return DownloadWorkflowIds.BigOne;
 
         return null;
     }
@@ -260,7 +265,7 @@ public partial class LookupViewModel : ObservableObject
         var dlSettings = _downloadSettings.Load();
         foreach (var site in _enabledSites)
         {
-            AvailabilityChecks.Add(new LookupCheckRowViewModel(site, ResolveRegisteredProviderId(site, dlSettings)));
+            AvailabilityChecks.Add(new LookupCheckRowViewModel(site, ResolveRegisteredWorkflowId(site, dlSettings)));
         }
     }
 
@@ -426,7 +431,7 @@ public partial class LookupViewModel : ObservableObject
     [RelayCommand]
     private async Task DownloadFromSiteAsync(LookupCheckRowViewModel? row)
     {
-        if (row is null || SelectedResult is null || !row.HasDownloadProvider || row.IsResolvingDownload)
+        if (row is null || SelectedResult is null || !row.HasDownloadWorkflow || row.IsResolvingDownload)
         {
             return;
         }
@@ -457,13 +462,14 @@ public partial class LookupViewModel : ObservableObject
 
         row.IsResolvingDownload = true;
         row.NeedsBrowserAttention = false;
+        row.BrowserFallbackUrl = string.Empty;
         row.DownloadStatusText = $"Resolving {dlSettings.PreferredQuality} (auto-fallback enabled)…";
 
         var progress = new Progress<string>(msg => _uiDispatcher.Post(() => row.DownloadStatusText = msg));
 
         try
         {
-            var outcome = await Task.Run(() => _providerRegistry.ResolveForSiteAsync(row.ProviderId, request, progress, ct), ct);
+            var outcome = await Task.Run(() => _workflowDispatcher.ResolveForSiteAsync(row.SiteId, row.WorkflowId, request, progress, ct), ct);
 
             if (outcome.IsSuccess && outcome.Download is not null)
             {
@@ -477,8 +483,8 @@ public partial class LookupViewModel : ObservableObject
             }
             else if (outcome.Status == DownloadResolveStatus.NeedsBrowser)
             {
-                // Preserve row.CheckedUrl so clicking 'Open in Browser' always opens the original matched search page.
                 row.NeedsBrowserAttention = true;
+                row.BrowserFallbackUrl = outcome.FallbackBrowserUrl?.AbsoluteUri ?? row.CheckedUrl;
                 row.DownloadStatusText = outcome.Message;
             }
             else
@@ -579,7 +585,7 @@ public partial class LookupViewModel : ObservableObject
             return;
         }
 
-        _dialogs.OpenUrl(row.CheckedUrl);
+        _dialogs.OpenUrl(!string.IsNullOrWhiteSpace(row.BrowserFallbackUrl) ? row.BrowserFallbackUrl : row.CheckedUrl);
     }
 
     private bool CanOpenInLocalLibrary() => SelectedResult?.InLocalLibrary == true && SelectedResult.LocalTitleId.HasValue;
