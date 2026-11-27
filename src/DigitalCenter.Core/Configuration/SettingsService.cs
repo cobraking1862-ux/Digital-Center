@@ -60,7 +60,11 @@ public sealed class SettingsService
         // Preserve every existing/custom site and do not assign BigOne automatically.
         if (settings.Version < 11)
         {
-            if (!settings.LookupSites.Any(site =>
+            // An empty site list means a fresh/default installation; leave it empty so
+            // Lookup and Maintenance can load the complete default-site catalog. The
+            // built-in catalog already includes BollyFlix. Add BollyFlix alongside sites
+            // only when migrating a user's existing custom/site list.
+            if (settings.LookupSites.Count > 0 && !settings.LookupSites.Any(site =>
                     string.Equals(site.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase)))
             {
                 settings.LookupSites.Insert(0, new LookupSiteEntry
