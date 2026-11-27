@@ -27,6 +27,7 @@ public static class DownloadWorkflowIds
     public const string None = "";
     public const string BigOne = "big-one";
     public const string BigOneSite = "builtin-bollyflix";
+    public const string BigOneSiteHost = "new1.bollyflix.tours";
     public const string BigOneSiteUrl = "https://new1.bollyflix.tours/";
     public const string BigOneLookupUrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}";
 }
