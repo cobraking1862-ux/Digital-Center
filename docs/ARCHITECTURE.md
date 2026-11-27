@@ -43,6 +43,7 @@ CBA Movie Explorer (`DigitalCenter.slnx`) follows a strict **3-layer architectur
 All runtime data is isolated under `%APPDATA%\DigitalCenter` (defined by `AppPaths`):
 - `digitalcenter.db` — Primary SQLite database (with `-wal` / `-shm` sidecars in WAL mode)
 - `settings.json` — Persisted operator settings (`AppSettings` / `SettingsService`)
+- `download-settings.json` — Download Manager and per-site workflow assignment settings (`DownloadSettings` / `DownloadSettingsService`), including obsolete generic-workflow assignment cleanup
 - `Posters/` — Cached TMDb artwork (`PosterCache`)
 - `Logs/` — Application log files (`FileLogger`)
 - `Backups/` — Timestamped SQLite database backups (`BackupService`)
@@ -70,6 +71,9 @@ All runtime data is isolated under `%APPDATA%\DigitalCenter` (defined by `AppPat
 | `BackupService` | Performs online SQLite backups (`SqliteConnection.BackupDatabase`) and schema-validated restores with automatic `.pre-restore-*` safety copies. |
 | `MaintenanceService` | Runs catalog health checks, rescans, and cleanup routines. |
 | `PosterCache` | Downloads and caches poster, backdrop, and cast profile artwork under `AppPaths.PostersDirectory`. |
+| `BigOneDownloadWorkflow` | The dedicated site-specific download workflow for the built-in BollyFlix Lookup Site (`builtin-bollyflix`): stage-aware recognition of the BollyFlix listing/title pages, per-quality section parsing, strict FastDLServer route preference (never Linksmod), hop-by-hop validated redirects (automatic redirects disabled), approved cloud-origin `/cloud/...` resolution, cloud landing page treated as intermediate, and bounded final download-response verification before the IDM hand-off. |
+| `DownloadWorkflowDispatcher` | Explicit per-site workflow routing: rejects unassigned/unknown/removed workflow ids, scopes BigOne to the designated BollyFlix site, and re-validates the source URL so stale assignments cannot bypass site isolation. |
+| `IdmLauncherService` / `QualityPreferenceMatcher` | Hands verified downloads to Internet Download Manager's non-silent confirmation dialog and ranks candidate routes by preferred quality with automatic downward fallback. |
 
 ### ViewModels (`src/DigitalCenter.ViewModels/ViewModels`)
 - `MainViewModel`: Shell navigation (`Library`, `USB Cart`, `Watch Folder`, `Settings`), cart badge updates, activity feed, and details-view routing.
