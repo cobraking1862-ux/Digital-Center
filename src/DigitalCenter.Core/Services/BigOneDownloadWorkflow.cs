@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using DigitalCenter.Core.Configuration;
@@ -52,7 +54,6 @@ public sealed class BigOneDownloadWorkflow
 
     private static readonly HashSet<string> FileHostHosts = new(StringComparer.OrdinalIgnoreCase)
     {
-        "dl.fastdlserver.site",
         "new10.gdflix.io"
     };
 
@@ -140,7 +141,7 @@ public sealed class BigOneDownloadWorkflow
         var candidates = ParseCloudActions(cloudPage.Body, cloudPage.FinalUri);
         foreach (var candidate in candidates)
         {
-            var verification = await SendValidatedAsync(candidate, IsApprovedFinalHost, ct).ConfigureAwait(false);
+            var verification = await VerifyFinalDestinationAsync(candidate, ct).ConfigureAwait(false);
             if (!IsVerifiedDownloadResponse(verification))
                 continue;
 
@@ -235,7 +236,25 @@ public sealed class BigOneDownloadWorkflow
         return IsApprovedCloudUri(resolved) ? resolved : null;
     }
 
-    private async Task<HttpStepResult> SendValidatedAsync(Uri start, Func<Uri, bool> allowed, CancellationToken ct)
+    private async Task<HttpStepResult> VerifyFinalDestinationAsync(Uri candidate, CancellationToken ct)
+    {
+        // Prefer HEAD so validation never downloads media bytes. Fall back to a one-byte
+        // ranged GET only where the host explicitly does not implement HEAD.
+        var result = await SendValidatedAsync(candidate, IsApprovedFinalHost, ct, HttpMethod.Head).ConfigureAwait(false);
+        if (result.StatusCode is 405 or 501)
+        {
+            result = await SendValidatedAsync(candidate, IsApprovedFinalHost, ct, HttpMethod.Get, useRange: true).ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    private async Task<HttpStepResult> SendValidatedAsync(
+        Uri start,
+        Func<Uri, bool> allowed,
+        CancellationToken ct,
+        HttpMethod? method = null,
+        bool useRange = false)
     {
         var current = start;
         for (var redirectCount = 0; redirectCount <= 5; redirectCount++)
@@ -243,7 +262,8 @@ public sealed class BigOneDownloadWorkflow
             if (!IsSafeUri(current) || !allowed(current))
                 return HttpStepResult.Failure(current, "A requested destination failed BigOne host validation.");
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, current);
+            using var request = new HttpRequestMessage(method ?? HttpMethod.Get, current);
+            if (useRange) request.Headers.Range = new RangeHeaderValue(0, 0);
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             var effectiveUri = response.RequestMessage?.RequestUri ?? current;
             if (effectiveUri != current || !IsSafeUri(effectiveUri) || !allowed(effectiveUri))
@@ -262,9 +282,11 @@ public sealed class BigOneDownloadWorkflow
             }
 
             if (status is 401 or 403 or 429 or 503)
-                return HttpStepResult.Failure(current, "The host requires browser interaction or is restricting automated access.");
+                return HttpStepResult.Failure(current, "The host requires browser interaction or is restricting automated access.", status);
+            if (status is 405 or 501)
+                return HttpStepResult.Failure(current, $"The host does not support {request.Method}.", status);
             if (status < 200 || status >= 300)
-                return HttpStepResult.Failure(current, $"The host returned HTTP {status}.");
+                return HttpStepResult.Failure(current, $"The host returned HTTP {status}.", status);
 
             var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
             var disposition = response.Content.Headers.ContentDisposition;
@@ -366,15 +388,14 @@ public sealed class BigOneDownloadWorkflow
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         uri.IdnHost.Equals("dl.fastdlserver.site", StringComparison.OrdinalIgnoreCase) &&
         uri.AbsolutePath.Equals("/", StringComparison.Ordinal) &&
-        QueryContainsKey(uri.Query, "id") && QueryHasValue(uri.Query, "type", "file");
+        QueryHasNonEmptyValue(uri.Query, "id") && QueryHasValue(uri.Query, "type", "file");
 
     private static bool IsFastDlOrRecognizedFileHost(Uri uri) => IsFastDlRoute(uri) || IsRecognizedFileHost(uri);
 
     private static bool IsRecognizedFileHost(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         FileHostHosts.Contains(uri.IdnHost) &&
-        (uri.IdnHost.Equals("dl.fastdlserver.site", StringComparison.OrdinalIgnoreCase) ||
-         uri.AbsolutePath.StartsWith("/file/", StringComparison.OrdinalIgnoreCase));
+        uri.AbsolutePath.StartsWith("/file/", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsApprovedCloudUri(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
@@ -382,7 +403,8 @@ public sealed class BigOneDownloadWorkflow
 
     private static bool IsApprovedFinalHost(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
-        FinalDestinationHosts.Contains(uri.IdnHost);
+        FinalDestinationHosts.Contains(uri.IdnHost) &&
+        !uri.AbsolutePath.Equals("/", StringComparison.Ordinal);
 
     private static bool IsValidCloudOrigin(Uri uri) =>
         uri.IsAbsoluteUri && IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
@@ -447,6 +469,12 @@ public sealed class BigOneDownloadWorkflow
             .Any(parts => parts.Length == 2 && Uri.UnescapeDataString(parts[0]).Equals(key, StringComparison.OrdinalIgnoreCase) &&
                           Uri.UnescapeDataString(parts[1]).Equals(value, StringComparison.OrdinalIgnoreCase));
 
+    private static bool QueryHasNonEmptyValue(string query, string key) =>
+        query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => part.Split('=', 2))
+            .Any(parts => parts.Length == 2 && Uri.UnescapeDataString(parts[0]).Equals(key, StringComparison.OrdinalIgnoreCase) &&
+                          !string.IsNullOrWhiteSpace(Uri.UnescapeDataString(parts[1])));
+
     private static string? SanitizeFileName(string? fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName)) return null;
@@ -486,7 +514,7 @@ public sealed class BigOneDownloadWorkflow
         bool IsAttachment,
         string? FailureReason)
     {
-        public static HttpStepResult Failure(Uri uri, string reason) => new(false, uri, 0, string.Empty, string.Empty, null, false, reason);
+        public static HttpStepResult Failure(Uri uri, string reason, int statusCode = 0) => new(false, uri, statusCode, string.Empty, string.Empty, null, false, reason);
         public static HttpStepResult Success(Uri uri, int status, string type, string body, string? name, bool attachment) =>
             new(true, uri, status, type, body, name, attachment, null);
     }
