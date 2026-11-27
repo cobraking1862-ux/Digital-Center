@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
@@ -280,7 +281,7 @@ public partial class App : Application
         services.AddSingleton<DramaWatchFolderService>();
         services.AddSingleton<DramaCopyService>();
         // BigOne must inspect every redirect itself; never share a redirect-following client.
-        services.AddSingleton(_ =>
+        services.AddSingleton<HttpClient>(_ =>
         {
             var handler = new HttpClientHandler
             {
