@@ -379,7 +379,7 @@ public sealed class BigOneDownloadWorkflow
         !uri.AbsolutePath.Contains("/category/", StringComparison.OrdinalIgnoreCase) &&
         !uri.AbsolutePath.Contains("/tag/", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsBollyFlixUri(Uri? uri) =>
+    public static bool IsBollyFlixUri(Uri? uri) =>
         uri is { IsAbsoluteUri: true } && IsSafeUri(uri) &&
         uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         uri.IdnHost.Equals(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase);
