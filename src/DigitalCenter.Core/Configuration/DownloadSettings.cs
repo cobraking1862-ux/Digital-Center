@@ -30,7 +30,7 @@ public static class DownloadWorkflowIds
 }
 
 /// <summary>
-/// Persisted Download Manager &amp; Workflow Provider settings (v14.0.0),
+/// Persisted Download Manager and site workflow settings (v14.0.0),
 /// stored separately in download-settings.json so existing settings.json files
 /// remain 100% backward-compatible with zero schema migrations.
 /// </summary>
@@ -94,8 +94,8 @@ public sealed class DownloadSettingsService
             // Remove only the two retired workflow IDs. Do not migrate them to BigOne:
             // assignments are site-specific and require an explicit operator choice.
             var obsoleteSiteIds = loaded.SiteWorkflowBindings
-                .Where(pair => pair.Value.Equals("direct-link", StringComparison.OrdinalIgnoreCase) ||
-                               pair.Value.Equals("multi-step-link", StringComparison.OrdinalIgnoreCase))
+                .Where(pair => string.Equals(pair.Value, "direct-link", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(pair.Value, "multi-step-link", StringComparison.OrdinalIgnoreCase))
                 .Select(pair => pair.Key)
                 .ToList();
 
@@ -133,8 +133,8 @@ public sealed class DownloadSettingsService
     {
         if (string.IsNullOrWhiteSpace(siteId)) return null;
         var settings = Load();
-        return settings.SiteWorkflowBindings.TryGetValue(siteId.Trim(), out var pid) && !string.IsNullOrWhiteSpace(pid)
-            ? pid.Trim()
+        return settings.SiteWorkflowBindings.TryGetValue(siteId.Trim(), out var workflowId) && !string.IsNullOrWhiteSpace(workflowId)
+            ? workflowId.Trim()
             : null;
     }
 
