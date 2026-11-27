@@ -382,7 +382,7 @@ public sealed class BigOneDownloadWorkflow
     private static bool IsBollyFlixUri(Uri? uri) =>
         uri is { IsAbsoluteUri: true } && IsSafeUri(uri) &&
         uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
-        uri.IdnHost.Equals("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase);
+        uri.IdnHost.Equals(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFastDlRoute(Uri uri) =>
         IsSafeUri(uri) && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
