@@ -9,7 +9,7 @@
     <RootNamespace>DigitalCenter.App</RootNamespace>
     <AssemblyName>DigitalCenter</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>13.0.2</Version>
+    <Version>14.0.0</Version>
     <Product>DigitalCenter</Product>
     <Description>DigitalCenter - local media catalog and USB copy manager.</Description>
     <!-- Used by `dotnet user-secrets` to supply the TMDb read token in development. -->
