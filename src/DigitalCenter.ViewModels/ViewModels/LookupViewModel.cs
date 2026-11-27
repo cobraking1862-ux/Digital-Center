@@ -83,7 +83,7 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
     /// <summary>Show the Open button on every checked row so interactive or blocked sites can be opened in one click.</summary>
     public bool CanOpen => !string.IsNullOrWhiteSpace(BrowserFallbackUrl) || !string.IsNullOrWhiteSpace(CheckedUrl);
 
-    /// <summary>Show the Download button only when this site has a registered workflow provider and a checked URL.</summary>
+    /// <summary>Show the Download button only when a supported site workflow is assigned and a checked URL.</summary>
     public bool CanDownload => HasDownloadWorkflow && !string.IsNullOrWhiteSpace(CheckedUrl) && !IsResolvingDownload;
 
     public bool HasDownloadStatus => !string.IsNullOrWhiteSpace(DownloadStatusText);
@@ -168,7 +168,7 @@ public partial class LookupViewModel : ObservableObject
         _lookupService = lookupService;
         _ticketService = ticketService;
         _settingsService = settingsService;
-        _downloadSettings = new DownloadSettingsService(paths);
+        _downloadSettings = new DownloadSettingsService(paths, logger);
         _workflowDispatcher = workflowDispatcher;
         _idmLauncher = new IdmLauncherService(logger);
         _dialogs = dialogs;
