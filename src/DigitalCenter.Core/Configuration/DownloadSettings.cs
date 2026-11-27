@@ -129,7 +129,7 @@ public sealed class DownloadSettingsService
         File.Move(temp, _filePath, overwrite: true);
     }
 
-    public string? GetProviderIdForSite(string? siteId)
+    public string? GetWorkflowIdForSite(string? siteId)
     {
         if (string.IsNullOrWhiteSpace(siteId)) return null;
         var settings = Load();
@@ -138,18 +138,18 @@ public sealed class DownloadSettingsService
             : null;
     }
 
-    public void SetProviderIdForSite(string siteId, string? providerId)
+    public void SetWorkflowIdForSite(string siteId, string? workflowId)
     {
         if (string.IsNullOrWhiteSpace(siteId)) return;
         var settings = Load();
         var key = siteId.Trim();
-        if (string.IsNullOrWhiteSpace(providerId))
+        if (string.IsNullOrWhiteSpace(workflowId))
         {
             settings.SiteWorkflowBindings.Remove(key);
         }
         else
         {
-            settings.SiteWorkflowBindings[key] = providerId.Trim();
+            settings.SiteWorkflowBindings[key] = workflowId.Trim();
         }
 
         Save(settings);
