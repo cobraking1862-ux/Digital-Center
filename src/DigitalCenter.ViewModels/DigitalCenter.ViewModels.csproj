@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Version>14.0.0</Version>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>DigitalCenter.ViewModels</RootNamespace>
     <Description>DigitalCenter view models (platform-independent, MVVM toolkit based).</Description>
