@@ -74,6 +74,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
 {
     private readonly Action _onToggled;
     private readonly Action<string, string?> _onWorkflowChanged;
+    private bool _isInitializing;
 
     public LookupSiteRowViewModel(
         LookupSiteEntry entry,
@@ -82,6 +83,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
         Action onToggled,
         Action<string, string?> onWorkflowChanged)
     {
+        _isInitializing = true;
         Entry = entry;
         AvailableWorkflows = entry.Id.Equals(DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase)
             ? availableWorkflows
@@ -93,6 +95,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
         SelectedWorkflowId = AvailableWorkflows.Any(option => option.WorkflowId.Equals(requestedWorkflow, StringComparison.OrdinalIgnoreCase))
             ? requestedWorkflow
             : DownloadWorkflowIds.None;
+        _isInitializing = false;
     }
 
     public LookupSiteEntry Entry { get; }
@@ -109,6 +112,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
 
     partial void OnIsEnabledChanged(bool value)
     {
+        if (_isInitializing) return;
         if (Entry.IsEnabled != value)
         {
             Entry.IsEnabled = value;
@@ -118,6 +122,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
 
     partial void OnSelectedWorkflowIdChanged(string value)
     {
+        if (_isInitializing) return;
         _onWorkflowChanged(Entry.Id, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
     }
 }
