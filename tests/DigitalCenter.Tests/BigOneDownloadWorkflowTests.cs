@@ -314,6 +314,56 @@ public sealed class BigOneDownloadWorkflowTests
     }
 
     [Fact]
+    public void LookupSiteMigration_AddsStableBollyFlixEntryWithoutReplacingExistingSites()
+    {
+        var settings = new AppSettings
+        {
+            Version = 10,
+            LookupSites =
+            [
+                new LookupSiteEntry
+                {
+                    Id = "custom-mkvcinemas",
+                    Name = "My MKVCinemas",
+                    UrlTemplate = "https://custom.example.test/?s={title}",
+                    IsEnabled = false,
+                    IsBuiltIn = false
+                }
+            ]
+        };
+
+        SettingsService.MigrateLegacy(settings);
+
+        Assert.Equal(11, settings.Version);
+        var bollyFlix = Assert.Single(settings.LookupSites.Where(site => site.Id == DownloadWorkflowIds.BigOneSite));
+        Assert.Equal("BollyFlix", bollyFlix.Name);
+        Assert.Equal("https://new1.bollyflix.tours/?s={imdb_id}", bollyFlix.UrlTemplate);
+        Assert.True(bollyFlix.IsBuiltIn);
+        Assert.False(bollyFlix.IsEnabled == false && settings.LookupSites.Count == 1);
+        Assert.Contains(settings.LookupSites, site => site.Id == "custom-mkvcinemas" && site.UrlTemplate == "https://custom.example.test/?s={title}");
+    }
+
+    [Fact]
+    public void LookupSiteMigration_DoesNotReAddAnIntentionallyRemovedBollyFlixSite()
+    {
+        var settings = new AppSettings { Version = 11, LookupSites = [] };
+
+        SettingsService.MigrateLegacy(settings);
+
+        Assert.Empty(settings.LookupSites);
+        Assert.Equal(11, settings.Version);
+    }
+
+    [Fact]
+    public void DefaultLookupSites_ExposeBollyFlixWithTheStableSiteId()
+    {
+        var bollyFlix = Assert.Single(ImdbLookupService.GetDefaultSites().Where(site => site.Id == DownloadWorkflowIds.BigOneSite));
+
+        Assert.Equal("https://new1.bollyflix.tours/?s={imdb_id}", bollyFlix.UrlTemplate);
+        Assert.True(bollyFlix.IsBuiltIn);
+    }
+
+    [Fact]
     public void DownloadSettings_RemovesOnlyObsoleteBindingsAndPreservesUnrelatedValues()
     {
         var root = Path.Combine(Path.GetTempPath(), "DigitalCenterTests", Guid.NewGuid().ToString("N"));
