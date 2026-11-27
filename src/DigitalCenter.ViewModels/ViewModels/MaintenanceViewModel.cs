@@ -1320,7 +1320,7 @@ public partial class MaintenanceViewModel : ObservableObject
     {
         if (site is null) return;
         LookupSites.Remove(site);
-        _downloadSettings.SetProviderIdForSite(site.Id, null);
+        _downloadSettings.SetWorkflowIdForSite(site.Id, null);
         PersistLookupSites();
         LookupSitesStatusText = $"Removed '{site.Name}'.";
     }
