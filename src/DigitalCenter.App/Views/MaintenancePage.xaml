@@ -652,8 +652,8 @@
                                                 <ComboBox Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0"
                                                           ItemsSource="{Binding AvailableWorkflows}"
                                                           DisplayMemberPath="DisplayName"
-                                                          SelectedValuePath="ProviderId"
-                                                          SelectedValue="{Binding SelectedProviderId, Mode=TwoWay}"
+                                                          SelectedValuePath="WorkflowId"
+                                                          SelectedValue="{Binding SelectedWorkflowId, Mode=TwoWay}"
                                                           ToolTip="Assign an authorized download workflow for this site"/>
                                                 <Button Grid.Column="3" Style="{StaticResource SecondaryButton}" Content="Remove" Padding="10,4"
                                                         VerticalAlignment="Center"
