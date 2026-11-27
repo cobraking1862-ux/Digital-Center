@@ -63,10 +63,12 @@ public sealed class DownloadSettingsService
     };
 
     private readonly string _filePath;
+    private readonly IAppLogger? _logger;
 
-    public DownloadSettingsService(AppPaths paths)
+    public DownloadSettingsService(AppPaths paths, IAppLogger? logger = null)
     {
         _filePath = Path.Combine(paths.DataRoot, "download-settings.json");
+        _logger = logger;
     }
 
     public string SettingsFilePath => _filePath;
@@ -119,8 +121,9 @@ public sealed class DownloadSettingsService
 
             return loaded;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.Warn($"Download settings could not be loaded ({ex.GetType().Name}); defaults are in use.");
             return new DownloadSettings();
         }
     }
