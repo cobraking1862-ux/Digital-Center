@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\src\DigitalCenter.Core\DigitalCenter.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\BigOne\*.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
