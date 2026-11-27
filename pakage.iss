@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "CBA Explorer"
-#define MyAppVersion "13.0.2"
+#define MyAppVersion "14.0.0"
 #define MyAppPublisher "Muhammad Masoom, Inc."
 #define MyAppURL "https://cbajoker.github.io/Portfolio/"
 #define MyAppExeName "DigitalCenter.exe"
