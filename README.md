@@ -12,16 +12,18 @@ A Windows desktop application built with **.NET 10** and **WPF** for managing a 
 - **USB Copy Queue:** Queues titles from the library, detects removable/fixed drives (`DriveProbe`), estimates capacity, cleans filenames, handles conflicts (`Skip`, `Overwrite`, `Rename`), and optionally verifies SHA-256 hashes (`UsbCopyService`).
 - **Backup & Restore:** Creates consistent database backups using the SQLite Online Backup API and validates backups before restoring with an automatic pre-restore safety copy (`BackupService`).
 
+- **Site-specific Download Workflows:** Optional BigOne resolution for the designated BollyFlix Lookup Site, with quality-aware FastDLServer selection, validated redirects, final-download verification, and browser fallback. BigOne must be explicitly assigned to BollyFlix; no generic link crawler or BigO placeholder is enabled.
+
 ## Solution Architecture
 
-The solution (`DigitalCenter.slnx`) is split into four projects (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details):
+The solution (`DigitalCenter.slnx`) is split into four projects (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the application architecture and [docs/DOWNLOAD_WORKFLOWS.md](docs/DOWNLOAD_WORKFLOWS.md) for BigOne site assignment, validation, browser fallback, and settings compatibility):
 
 | Project | Target Framework | Responsibility |
 | --- | --- | --- |
-| `src/DigitalCenter.Core` | `net10.0` | Platform-independent domain models, EF Core 10 + SQLite/FTS5 data layer, configuration (`AppPaths`, `AppSettings`, `TmdbOptions`), TMDb client, and core services. |
+| `src/DigitalCenter.Core` | `net10.0` | Platform-independent domain models, EF Core 10 + SQLite/FTS5 data layer, configuration (`AppPaths`, `AppSettings`, `TmdbOptions`), TMDb client, and core services, including the site-scoped BigOne download workflow. |
 | `src/DigitalCenter.ViewModels` | `net10.0` | Platform-independent MVVM ViewModels (`CommunityToolkit.Mvvm` 8.4.2) and UI service abstractions (`IUiDispatcher`, `IDialogService`, `IAppControl`). |
 | `src/DigitalCenter.App` | `net10.0-windows` | WPF desktop host, DI composition root (`App.xaml.cs`), views, custom `VirtualizingWrapPanel`, converters, and the "Daylight Slate" light theme. |
-| `tests/DigitalCenter.Tests` | `net10.0` | xUnit 2.9.3 unit and integration test suite covering `DigitalCenter.Core` (database, FTS5 search, parser, scanner, importer, TMDb, USB copy, watch folders, backup/restore, and maintenance). |
+| `tests/DigitalCenter.Tests` | `net10.0` | xUnit 2.9.3 unit and integration test suite covering `DigitalCenter.Core` (database, FTS5 search, parser, scanner, importer, TMDb, USB copy, watch folders, backup/restore, maintenance, and BigOne workflow validation). |
 
 ## Prerequisites
 
