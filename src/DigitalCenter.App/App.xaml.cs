@@ -279,6 +279,26 @@ public partial class App : Application
         services.AddSingleton<DramaLibraryService>();
         services.AddSingleton<DramaWatchFolderService>();
         services.AddSingleton<DramaCopyService>();
+        // BigOne must inspect every redirect itself; never share a redirect-following client.
+        services.AddSingleton(_ =>
+        {
+            var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip |
+                                         System.Net.DecompressionMethods.Deflate |
+                                         System.Net.DecompressionMethods.Brotli
+            };
+            var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("DigitalCenter/14.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml;q=0.9,*/*;q=0.8");
+            return client;
+        });
+        services.AddSingleton(new BigOneOptions(
+            configuration["Download:BigOneCloudOrigin"] ?? "https://new10.gdflix.io/"));
+        services.AddSingleton<BigOneDownloadWorkflow>();
+        services.AddSingleton<DownloadWorkflowDispatcher>();
+
         services.AddSingleton<ImdbLookupService>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<MaintenanceService>();
