@@ -24,7 +24,7 @@ public sealed class LookupSiteEntry
 /// </summary>
 public sealed class AppSettings
 {
-    public int Version { get; set; } = 10;
+    public int Version { get; set; } = 11;
 
     // ------------------------------------------------------------- library
     /// <summary>Absolute path of the folder that holds movies.</summary>
