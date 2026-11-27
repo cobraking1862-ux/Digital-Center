@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DigitalCenter.ViewModels;
 
 /// <summary>Selectable download workflow option for a Lookup site row.</summary>
-public sealed record WorkflowOptionItem(string ProviderId, string DisplayName);
+public sealed record WorkflowOptionItem(string WorkflowId, string DisplayName);
 
 /// <summary>Display wrapper around a backup file for the maintenance list.</summary>
 public sealed class BackupItemViewModel
@@ -77,19 +77,22 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
 
     public LookupSiteRowViewModel(
         LookupSiteEntry entry,
-        string? boundProviderId,
+        string? boundWorkflowId,
         IReadOnlyList<WorkflowOptionItem> availableWorkflows,
         Action onToggled,
         Action<string, string?> onWorkflowChanged)
     {
         Entry = entry;
-        AvailableWorkflows = availableWorkflows;
+        AvailableWorkflows = entry.Id.Equals(DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase)
+            ? availableWorkflows
+            : availableWorkflows.Where(option => !option.WorkflowId.Equals(DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase)).ToList();
         _onToggled = onToggled;
         _onWorkflowChanged = onWorkflowChanged;
         IsEnabled = entry.IsEnabled;
-        SelectedProviderId = string.IsNullOrWhiteSpace(boundProviderId)
-            ? DownloadWorkflowIds.None
-            : boundProviderId.Trim();
+        var requestedWorkflow = string.IsNullOrWhiteSpace(boundWorkflowId) ? DownloadWorkflowIds.None : boundWorkflowId.Trim();
+        SelectedWorkflowId = AvailableWorkflows.Any(option => option.WorkflowId.Equals(requestedWorkflow, StringComparison.OrdinalIgnoreCase))
+            ? requestedWorkflow
+            : DownloadWorkflowIds.None;
     }
 
     public LookupSiteEntry Entry { get; }
@@ -102,7 +105,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
     public bool IsBuiltIn => Entry.IsBuiltIn;
 
     [ObservableProperty] public partial bool IsEnabled { get; set; }
-    [ObservableProperty] public partial string SelectedProviderId { get; set; }
+    [ObservableProperty] public partial string SelectedWorkflowId { get; set; }
 
     partial void OnIsEnabledChanged(bool value)
     {
@@ -113,7 +116,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
         }
     }
 
-    partial void OnSelectedProviderIdChanged(string value)
+    partial void OnSelectedWorkflowIdChanged(string value)
     {
         _onWorkflowChanged(Entry.Id, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
     }
@@ -218,8 +221,7 @@ public partial class MaintenanceViewModel : ObservableObject
         AvailableWorkflows =
         [
             new WorkflowOptionItem(DownloadWorkflowIds.None, "None (Lookup-only)"),
-            new WorkflowOptionItem(DownloadWorkflowIds.DirectLink, "Direct Link Workflow"),
-            new WorkflowOptionItem(DownloadWorkflowIds.MultiStepLink, "Multi-Step Host Workflow")
+            new WorkflowOptionItem(DownloadWorkflowIds.BigOne, "BigOne — BollyFlix only")
         ];
 
         ProgressText = string.Empty;
@@ -1221,26 +1223,30 @@ public partial class MaintenanceViewModel : ObservableObject
         LookupSites.Clear();
         foreach (var entry in entries)
         {
-            dl.SiteWorkflowBindings.TryGetValue(entry.Id, out var boundProviderId);
+            dl.SiteWorkflowBindings.TryGetValue(entry.Id, out var boundWorkflowId);
             LookupSites.Add(new LookupSiteRowViewModel(
                 entry,
-                boundProviderId,
+                boundWorkflowId,
                 AvailableWorkflows,
                 PersistLookupSites,
                 OnSiteWorkflowChanged));
         }
     }
 
-    private void OnSiteWorkflowChanged(string siteId, string? providerId)
+    private void OnSiteWorkflowChanged(string siteId, string? workflowId)
     {
         try
         {
-            _downloadSettings.SetProviderIdForSite(siteId, providerId);
+            // The dropdown hides BigOne for every other site; enforce the same rule at persistence.
+            if (string.Equals(workflowId, DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(siteId, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase))
+                return;
+            _downloadSettings.SetWorkflowIdForSite(siteId, workflowId);
             LookupSitesChanged?.Invoke();
         }
         catch (Exception ex)
         {
-            _logger.Warn($"Saving workflow binding for site '{siteId}' failed: {ex.Message}");
+            _logger.Warn($"Saving workflow assignment for site '{siteId}' failed: {ex.Message}");
         }
     }
 
