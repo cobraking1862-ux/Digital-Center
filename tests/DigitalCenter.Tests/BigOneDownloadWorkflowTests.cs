@@ -1,3 +1,4 @@
+using System.Net;
 using DigitalCenter.Core.Configuration;
 using DigitalCenter.Core.Services;
 using Xunit;
@@ -38,7 +39,7 @@ public sealed class BigOneDownloadWorkflowTests
             .Map(CloudUrl, new MockHttpMessageHandler.Response(200, Fixture("page4.html")))
             .MapHost("cloud-dl.bj1zcnlye7n.workers.dev",
                 finalCloudResponse ?? new MockHttpMessageHandler.Response(
-                    200, string.Empty, "application/zip", FileName: "SampleTitle.720p.mkv.zip", IsAttachment: true))
+                    200, string.Empty, "application/zip", FileName: "SampleTitle.1080p.mkv.zip", IsAttachment: true))
             .MapHost("quick.cloudpaglu.site",
                 new MockHttpMessageHandler.Response(404, "not found"));
         return handler;
@@ -107,7 +108,8 @@ public sealed class BigOneDownloadWorkflowTests
         var options = BigOneDownloadWorkflow.ParseQualityOptions(Fixture("page2.html"), new Uri(MovieUrl));
 
         Assert.Equal("1080p", QualityPreferenceMatcher.SelectBestOption(options, "1080p")?.QualityLabel);
-        Assert.Equal("720p", QualityPreferenceMatcher.SelectBestOption(options, "900p")?.QualityLabel);
+        var lowerOnly = options.Where(option => option.QualityLabel is "480p" or "720p").ToList();
+        Assert.Equal("720p", QualityPreferenceMatcher.SelectBestOption(lowerOnly, "1080p")?.QualityLabel);
     }
 
     [Fact]
@@ -157,7 +159,7 @@ public sealed class BigOneDownloadWorkflowTests
         Assert.NotNull(outcome.Download);
         Assert.Equal("1080p", outcome.Download!.Quality);
         Assert.Equal("cloud-dl.bj1zcnlye7n.workers.dev", outcome.Download.DownloadUrl.Host);
-        Assert.Equal("SampleTitle.720p.mkv.zip", outcome.Download.FileName);
+        Assert.Equal("SampleTitle.1080p.mkv.zip", outcome.Download.FileName);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == SearchUrl);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == MovieUrl);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == FastDl1080Url);
@@ -188,7 +190,7 @@ public sealed class BigOneDownloadWorkflowTests
             .Map(FileHostUrl, new MockHttpMessageHandler.Response(200, Fixture("page3.html")))
             .Map(CloudUrl, new MockHttpMessageHandler.Response(200, Fixture("page4.html")))
             .MapHost("cloud-dl.bj1zcnlye7n.workers.dev",
-                new MockHttpMessageHandler.Response(200, string.Empty, "application/zip", FileName: "SampleTitle.720p.mkv.zip", IsAttachment: true));
+                new MockHttpMessageHandler.Response(200, string.Empty, "application/zip", FileName: "SampleTitle.1080p.mkv.zip", IsAttachment: true));
         using var http = new HttpClient(handler);
         var workflow = new BigOneDownloadWorkflow(http);
 
