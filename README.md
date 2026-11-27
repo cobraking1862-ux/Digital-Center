@@ -23,7 +23,7 @@ The solution (`DigitalCenter.slnx`) is split into four projects (see [docs/ARCHI
 | `src/DigitalCenter.Core` | `net10.0` | Platform-independent domain models, EF Core 10 + SQLite/FTS5 data layer, configuration (`AppPaths`, `AppSettings`, `TmdbOptions`), TMDb client, and core services, including the site-scoped BigOne download workflow. |
 | `src/DigitalCenter.ViewModels` | `net10.0` | Platform-independent MVVM ViewModels (`CommunityToolkit.Mvvm` 8.4.2) and UI service abstractions (`IUiDispatcher`, `IDialogService`, `IAppControl`). |
 | `src/DigitalCenter.App` | `net10.0-windows` | WPF desktop host, DI composition root (`App.xaml.cs`), views, custom `VirtualizingWrapPanel`, converters, and the "Daylight Slate" light theme. |
-| `tests/DigitalCenter.Tests` | `net10.0` | xUnit 2.9.3 unit and integration test suite covering `DigitalCenter.Core` (database, FTS5 search, parser, scanner, importer, TMDb, USB copy, watch folders, backup/restore, maintenance, and BigOne workflow validation). |
+| `tests/DigitalCenter.Tests` | `net10.0` | xUnit 2.9.2 unit and integration test suite covering `DigitalCenter.Core` (database, FTS5 search, parser, scanner, importer, TMDb, USB copy, watch folders, backup/restore, maintenance, and BigOne workflow validation). |
 
 ## Prerequisites
 
