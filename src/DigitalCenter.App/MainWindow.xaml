@@ -5,18 +5,18 @@
         xmlns:vm="clr-namespace:DigitalCenter.ViewModels;assembly=DigitalCenter.ViewModels"
         xmlns:views="clr-namespace:DigitalCenter.App.Views"
         xmlns:conv="clr-namespace:DigitalCenter.App.Converters"
-        Title="DigitalCenter 5.0"
-        Width="1440"
-        Height="860"
-        MinWidth="1060"
-        MinHeight="660"
+        Title="DigitalCenter"
+        Width="1380"
+        Height="840"
+        MinWidth="1020"
+        MinHeight="640"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         Background="{StaticResource WindowBackground}">
 
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="48"
-                            ResizeBorderThickness="7"
+        <shell:WindowChrome CaptionHeight="46"
+                            ResizeBorderThickness="6"
                             GlassFrameThickness="0"
                             CornerRadius="0"
                             UseAeroCaptionButtons="False"/>
@@ -29,11 +29,26 @@
         <DataTemplate DataType="{x:Type vm:LibraryViewModel}">
             <views:LibraryPage Style="{StaticResource PageFadeStyle}"/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DramaViewModel}">
+            <views:DramaPage Style="{StaticResource PageFadeStyle}"/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DramaDetailsViewModel}">
+            <views:DramaDetailsPage Style="{StaticResource PageFadeStyle}"/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LookupViewModel}">
+            <views:LookupPage Style="{StaticResource PageFadeStyle}"/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TicketsViewModel}">
+            <views:TicketsPage Style="{StaticResource PageFadeStyle}"/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:UsbCartViewModel}">
             <views:UsbCartPage Style="{StaticResource PageFadeStyle}"/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ManagementViewModel}">
             <views:ManagementPage Style="{StaticResource PageFadeStyle}"/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MaintenanceViewModel}">
+            <views:MaintenancePage Style="{StaticResource PageFadeStyle}"/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsPage Style="{StaticResource PageFadeStyle}"/>
@@ -43,78 +58,59 @@
         </DataTemplate>
     </Window.Resources>
 
-    <!-- ======================= aurora canvas =================
-         Base gradient + two softly diffused accent glows + a faint violet wash,
-         all pulled from the theme tokens so the canvas always follows the
-         palette. Glows are plain radial gradients: diffuse by nature, so no
-         BlurEffect cost anywhere in the visual tree. -->
-    <Grid Background="{StaticResource WindowBackdrop}">
-        <Rectangle Fill="{StaticResource GlowTopLeft}"/>
-        <Rectangle Fill="{StaticResource GlowBottomRight}"/>
-        <Rectangle Fill="{StaticResource GlowCenter}"/>
+    <Grid Background="{StaticResource WindowBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="46"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <!-- ================= custom Fluent caption bar ================= -->
-            <Grid Grid.Row="0">
+        <!-- ================= Clean Light Caption Bar ================= -->
+        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- The single hamburger control (opens/closes the sidebar) -->
                 <Button Grid.Column="0"
                         Style="{StaticResource IconButton}"
-                        Width="38" Height="34"
+                        Width="36" Height="32"
+                        Focusable="False"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         Click="OnHamburgerClick"
                         Margin="10,0,0,0"
-                        ToolTip="Toggle sidebar"
+                        ToolTip="Toggle navigation sidebar"
                         AutomationProperties.Name="Toggle sidebar">
-                    <TextBlock Text="{StaticResource Icon.Hamburger}" Style="{StaticResource GlyphIcon}"
-                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    <TextBlock Text="{StaticResource Icon.Hamburger}" Style="{StaticResource GlyphIcon}" FontSize="16"
+                               Foreground="{StaticResource TextBrush}"/>
                 </Button>
 
-                <!-- Brand -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <Grid Width="27" Height="27" VerticalAlignment="Center">
-                        <Border CornerRadius="{StaticResource Radius.Control}" Background="{StaticResource AccentGradient}"
-                                BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.22" Color="#6D28D9"/>
-                            </Border.Effect>
-                        </Border>
-                        <TextBlock Text="{StaticResource Icon.Play}" Style="{StaticResource GlyphXs}"
-                                   Foreground="White" Margin="1,0,0,0"/>
-                    </Grid>
-                    <TextBlock Text="DigitalCenter" Style="{StaticResource AppTitle}" Margin="11,0,0,0"
-                               VerticalAlignment="Center"/>
-                    <Border Background="{StaticResource PrimaryDimBrush}" BorderBrush="{StaticResource AccentBorderBrush}" BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Xs}" Padding="8,3" Margin="11,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="5.0" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource PrimaryDarkBrush}"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                    <Border Width="24" Height="24" CornerRadius="5" Background="{StaticResource PrimaryBrush}" VerticalAlignment="Center">
+                        <TextBlock Text="{StaticResource Icon.Play}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="10" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
+                    <TextBlock Text="DigitalCenter" Style="{StaticResource AppTitle}" Margin="10,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Window controls -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top"
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Style="{StaticResource CaptionButton}" Click="OnMinimizeClick" ToolTip="Minimize"
                             AutomationProperties.Name="Minimize">
-                        <TextBlock Text="{StaticResource Icon.Minimize}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="{StaticResource Icon.Minimize}" FontSize="11"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   Foreground="{StaticResource TextBrush}"/>
                     </Button>
                     <Button Style="{StaticResource CaptionButton}" Click="OnMaximizeRestoreClick" ToolTip="Maximize"
                             AutomationProperties.Name="Maximize">
                         <Grid>
-                            <TextBlock Text="{StaticResource Icon.Maximize}"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                            <TextBlock Text="{StaticResource Icon.Maximize}" FontSize="11"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       Foreground="{StaticResource TextBrush}">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphXs}">
+                                    <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Visible"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
@@ -124,10 +120,11 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBlock Text="{StaticResource Icon.Restore}"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                            <TextBlock Text="{StaticResource Icon.Restore}" FontSize="11"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       Foreground="{StaticResource TextBrush}">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphXs}">
+                                    <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
@@ -140,216 +137,75 @@
                         </Grid>
                     </Button>
                     <Button Style="{StaticResource CloseCaptionButton}" Click="OnCloseClick" ToolTip="Close"
-                            AutomationProperties.Name="Close" Margin="0,0,8,0">
-                        <TextBlock Text="{StaticResource Icon.Close}" Style="{StaticResource GlyphXs}"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            AutomationProperties.Name="Close" Margin="0,0,6,0">
+                        <TextBlock Text="{StaticResource Icon.Close}" FontSize="11"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"/>
                     </Button>
                 </StackPanel>
             </Grid>
+        </Border>
 
-            <!-- ================================ body ======================== -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <!-- ================================ Body ======================== -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <!-- Glass navigation rail -->
-                <Border x:Name="Sidebar"
-                        Grid.Column="0"
-                        Background="{StaticResource SidebarSurface}"
-                        BorderBrush="{StaticResource BorderLowBrush}"
-                        BorderThickness="0,0,1,0"
-                        Width="248">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Text="Library" Style="{StaticResource EyebrowText}"
-                                   Margin="26,16,16,10"
-                                   Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}"/>
-
-                        <ListBox Grid.Row="1"
-                                 ItemsSource="{Binding NavItems}"
-                                 SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
-                                 PreviewMouseLeftButtonUp="OnNavRowClick"
-                                 ItemContainerStyle="{StaticResource NavListBoxItem}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 Margin="0,2,0,0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border x:Name="IconChipHost"
-                                                Width="{StaticResource IconChipSize}" Height="{StaticResource IconChipSize}"
-                                                CornerRadius="{StaticResource Radius.Tile}"
-                                                Background="{StaticResource ControlBrush}" HorizontalAlignment="Center">
-                                            <TextBlock Text="{Binding Glyph}"
-                                                       Style="{StaticResource GlyphIcon}"
-                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <TextBlock Grid.Column="1" Text="{Binding Title}"
-                                                   FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center"
-                                                   Margin="12,0,0,0"
-                                                   ToolTip="{Binding Title}"
-                                                   Visibility="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
-                                        <!-- Cart badge: rectangular counter -->
-                                        <Border x:Name="CartBadge" Grid.Column="2" Background="{StaticResource AccentGradient}"
-                                                CornerRadius="{StaticResource Radius.Xs}" Padding="7,2" VerticalAlignment="Center"
-                                                Margin="8,0,2,0"
-                                                Visibility="{Binding BadgeCount, Converter={StaticResource CountToVis}}">
-                                            <TextBlock Text="{Binding BadgeCount}" FontSize="10.5" FontWeight="Bold"
-                                                       Foreground="White"/>
-                                        </Border>
-                                    </Grid>
-                                    <DataTemplate.Triggers>
-                                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                            <Setter TargetName="IconChipHost" Property="Background" Value="{StaticResource AccentGradientSoft}"/>
-                                            <Setter TargetName="IconChipHost" Property="Effect" Value="{StaticResource ShadowAccent}"/>
-                                        </DataTrigger>
-                                        <!-- Collapsed rail: only the icon fits, so the
-                                             counter hides instead of being clipped. -->
-                                        <DataTrigger Binding="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
-                                            <Setter TargetName="CartBadge" Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </DataTemplate.Triggers>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <!-- ===== Current Activity & Status =====
-                             The ONE consolidated runtime feed: navigation, cart,
-                             background work (Watch Folder, TMDb), file moves and
-                             system events all land here instead of being
-                             scattered over the individual screens. -->
-                        <Border Grid.Row="2" Margin="14,6,14,14"
-                                Visibility="{Binding IsSidebarOpen, Converter={StaticResource BoolToVis}}">
-                            <StackPanel>
-                                <Separator Style="{StaticResource Divider}" Margin="8,0,8,10"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphSmall}"
-                                                   Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Current Activity &amp; Status" FontSize="12.5" FontWeight="SemiBold"
-                                                   Margin="8,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" Padding="7,3" MinHeight="24"
-                                            Command="{Binding ClearActivityCommand}"
-                                            ToolTip="Clear the activity list"
-                                            AutomationProperties.Name="Clear activity">
-                                        <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphXs}"/>
-                                    </Button>
-                                </Grid>
-
-                                <Border Background="{StaticResource ControlBrush}" BorderBrush="{StaticResource BorderLowBrush}"
-                                        BorderThickness="1" CornerRadius="{StaticResource Radius.Control}"
-                                        Margin="0,8,0,0" Padding="9,8" MaxHeight="186">
-                                    <Grid>
-                                        <ListBox ItemsSource="{Binding Activity.Entries}"
-                                                 Background="Transparent" BorderThickness="0"
-                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                                 Visibility="{Binding Activity.HasEntries, Converter={StaticResource BoolToVis}}"
-                                                 VirtualizingPanel.IsVirtualizing="True">
-                                            <ListBox.ItemContainerStyle>
-                                                <Style TargetType="ListBoxItem">
-                                                    <Setter Property="Padding" Value="0"/>
-                                                    <Setter Property="Margin" Value="0"/>
-                                                    <Setter Property="Focusable" Value="False"/>
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate TargetType="ListBoxItem">
-                                                                <ContentPresenter Margin="0,0,0,8"/>
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Style>
-                                            </ListBox.ItemContainerStyle>
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock x:Name="KindGlyph" Text="{StaticResource Icon.Info}"
-                                                                   Style="{StaticResource GlyphXs}" VerticalAlignment="Top"
-                                                                   Foreground="{StaticResource SubTextBrush}" Margin="0,2,0,0"/>
-                                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                            <TextBlock Text="{Binding Message}" FontSize="11" TextWrapping="Wrap"
-                                                                       Foreground="{StaticResource BodySoftBrush}" LineHeight="15"/>
-                                                            <TextBlock FontSize="9.5" Margin="0,2,0,0"
-                                                                       Foreground="{StaticResource FaintTextBrush}">
-                                                                <Run Text="{Binding TimeText, Mode=OneWay}"/>
-                                                                <Run Text=" · "/>
-                                                                <Run Text="{Binding KindText, Mode=OneWay}"/>
-                                                            </TextBlock>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                    <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Navigation">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Home}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Cart">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Cart}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource CyanBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Background">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Sync}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="FileOperation">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.OpenFile}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource CyanBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Success">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Check}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource OkBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Warning">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Warning}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource WarnBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Kind}" Value="Error">
-                                                            <Setter TargetName="KindGlyph" Property="Text" Value="{StaticResource Icon.Error}"/>
-                                                            <Setter TargetName="KindGlyph" Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                                        </DataTrigger>
-                                                    </DataTemplate.Triggers>
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                        </ListBox>
-
-                                        <TextBlock Text="{Binding Activity.LatestMessage}" FontSize="11" TextWrapping="Wrap"
-                                                   Foreground="{StaticResource FaintTextBrush}"
-                                                   Visibility="{Binding Activity.HasEntries, Converter={StaticResource BoolToVisInverted}}"/>
-                                    </Grid>
+            <!-- Simplified Navigation Sidebar -->
+            <Border x:Name="Sidebar"
+                    Grid.Column="0"
+                    Background="{StaticResource SidebarBackground}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="0,0,1,0"
+                    Width="220">
+                <ListBox ItemsSource="{Binding NavItems}"
+                         SelectedItem="{Binding SelectedNavItem, Mode=TwoWay}"
+                         ItemContainerStyle="{StaticResource NavListBoxItem}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Margin="0,12,0,12"
+                         VerticalAlignment="Top"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         PreviewMouseLeftButtonDown="OnNavListPreviewMouseLeftButtonDown">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="32" Height="32" CornerRadius="5"
+                                        Background="Transparent" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Glyph}"
+                                               Style="{StaticResource GlyphIcon}" FontSize="16"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Border>
+                                <TextBlock Grid.Column="1" Text="{Binding Title}"
+                                           FontSize="13.5" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                           Margin="10,0,0,0"
+                                           ToolTip="{Binding Title}"
+                                           Visibility="{Binding DataContext.IsSidebarOpen, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}"/>
+                                <Border Grid.Column="2" Background="{StaticResource PrimaryBrush}"
+                                        CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center"
+                                        Margin="6,0,2,0"
+                                        Visibility="{Binding BadgeCount, Converter={StaticResource CountToVis}}">
+                                    <TextBlock Text="{Binding BadgeCount}" FontSize="10.5" FontWeight="Bold"
+                                               Foreground="White"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
 
-                <!-- Page content (pages fade in through their own Loaded trigger) -->
-                <ContentControl Grid.Column="1"
-                                Content="{Binding CurrentPage}"
-                                Margin="0"/>
-            </Grid>
+            <!-- Page Content -->
+            <ContentControl Grid.Column="1"
+                            Content="{Binding CurrentPage}"
+                            Margin="0"/>
         </Grid>
     </Grid>
 </Window>

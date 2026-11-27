@@ -9,167 +9,122 @@ using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.ViewModels;
 
-/// <summary>The categories of the library screen.</summary>
+/// <summary>The primary filter views of the main library.</summary>
 public enum LibraryTab
 {
-    /// <summary>
-    /// The Home dashboard: Movies and TV Series are loaded and shown together,
-    /// so landing on Home displays the collection without touching a category
-    /// button first.
-    /// </summary>
-    All,
-
+    Dashboard,
     Movies,
-    Series,
+    Collections,
     Genres
 }
 
 /// <summary>
-/// Home screen: grid-only library with portrait poster cards. The top
-/// navigation selects Movies / Series / Genres; the subbar
-/// offers year, language and sorting; the search box on the right is the only
-/// other header control.
-///
-/// Card interaction is split in two: a single click selects the card
-/// (<see cref="SelectItemCommand"/>), a double click — or Enter/Space on a
-/// focused card — raises <see cref="DetailsRequested"/> and opens the details
-/// screen. Works identically for movies and series.
+/// Library screen: unified virtualized poster grid for All (Dashboard), Movies,
+/// Collections, and Genres, with 5-year grouped year filter, language, sorting,
+/// and debounced search.
 /// </summary>
 public partial class LibraryViewModel : ObservableObject
 {
     private readonly LibraryQueryService _queryService;
     private readonly UsbCopyService _copyService;
     private readonly SettingsService _settingsService;
-    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly IAppLogger _logger;
+    private readonly ActivityFeedService _activityFeed;
+    private readonly IUiDispatcher? _uiDispatcher;
 
     public LibraryViewModel(
         LibraryQueryService queryService,
         UsbCopyService copyService,
         SettingsService settingsService,
-        ActivityFeed activity,
         IDialogService dialogs,
-        IAppLogger logger)
+        IAppLogger logger,
+        ActivityFeedService activityFeed,
+        IUiDispatcher? uiDispatcher = null)
     {
         _queryService = queryService;
         _copyService = copyService;
         _settingsService = settingsService;
-        _activity = activity;
         _dialogs = dialogs;
         _logger = logger;
+        _activityFeed = activityFeed;
+        _uiDispatcher = uiDispatcher;
 
-        SearchText = string.Empty;
-        TotalMatchesText = string.Empty;
-        StatusText = string.Empty;
-        SortOptionsSource =
-        [
-            "Title A → Z",
-            "Title Z → A",
-            "Year (newest)",
-            "Year (oldest)",
-            "Recently added"
-        ];
+        _suppressFilterRefresh = true;
+        try
+        {
+            SelectedTab = LibraryTab.Dashboard;
+            SearchText = string.Empty;
+            TotalMatchesText = string.Empty;
+            StatusText = string.Empty;
+            SortOptionsSource =
+            [
+                "Title A → Z",
+                "Title Z → A",
+                "Year (newest)",
+                "Year (oldest)",
+                "Recently added"
+            ];
 
-        YearOptions = ["All years"];
-        LanguageOptions = ["All languages"];
+            YearOptions = ["All years"];
+            LanguageOptions = ["All languages"];
+            SelectedYear = "All years";
+            SelectedLanguage = "All languages";
+        }
+        finally
+        {
+            _suppressFilterRefresh = false;
+        }
     }
 
     public event Action<int>? DetailsRequested;
-
-    /// <summary>Raised after titles were added to the USB cart (shell refreshes the cart).</summary>
     public event Action? CartChanged;
 
     public IReadOnlyList<string> SortOptionsSource { get; }
 
-    public ObservableCollection<LibraryItemViewModel> Items { get; } = [];
-
-    /// <summary>Movies shown on the Home dashboard (newest first, capped).</summary>
-    public ObservableCollection<LibraryItemViewModel> HomeMovies { get; } = [];
-
-    /// <summary>TV Series shown on the Home dashboard (newest first, capped).</summary>
-    public ObservableCollection<LibraryItemViewModel> HomeSeries { get; } = [];
-
     public ObservableCollection<string> YearOptions { get; }
-
     public ObservableCollection<string> LanguageOptions { get; }
-
-    /// <summary>Genre chips shown on the Genres tab (name + count label).</summary>
     public ObservableCollection<GenreChipViewModel> GenreChips { get; } = [];
+    public ObservableCollection<GenreChipViewModel> CollectionChips { get; } = [];
 
-    [ObservableProperty]
-    public partial LibraryTab SelectedTab { get; set; }
+    private ObservableCollection<LibraryItemViewModel> _items = [];
+    public ObservableCollection<LibraryItemViewModel> Items
+    {
+        get => _items;
+        private set
+        {
+            if (SetProperty(ref _items, value))
+            {
+                OnPropertyChanged(nameof(HasNoItems));
+            }
+        }
+    }
 
-    [ObservableProperty]
-    public partial string SearchText { get; set; }
+    [ObservableProperty] public partial LibraryTab SelectedTab { get; set; }
+    [ObservableProperty] public partial string SearchText { get; set; }
+    [ObservableProperty] public partial string SelectedYear { get; set; }
+    [ObservableProperty] public partial string SelectedLanguage { get; set; }
+    [ObservableProperty] public partial int SortIndex { get; set; }
+    [ObservableProperty] public partial string? SelectedGenre { get; set; }
+    [ObservableProperty] public partial string? SelectedCollection { get; set; }
+    [ObservableProperty] public partial string TotalMatchesText { get; set; }
+    [ObservableProperty] public partial string StatusText { get; set; }
+    [ObservableProperty] public partial bool IsLoading { get; set; }
+    [ObservableProperty] public partial string LoadError { get; set; } = string.Empty;
 
-    // Initialized here (not in the constructor) so the combos start on their
-    // "all" entry instead of showing an empty selection, and so no change
-    // callback fires while the view model is still being built.
-    [ObservableProperty]
-    public partial string SelectedYear { get; set; } = "All years";
-
-    [ObservableProperty]
-    public partial string SelectedLanguage { get; set; } = "All languages";
-
-    [ObservableProperty]
-    public partial int SortIndex { get; set; }
-
-    [ObservableProperty]
-    public partial string? SelectedGenre { get; set; }
-
-    [ObservableProperty]
-    public partial string TotalMatchesText { get; set; }
-
-    [ObservableProperty]
-    public partial string StatusText { get; set; }
-
-    [ObservableProperty]
-    public partial LibraryItemViewModel? SelectedItem { get; set; }
-
-    [ObservableProperty]
-    public partial int HomeMovieTotal { get; set; }
-
-    [ObservableProperty]
-    public partial int HomeSeriesTotal { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsLoading { get; set; }
-
-    [ObservableProperty]
-    public partial string LoadError { get; set; } = string.Empty;
-
-    public bool HasNoItems => !IsLoading && Items.Count == 0 && !HasHomeItems && LoadError.Length == 0;
-
-    /// <summary>True on the Home dashboard (Movies + TV Series shown together).</summary>
-    public bool IsHomeTab => SelectedTab == LibraryTab.All;
-
-    public bool HasHomeMovies => HomeMovies.Count > 0;
-
-    public bool HasHomeSeries => HomeSeries.Count > 0;
-
-    public bool HasHomeItems => HomeMovies.Count > 0 || HomeSeries.Count > 0;
-
-    /// <summary>How many movies the dashboard shows out of the matching total.</summary>
-    public string HomeMovieSummary => HomeMovieTotal <= HomeMovies.Count
-        ? $"{HomeMovieTotal} title(s)"
-        : $"{HomeMovies.Count} of {HomeMovieTotal} title(s)";
-
-    public string HomeSeriesSummary => HomeSeriesTotal <= HomeSeries.Count
-        ? $"{HomeSeriesTotal} title(s)"
-        : $"{HomeSeries.Count} of {HomeSeriesTotal} title(s)";
-
-    /// <summary>The poster grid is shown on every tab except the Home dashboard.</summary>
-    public bool IsCategoryGridVisible => !IsHomeTab;
-
+    public bool HasNoItems => !IsLoading && Items.Count == 0 && LoadError.Length == 0;
     public bool IsGenresTab => SelectedTab == LibraryTab.Genres;
-
+    public bool IsCollectionsTab => SelectedTab == LibraryTab.Collections;
     public bool HasGenres => GenreChips.Count > 0;
+    public bool HasCollections => CollectionChips.Count > 0;
 
     private CancellationTokenSource? _debounce;
+    private int _refreshGeneration;
 
     partial void OnSearchTextChanged(string value)
     {
+        if (_suppressFilterRefresh) return;
+
         _debounce?.Cancel();
         _debounce = new CancellationTokenSource();
         _ = DebouncedRefreshAsync(_debounce.Token);
@@ -177,135 +132,104 @@ public partial class LibraryViewModel : ObservableObject
 
     partial void OnSelectedTabChanged(LibraryTab value)
     {
-        if (value == LibraryTab.Genres && GenreChips.Count == 0)
+        if (_suppressFilterRefresh) return;
+
+        if (value == LibraryTab.Genres)
         {
             _ = LoadGenreChipsAsync();
         }
+        else if (value == LibraryTab.Collections)
+        {
+            _ = LoadCollectionChipsAsync();
+        }
 
-        OnPropertyChanged(nameof(IsHomeTab));
-        OnPropertyChanged(nameof(IsCategoryGridVisible));
         OnPropertyChanged(nameof(IsGenresTab));
+        OnPropertyChanged(nameof(IsCollectionsTab));
         OnPropertyChanged(nameof(HasGenres));
-        _activity.Publish($"Browsing {TabLabel(value)}.", ActivityKind.Navigation);
+        OnPropertyChanged(nameof(HasCollections));
+
+        if (value != LibraryTab.Genres && SelectedGenre is not null)
+        {
+            SelectedGenre = null;
+            return;
+        }
+
+        if (value != LibraryTab.Collections && SelectedCollection is not null)
+        {
+            SelectedCollection = null;
+            return;
+        }
+
         _ = RefreshSafeAsync();
     }
 
-    /// <summary>The wording used in the activity feed for a category.</summary>
-    private static string TabLabel(LibraryTab tab) => tab switch
+    private bool _suppressFilterRefresh;
+
+    partial void OnSelectedYearChanged(string value)
     {
-        LibraryTab.Movies => "Movies",
-        LibraryTab.Series => "TV Series",
-        LibraryTab.Genres => "genres",
-        _ => "the Home dashboard"
-    };
-
-    partial void OnSelectedYearChanged(string value) => _ = RefreshSafeAsync();
-
-    partial void OnSelectedLanguageChanged(string value) => _ = RefreshSafeAsync();
-
-    partial void OnSortIndexChanged(int value) => _ = RefreshSafeAsync();
-
-    partial void OnSelectedGenreChanged(string? value) => _ = RefreshSafeAsync();
-
-    /// <summary>
-    /// Keeps exactly one card selected and mirrors the state onto the rows —
-    /// including the two Home dashboard sections, whose cards are separate
-    /// instances of the same titles.
-    /// </summary>
-    partial void OnSelectedItemChanged(LibraryItemViewModel? value)
-    {
-        foreach (var item in Items)
+        if (!_suppressFilterRefresh && !string.IsNullOrEmpty(value))
         {
-            item.IsSelected = ReferenceEquals(item, value);
-        }
-
-        foreach (var item in HomeMovies)
-        {
-            item.IsSelected = value is not null && item.Id == value.Id;
-        }
-
-        foreach (var item in HomeSeries)
-        {
-            item.IsSelected = value is not null && item.Id == value.Id;
+            _ = RefreshSafeAsync();
         }
     }
 
-    partial void OnIsLoadingChanged(bool value)
+    partial void OnSelectedLanguageChanged(string value)
     {
-        OnPropertyChanged(nameof(HasNoItems));
+        if (!_suppressFilterRefresh && !string.IsNullOrEmpty(value))
+        {
+            _ = RefreshSafeAsync();
+        }
     }
 
+    partial void OnSortIndexChanged(int value)
+    {
+        if (!_suppressFilterRefresh)
+        {
+            _ = RefreshSafeAsync();
+        }
+    }
+
+    partial void OnSelectedGenreChanged(string? value)
+    {
+        if (!_suppressFilterRefresh)
+        {
+            _ = RefreshSafeAsync();
+        }
+    }
+
+    partial void OnSelectedCollectionChanged(string? value)
+    {
+        if (!_suppressFilterRefresh)
+        {
+            _ = RefreshSafeAsync();
+        }
+    }
+
+    partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(HasNoItems));
     partial void OnLoadErrorChanged(string value) => OnPropertyChanged(nameof(HasNoItems));
 
     private async Task DebouncedRefreshAsync(CancellationToken ct)
     {
         try
         {
-            await Task.Delay(350, ct);
-            var term = SearchText?.Trim();
-            _activity.Publish(
-                term is { Length: > 0 } ? $"Searching the library for “{term}”." : "Search cleared.",
-                ActivityKind.Navigation);
+            await Task.Delay(220, ct);
+            ct.ThrowIfCancellationRequested();
             await RefreshSafeAsync();
         }
-        catch (OperationCanceledException)
-        {
-            // A newer keystroke replaced this pending refresh.
-        }
+        catch (OperationCanceledException) { }
     }
 
-    private bool _refreshRunning;
-    private bool _refreshQueued;
-    private Task _activeRefresh = Task.CompletedTask;
-
-    /// <summary>
-    /// The single entry point for a library reload. Overlapping reloads are
-    /// coalesced instead of running at the same time: two passes clearing and
-    /// refilling <see cref="Items"/> concurrently is what produced doubled rows,
-    /// a lost selection and duplicated year/language filter entries.
-    ///
-    /// Every caller receives the task for the active reload, including callers
-    /// that arrive while it is already running. Startup can therefore await this
-    /// method and know that the homepage collections have actually been
-    /// rehydrated; returning early here used to make that await a no-op.
-    /// </summary>
-    public Task RefreshSafeAsync()
-    {
-        if (_refreshRunning)
-        {
-            _refreshQueued = true;
-            return _activeRefresh;
-        }
-
-        _refreshRunning = true;
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _activeRefresh = completion.Task;
-        _ = RefreshLoopAsync(completion);
-        return _activeRefresh;
-    }
-
-    private async Task RefreshLoopAsync(TaskCompletionSource completion)
+    public async Task RefreshSafeAsync()
     {
         try
         {
-            do
-            {
-                _refreshQueued = false;
-                LoadError = string.Empty;
-                await RefreshCoreAsync();
-            }
-            while (_refreshQueued);
+            LoadError = string.Empty;
+            await RefreshCoreAsync();
         }
         catch (Exception ex)
         {
             _logger.Error("Loading the library failed.", ex);
             LoadError = ex.Message;
-            _activity.Publish($"Loading the library failed: {ex.Message}", ActivityKind.Error);
-        }
-        finally
-        {
-            _refreshRunning = false;
-            completion.TrySetResult();
         }
     }
 
@@ -318,185 +242,136 @@ public partial class LibraryViewModel : ObservableObject
         SetGenreChips(genres);
     }
 
-    /// <summary>How many titles each Home dashboard section shows.</summary>
-    private const int HomeSectionSize = 12;
+    private async Task LoadCollectionChipsAsync()
+    {
+        var collections = await _queryService.GetCollectionCountsAsync();
+        SetCollectionChips(collections);
+    }
+
+    private CancellationTokenSource? _queryCts;
 
     private async Task RefreshCoreAsync()
     {
-        if (IsHomeTab)
-        {
-            // The dashboard loads BOTH categories in one go: landing on Home
-            // shows Movies and TV Series immediately, no category click needed.
-            Items.Clear();
-            await LoadHomeSectionsAsync();
-            return;
-        }
+        _queryCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _queryCts = cts;
+        var ct = cts.Token;
 
-        HomeMovies.Clear();
-        HomeSeries.Clear();
-        RaiseHomeState();
-
-        var filter = BuildFilter();
+        var generation = Interlocked.Increment(ref _refreshGeneration);
         IsLoading = true;
         try
         {
-            var page = await _queryService.QueryAsync(filter);
-
-            // Rebuilding the grid must not throw away the selection: keep it by
-            // title id so a background refresh cannot deselect the open card.
-            var selectedId = SelectedItem?.Id;
-
-            Items.Clear();
-            foreach (var row in page.Items)
+            var filter = BuildFilter(KindOrNull());
+            var page = await _queryService.QueryAsync(filter, ct);
+            if (generation != Volatile.Read(ref _refreshGeneration) || ct.IsCancellationRequested)
             {
-                Items.Add(new LibraryItemViewModel(row));
+                return;
             }
 
-            SelectedItem = selectedId is { } id ? Items.FirstOrDefault(item => item.Id == id) : null;
+            var viewModels = await Task.Run(
+                () => page.Items.Select(row => new LibraryItemViewModel(row)).ToList(),
+                ct);
+            if (generation != Volatile.Read(ref _refreshGeneration) || ct.IsCancellationRequested)
+            {
+                return;
+            }
 
-            TotalMatchesText = page.TotalMatches == page.Items.Count
-                ? $"{page.TotalMatches} title(s)"
-                : $"{page.TotalMatches} matching title(s), showing first {page.Items.Count}";
+            void ApplyResultsToUi()
+            {
+                Items = new ObservableCollection<LibraryItemViewModel>(viewModels);
+
+                TotalMatchesText = page.TotalMatches == page.Items.Count
+                    ? $"{page.TotalMatches} title(s)"
+                    : $"{page.TotalMatches} matching title(s), showing first {page.Items.Count}";
+            }
+
+            if (_uiDispatcher is not null)
+            {
+                _uiDispatcher.Post(ApplyResultsToUi);
+            }
+            else
+            {
+                ApplyResultsToUi();
+            }
 
             await EnsureFilterOptionsAsync();
         }
+        catch (OperationCanceledException) { }
         finally
         {
-            IsLoading = false;
+            if (generation == Volatile.Read(ref _refreshGeneration))
+            {
+                IsLoading = false;
+            }
+
+            OnPropertyChanged(nameof(HasNoItems));
         }
     }
-
-    /// <summary>The category the year/language options were loaded for.</summary>
-    private MediaKind? _optionsKind;
-
-    private bool _optionsLoaded;
-
-    /// <summary>
-    /// Fills the year and language filters for the CURRENT category. They used
-    /// to be loaded once and then never again, so switching between Movies and
-    /// Series kept offering the other category's years and languages (stale
-    /// filter options that could only produce an empty grid).
-    /// </summary>
-    /// <summary>
-    /// Fills the two Home dashboard sections with the current search/filter/sort
-    /// applied to each category, newest first, capped at
-    /// <see cref="HomeSectionSize"/> so the dashboard stays scannable (each
-    /// section header offers "Show all").
-    /// </summary>
-    private async Task LoadHomeSectionsAsync()
-    {
-        IsLoading = true;
-        try
-        {
-            var filter = BuildFilter() with { SortBy = "Created", SortDescending = true, MaxResults = HomeSectionSize };
-            var moviesTask = _queryService.QueryAsync(filter with { Type = MediaKind.Movie });
-            var seriesTask = _queryService.QueryAsync(filter with { Type = MediaKind.Series });
-            await Task.WhenAll(moviesTask, seriesTask);
-
-            var movies = moviesTask.Result;
-            var series = seriesTask.Result;
-
-            // Keep the current selection across the rebuild (by title id).
-            var selectedId = SelectedItem?.Id;
-
-            Fill(HomeMovies, movies.Items);
-            Fill(HomeSeries, series.Items);
-
-            HomeMovieTotal = movies.TotalMatches;
-            HomeSeriesTotal = series.TotalMatches;
-            OnPropertyChanged(nameof(HomeMovieSummary));
-            OnPropertyChanged(nameof(HomeSeriesSummary));
-
-            TotalMatchesText = $"{movies.TotalMatches} movie(s) · {series.TotalMatches} series";
-
-            SelectedItem = selectedId is { } id
-                ? HomeMovies.FirstOrDefault(item => item.Id == id) ?? HomeSeries.FirstOrDefault(item => item.Id == id)
-                : null;
-
-            RaiseHomeState();
-            await EnsureFilterOptionsAsync();
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private static void Fill(ObservableCollection<LibraryItemViewModel> target, IEnumerable<LibraryPageItem> rows)
-    {
-        target.Clear();
-        foreach (var row in rows)
-        {
-            target.Add(new LibraryItemViewModel(row));
-        }
-    }
-
-    private void RaiseHomeState()
-    {
-        OnPropertyChanged(nameof(HasHomeMovies));
-        OnPropertyChanged(nameof(HasHomeSeries));
-        OnPropertyChanged(nameof(HasHomeItems));
-        OnPropertyChanged(nameof(HasNoItems));
-    }
-
-    /// <summary>Shows every movie / series (leaves the dashboard for that category).</summary>
-    public void ShowAllMovies() => SelectedTab = LibraryTab.Movies;
-
-    public void ShowAllSeries() => SelectedTab = LibraryTab.Series;
 
     private async Task EnsureFilterOptionsAsync()
     {
         var kind = KindOrNull();
-        if (_optionsLoaded && _optionsKind == kind)
+        var yearsTask = _queryService.GetDistinctYearsAsync(kind);
+        var languagesTask = _queryService.GetDistinctLanguagesAsync(kind);
+        await Task.WhenAll(yearsTask, languagesTask);
+        var years = await yearsTask;
+        var languages = await languagesTask;
+
+        // Group individual years into clean 5-year ranges (e.g. 2021-2025, 2016-2020, 2006-2010, 2001-2005)
+        var yearBuckets = years
+            .Where(y => y > 1800)
+            .Select(y =>
+            {
+                var start = ((y - 1) / 5) * 5 + 1;
+                return (Start: start, End: start + 4);
+            })
+            .Distinct()
+            .OrderByDescending(b => b.Start)
+            .Select(b => $"{b.Start}-{b.End}")
+            .ToList();
+
+        _suppressFilterRefresh = true;
+        try
         {
-            return;
+            var expectedYears = new List<string>(yearBuckets.Count + 1) { "All years" };
+            expectedYears.AddRange(yearBuckets);
+            if (!YearOptions.SequenceEqual(expectedYears, StringComparer.Ordinal))
+            {
+                var selected = SelectedYear;
+                YearOptions.Clear();
+                foreach (var bucket in expectedYears)
+                {
+                    YearOptions.Add(bucket);
+                }
+                SelectedYear = selected is not null && YearOptions.Contains(selected) ? selected : "All years";
+            }
+
+            if (LanguageOptions.Count != languages.Count + 1)
+            {
+                var selected = SelectedLanguage;
+                LanguageOptions.Clear();
+                LanguageOptions.Add("All languages");
+                foreach (var language in languages)
+                {
+                    LanguageOptions.Add(language);
+                }
+                SelectedLanguage = selected is not null && LanguageOptions.Contains(selected) ? selected : "All languages";
+            }
         }
-
-        var years = await _queryService.GetDistinctYearsAsync(kind);
-        var languages = await _queryService.GetDistinctLanguagesAsync(kind);
-
-        var selectedYear = SelectedYear;
-        var selectedLanguage = SelectedLanguage;
-
-        YearOptions.Clear();
-        YearOptions.Add("All years");
-        foreach (var year in years)
+        finally
         {
-            YearOptions.Add(year.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
-        LanguageOptions.Clear();
-        LanguageOptions.Add("All languages");
-        foreach (var language in languages)
-        {
-            LanguageOptions.Add(language);
-        }
-
-        _optionsKind = kind;
-        _optionsLoaded = true;
-
-        // A selection that the new category does not have falls back to "all"
-        // instead of leaving the combo empty (which would silently filter
-        // everything away).
-        if (selectedYear is null || !YearOptions.Contains(selectedYear))
-        {
-            SelectedYear = "All years";
-        }
-
-        if (selectedLanguage is null || !LanguageOptions.Contains(selectedLanguage))
-        {
-            SelectedLanguage = "All languages";
+            _suppressFilterRefresh = false;
         }
     }
 
     private MediaKind? KindOrNull() => SelectedTab switch
     {
         LibraryTab.Movies => MediaKind.Movie,
-        LibraryTab.Series => MediaKind.Series,
+        LibraryTab.Collections => MediaKind.Movie,
         _ => null
     };
 
-    private LibraryFilter BuildFilter()
+    private LibraryFilter BuildFilter(MediaKind? type)
     {
         var (sortBy, descending) = SortIndex switch
         {
@@ -508,11 +383,21 @@ public partial class LibraryViewModel : ObservableObject
         };
 
         int? yearFrom = null, yearTo = null;
-        if (SelectedYear is not null && SelectedYear != "All years" &&
-            int.TryParse(SelectedYear, out var parsedYear))
+        if (SelectedYear is not null && SelectedYear != "All years")
         {
-            yearFrom = parsedYear;
-            yearTo = parsedYear;
+            var parts = SelectedYear.Split('-', StringSplitOptions.TrimEntries);
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out var fromY) &&
+                int.TryParse(parts[1], out var toY))
+            {
+                yearFrom = fromY;
+                yearTo = toY;
+            }
+            else if (int.TryParse(SelectedYear, out var parsedYear))
+            {
+                yearFrom = parsedYear;
+                yearTo = parsedYear;
+            }
         }
 
         var language = SelectedLanguage is null || SelectedLanguage == "All languages" ? null : SelectedLanguage;
@@ -520,40 +405,25 @@ public partial class LibraryViewModel : ObservableObject
         return new LibraryFilter
         {
             SearchText = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim(),
-            Type = KindOrNull(),
+            Type = type,
             YearFrom = yearFrom,
             YearTo = yearTo,
             Language = language,
             Genre = SelectedGenre,
+            OnlyCollections = SelectedTab == LibraryTab.Collections,
+            CollectionName = SelectedTab == LibraryTab.Collections ? SelectedCollection : null,
             SortBy = sortBy,
             SortDescending = descending
         };
     }
 
-    /// <summary>Selects a card (single click). Does not navigate.</summary>
     [RelayCommand]
-    private void SelectItem(LibraryItemViewModel? item) => SelectedItem = item;
-
-    /// <summary>Opens the details screen for a card (double click, Enter or Space).</summary>
-    [RelayCommand]
-    private void OpenDetails(LibraryItemViewModel? item)
-    {
-        if (item is null || item.Id <= 0)
-        {
-            return;
-        }
-
-        SelectedItem = item;
-        DetailsRequested?.Invoke(item.Id);
-    }
+    private void OpenDetails(LibraryItemViewModel? item) => DetailsRequested?.Invoke(item?.Id ?? 0);
 
     [RelayCommand]
     private async Task AddToCartAsync(LibraryItemViewModel? item)
     {
-        if (item is null || item.Id <= 0)
-        {
-            return;
-        }
+        if (item is null || item.Id <= 0) return;
 
         var settings = _settingsService.Load();
         try
@@ -571,23 +441,20 @@ public partial class LibraryViewModel : ObservableObject
                     ? $"'{item.Title}' is already in the USB cart."
                     : $"'{item.Title}' has no registered files to copy.";
 
-            _activity.Publish(
-                result.Queued > 0
-                    ? $"{item.TypeDisplay} “{item.Title}” added to the cart successfully ({result.Queued} file(s))."
-                    : StatusText,
-                result.Queued > 0 ? ActivityKind.Cart : ActivityKind.Warning);
+            if (result.Queued > 0)
+            {
+                _activityFeed.Publish($"Added to USB cart: {item.Title}");
+            }
 
             CartChanged?.Invoke();
         }
         catch (Exception ex)
         {
             _logger.Error("Adding a title to the USB cart failed.", ex);
-            _activity.Publish($"Adding “{item.Title}” to the cart failed: {ex.Message}", ActivityKind.Error);
             _dialogs.Error("USB Cart", $"The title could not be added to the cart: {ex.Message}");
         }
     }
 
-    /// <summary>Called by the view after the genre chips were loaded from the database.</summary>
     public void SetGenreChips(IEnumerable<(string Name, int Count)> genres)
     {
         GenreChips.Clear();
@@ -604,7 +471,50 @@ public partial class LibraryViewModel : ObservableObject
             GenreChips.Add(chip);
         }
 
+        if (SelectedGenre is { } selected && GenreChips.All(c => c.Name != selected))
+        {
+            SelectedGenre = null;
+        }
+
         OnPropertyChanged(nameof(HasGenres));
+    }
+
+    public void SetCollectionChips(IEnumerable<(string Name, int Count)> collections)
+    {
+        CollectionChips.Clear();
+        foreach (var (name, count) in collections)
+        {
+            var chip = new GenreChipViewModel(name, count)
+            {
+                IsSelected = string.Equals(SelectedCollection, name, StringComparison.OrdinalIgnoreCase)
+            };
+            chip.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(GenreChipViewModel.IsSelected))
+                {
+                    if (chip.IsSelected)
+                    {
+                        foreach (var other in CollectionChips.Where(c => !ReferenceEquals(c, chip) && c.IsSelected))
+                        {
+                            other.IsSelected = false;
+                        }
+                        SelectedCollection = chip.Name;
+                    }
+                    else if (string.Equals(SelectedCollection, chip.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        SelectedCollection = null;
+                    }
+                }
+            };
+            CollectionChips.Add(chip);
+        }
+
+        if (SelectedCollection is { } selected && CollectionChips.All(c => !string.Equals(c.Name, selected, StringComparison.OrdinalIgnoreCase)))
+        {
+            SelectedCollection = null;
+        }
+
+        OnPropertyChanged(nameof(HasCollections));
     }
 }
 
@@ -612,10 +522,8 @@ public partial class LibraryViewModel : ObservableObject
 public sealed partial class GenreChipViewModel(string name, int count) : ObservableObject
 {
     public string Name { get; } = name;
-
     public int Count { get; } = count;
-
-    public string Display => Count > 0 ? $"{Name}  ({Count})" : Name;
+    public string Display => Count > 0 ? $"{Name} ({Count})" : Name;
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }

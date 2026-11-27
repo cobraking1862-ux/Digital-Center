@@ -14,25 +14,11 @@ public sealed record MatchOutcome
     /// <summary>Confidence of the match (0-1); 0 when unmatched.</summary>
     public double Confidence { get; init; }
 
+    /// <summary>Original language code returned by TMDb search, when available.</summary>
+    public string? DetectedLanguage { get; init; }
+
     /// <summary>Operator-readable explanation (why this match, or why none).</summary>
     public string Detail { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Catalog title of the matched entry as returned by the search, when the
-    /// match came from a search (null for identifier matches). Lets callers
-    /// display/store the matched title without a second API request.
-    /// </summary>
-    public string? Title { get; init; }
-
-    /// <summary>Release/first-air year of the matched entry, when the search returned one.</summary>
-    public int? Year { get; init; }
-
-    /// <summary>
-    /// Original language of the matched entry ("en", "ur", ...), when the search
-    /// returned one. The Watch Folder workflow uses it to file the import under
-    /// its language without another API request.
-    /// </summary>
-    public string? OriginalLanguage { get; init; }
 
     public bool IsMatch => TmdbId.HasValue;
 
@@ -98,29 +84,28 @@ public sealed class MetadataMatcher
             return MatchOutcome.None("The file name contains neither an identifier nor a usable title.");
         }
 
-        var threshold = _settings.Load().MinimumMatchConfidence;
+        var threshold = Math.Clamp(_settings.Load().MinimumMatchConfidence, 0.30, 0.95);
         return await MatchByTitleAsync(parsed, threshold, ct);
     }
 
     private async Task<MatchOutcome> MatchByTitleAsync(ParsedFileName parsed, double threshold, CancellationToken ct)
     {
-        // A file with a season/episode marker is a TV episode: it is matched
-        // against TMDb's TV catalogue ONLY, so "Reacher.S01.E01" can never
-        // become a movie record called "Reacher S01 E01". Anything without a
-        // marker is searched as a movie first, then as a series.
         var searches = parsed.IsSeries
-            ? new[] { (Series: true, (string?)parsed.Title, parsed.Year) }
+            ? new[] { (Series: true, (string?)parsed.Title, (int?)null) }
             : new[]
             {
                 (Series: false, (string?)parsed.Title, parsed.Year),
                 (Series: true, (string?)parsed.Title, parsed.Year)
             };
 
+        var minSimilarity = Math.Min(0.45, threshold);
         MatchOutcome? best = null;
         foreach (var (isSeries, title, year) in searches)
         {
             ct.ThrowIfCancellationRequested();
-            var results = await SearchAsync(isSeries, title!, year, ct);
+            var results = isSeries
+                ? await _tmdb.SearchSeriesAsync(title!, year, ct)
+                : await _tmdb.SearchMoviesAsync(title!, year, ct);
 
             foreach (var candidate in results)
             {
@@ -128,13 +113,13 @@ public sealed class MetadataMatcher
                     TitleSimilarity.Score(parsed.Title, candidate.Title),
                     TitleSimilarity.Score(parsed.Title, candidate.OriginalTitle));
 
-                if (similarity < 0.55)
+                if (similarity < minSimilarity)
                 {
-                    continue; // Too different to be the same work.
+                    continue;
                 }
 
                 var yearScore = !year.HasValue || !candidate.Year.HasValue
-                    ? 0.5 // Unknown year on either side: neither confirm nor punish.
+                    ? 0.5
                     : candidate.Year == year.Value ? 1.0
                     : Math.Abs(candidate.Year.Value - year.Value) == 1 ? 0.6
                     : 0.0;
@@ -147,9 +132,7 @@ public sealed class MetadataMatcher
                         TmdbId = candidate.Id,
                         IsSeries = isSeries,
                         Confidence = score,
-                        Title = candidate.Title,
-                        Year = candidate.Year,
-                        OriginalLanguage = candidate.OriginalLanguage,
+                        DetectedLanguage = candidate.OriginalLanguage,
                         Detail = $"Matched '{candidate.Title}" +
                                  (candidate.Year.HasValue ? $" ({candidate.Year.Value})" : "") +
                                  $"' by title/year (confidence {score:P0})."
@@ -162,27 +145,5 @@ public sealed class MetadataMatcher
             parsed.Year.HasValue
                 ? $"No TMDb result for '{parsed.Title}' ({parsed.Year}) reached the {threshold:P0} confidence threshold."
                 : $"No TMDb result for '{parsed.Title}' reached the {threshold:P0} confidence threshold.");
-    }
-
-    /// <summary>
-    /// One catalogue search. A year filter that returns nothing is retried
-    /// without the year: release years in file names are frequently the year
-    /// of a re-release, a rip or a season, and TMDb may list a different one.
-    /// </summary>
-    private async Task<IReadOnlyList<TmdbSearchCandidate>> SearchAsync(
-        bool isSeries, string title, int? year, CancellationToken ct)
-    {
-        var results = isSeries
-            ? await _tmdb.SearchSeriesAsync(title, year, ct)
-            : await _tmdb.SearchMoviesAsync(title, year, ct);
-
-        if (results.Count == 0 && year.HasValue)
-        {
-            results = isSeries
-                ? await _tmdb.SearchSeriesAsync(title, null, ct)
-                : await _tmdb.SearchMoviesAsync(title, null, ct);
-        }
-
-        return results;
     }
 }

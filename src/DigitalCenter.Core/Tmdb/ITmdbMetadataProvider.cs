@@ -10,18 +10,10 @@ public sealed record TmdbSearchCandidate(
     string? PosterPath,
     bool IsSeries,
     string ReleaseInfo,
-    /// <summary>
-    /// Original language as reported by the search ("en", "ur", "ko", ...). The
-    /// search response already carries it, so organizing an import by language
-    /// never costs a second request.
-    /// </summary>
     string? OriginalLanguage = null);
 
-/// <summary>
-/// An episode entry of a season ("Poker Face", number 3). The optional TMDb
-/// episode id is the external identifier of that episode.
-/// </summary>
-public sealed record TmdbEpisodeInfo(int SeasonNumber, int EpisodeNumber, string? Title, long? TmdbId = null);
+/// <summary>An episode entry of a season ("Poker Face", number 3).</summary>
+public sealed record TmdbEpisodeInfo(int SeasonNumber, int EpisodeNumber, string? Title);
 
 /// <summary>One person credit (cast or crew) with an optional profile image.</summary>
 public sealed record TmdbPersonCredit(
@@ -52,19 +44,15 @@ public sealed record TmdbTitleMetadata
     public string? TrailerUrl { get; init; }
     public required bool IsSeries { get; init; }
     public string? AiringStatus { get; init; }
+    /// <summary>TMDb belongs_to_collection.name when this movie belongs to a multi-part movie collection (e.g. "Harry Potter Collection").</summary>
+    public string? CollectionName { get; init; }
+    public long? CollectionId { get; init; }
     public IReadOnlyList<string> Genres { get; init; } = [];
     public IReadOnlyList<string> Countries { get; init; } = [];
     /// <summary>Cast (first entries first) and crew of interest.</summary>
     public IReadOnlyList<TmdbPersonCredit> People { get; init; } = [];
     /// <summary>Season/episode breakdown when the metadata source provides one (may be empty).</summary>
     public IReadOnlyList<TmdbSeasonMetadata> Seasons { get; init; } = [];
-
-    /// <summary>
-    /// Number of seasons the catalog entry has (TMDb "seasons" array length),
-    /// independent of how many of them were actually fetched into
-    /// <see cref="Seasons"/>. Null when the source did not report it.
-    /// </summary>
-    public int? SeasonCount { get; init; }
 }
 
 public sealed record TmdbSeasonMetadata(int SeasonNumber, IReadOnlyList<TmdbEpisodeInfo> Episodes);
@@ -87,25 +75,8 @@ public interface ITmdbMetadataProvider
     Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default);
 
     /// <summary>
-    /// Series metadata in a single request, without per-season episode lists
-    /// (<see cref="TmdbTitleMetadata.Seasons"/> stays empty). This is the cheap
-    /// call for matching and importing one episode: the season that is
-    /// actually needed is fetched separately with
-    /// <see cref="GetSeriesSeasonAsync"/> instead of pulling every season.
-    /// </summary>
-    Task<TmdbTitleMetadata?> GetSeriesSummaryAsync(long tmdbId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Episodes of one season of a series. Returns null when TMDb does not
-    /// have that season (or it cannot be reached) — a missing season must
-    /// never fail an import, so callers treat null as "no episode details".
-    /// </summary>
-    Task<TmdbSeasonMetadata?> GetSeriesSeasonAsync(long tmdbId, int seasonNumber, CancellationToken ct = default);
-
-    /// <summary>
     /// Resolves an IMDb id ("tt0111161") to the TMDb catalog entry. Returns
-    /// null when TMDb does not know the id. This uses the official TMDb
-    /// /find endpoint — no IMDb page is scraped anywhere in DigitalCenter.
+    /// null when TMDb does not know the id.
     /// </summary>
     Task<(long Id, bool IsSeries)?> FindByImdbIdAsync(string imdbId, CancellationToken ct = default);
 

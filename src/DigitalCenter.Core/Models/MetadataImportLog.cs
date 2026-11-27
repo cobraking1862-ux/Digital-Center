@@ -16,7 +16,7 @@ public class MetadataImportLog
     /// <summary>Full path of the source file at detection time. The file stays in the Watch Folder until approval.</summary>
     public string? SourcePath { get; set; }
 
-    /// <summary>Pending / Approved / Rejected / Imported / Failed.</summary>
+    /// <summary>Pending / Approved / Rejected / Imported / ManuallyMoved / Failed.</summary>
     public string Status { get; set; } = "Pending";
 
     /// <summary>How far an approved import progressed (see <see cref="ImportStages"/>). Null until approved.</summary>

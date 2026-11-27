@@ -44,6 +44,31 @@ public sealed class PosterCache
         return fileName;
     }
 
+    /// <summary>
+    /// Saves a user-selected custom poster image under a unique filename so
+    /// cached bitmaps in the UI refresh immediately without stale entries.
+    /// </summary>
+    public async Task<string> SaveCustomPosterAsync(int mediaTitleId, Stream content, string? sourceFileName = null, CancellationToken ct = default)
+    {
+        Directory.CreateDirectory(_paths.PostersDirectory);
+        var ext = Path.GetExtension(sourceFileName);
+        if (string.IsNullOrWhiteSpace(ext) ||
+            !ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase) &&
+            !ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase) &&
+            !ext.Equals(".png", StringComparison.OrdinalIgnoreCase) &&
+            !ext.Equals(".bmp", StringComparison.OrdinalIgnoreCase))
+        {
+            ext = ".jpg";
+        }
+
+        var fileName = $"{mediaTitleId}-poster-{DateTime.UtcNow.Ticks}{ext.ToLowerInvariant()}";
+        var target = Path.Combine(_paths.PostersDirectory, fileName);
+
+        await using var file = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        await content.CopyToAsync(file, ct);
+        return fileName;
+    }
+
     /// <summary>Writes the backdrop of a title as "{mediaTitleId}-backdrop.jpg" and returns the file name.</summary>
     public async Task<string> SaveBackdropAsync(int mediaTitleId, Stream content, CancellationToken ct = default)
     {

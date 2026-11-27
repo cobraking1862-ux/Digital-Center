@@ -1,0 +1,32 @@
+# Build outputs and binaries
+**/bin/
+**/obj/
+artifacts/
+publish/
+publish-smoke/
+Output/
+TestResults/
+packages/
+*.exe
+*.dll
+*.pdb
+*.nupkg
+*.snupkg
+
+# IDE and editor caches
+.vs/
+.idea/
+.vscode/
+
+# Local databases, backups, and runtime caches
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite
+*.sqlite3
+*.pre-restore-*
+*.log
+Logs/
+Posters/
+Backups/

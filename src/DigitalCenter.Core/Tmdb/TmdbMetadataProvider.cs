@@ -192,15 +192,18 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         var countries = ReadCountries(root);
         ReadCredits(root, people);
         var trailer = ReadTrailer(root);
+        var (collectionId, collectionName) = ReadCollection(root);
 
         return new TmdbTitleMetadata
         {
             Title = title,
             OriginalTitle = root.TryGetProperty("original_title", out var ot) ? ot.GetString() : null,
+            CollectionId = collectionId,
+            CollectionName = collectionName,
             Year = ParseYear(releaseDate?.ToString("yyyy-MM-dd")),
             ReleaseDate = releaseDate,
             Synopsis = root.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
-            OriginalLanguage = root.TryGetProperty("original_language", out var ol) ? ol.GetString() : null,
+            OriginalLanguage = ReadOriginalLanguage(root),
             PosterPath = root.TryGetProperty("poster_path", out var pp) ? pp.GetString() : null,
             BackdropPath = root.TryGetProperty("backdrop_path", out var bp) ? bp.GetString() : null,
             ImdbId = ReadImdbId(root),
@@ -215,15 +218,7 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         };
     }
 
-    /// <summary>Series metadata including every available season's episodes.</summary>
-    public Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default) =>
-        GetSeriesCoreAsync(tmdbId, fetchSeasons: true, ct);
-
-    /// <summary>Series metadata in one request, without the per-season episode lists.</summary>
-    public Task<TmdbTitleMetadata?> GetSeriesSummaryAsync(long tmdbId, CancellationToken ct = default) =>
-        GetSeriesCoreAsync(tmdbId, fetchSeasons: false, ct);
-
-    private async Task<TmdbTitleMetadata?> GetSeriesCoreAsync(long tmdbId, bool fetchSeasons, CancellationToken ct)
+    public async Task<TmdbTitleMetadata?> GetSeriesAsync(long tmdbId, CancellationToken ct = default)
     {
         using var json = await GetJsonAsync($"tv/{tmdbId}?append_to_response=credits,videos,external_ids", ct);
         var root = json.RootElement;
@@ -241,7 +236,6 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         ReadCredits(root, people);
         var trailer = ReadTrailer(root);
 
-        // Series creators (the TV equivalent of a director).
         if (root.TryGetProperty("created_by", out var creators) && creators.ValueKind == JsonValueKind.Array)
         {
             foreach (var person in creators.EnumerateArray())
@@ -258,12 +252,7 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
             }
         }
 
-        // Season/episode breakdown: one request per season, capped to keep
-        // pathological metadata from stalling the import. Callers that only
-        // need one season (the import workflow) use the summary + a single
-        // GetSeriesSeasonAsync call instead of paying for all of them.
         var seasons = new List<TmdbSeasonMetadata>();
-        var seasonCount = 0;
         if (root.TryGetProperty("seasons", out var seasonList) && seasonList.ValueKind == JsonValueKind.Array)
         {
             foreach (var season in seasonList.EnumerateArray())
@@ -275,12 +264,6 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
 
                 var number = sn.GetInt32();
                 if (number < 0 || number > 25 || seasons.Any(s => s.SeasonNumber == number))
-                {
-                    continue;
-                }
-
-                seasonCount++;
-                if (!fetchSeasons)
                 {
                     continue;
                 }
@@ -297,7 +280,7 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
             Year = ParseYear(firstAir?.ToString("yyyy-MM-dd")),
             ReleaseDate = firstAir,
             Synopsis = root.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
-            OriginalLanguage = root.TryGetProperty("original_language", out var ol) ? ol.GetString() : null,
+            OriginalLanguage = ReadOriginalLanguage(root),
             PosterPath = root.TryGetProperty("poster_path", out var pp) ? pp.GetString() : null,
             BackdropPath = root.TryGetProperty("backdrop_path", out var bp) ? bp.GetString() : null,
             ImdbId = ReadImdbId(root),
@@ -309,62 +292,71 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
             Genres = genres,
             Countries = countries,
             People = people,
-            Seasons = seasons,
-            SeasonCount = seasonCount > 0 ? seasonCount : null
+            Seasons = seasons
         };
     }
 
-    /// <summary>Episodes of a single season; null when TMDb does not have it.</summary>
-    public async Task<TmdbSeasonMetadata?> GetSeriesSeasonAsync(long tmdbId, int seasonNumber, CancellationToken ct = default)
+    private static string? ReadOriginalLanguage(JsonElement root)
     {
-        if (seasonNumber < 0)
+        if (root.TryGetProperty("original_language", out var ol) && ol.ValueKind == JsonValueKind.String)
         {
-            return null;
+            var value = ol.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
         }
 
-        try
+        if (root.TryGetProperty("spoken_languages", out var spoken) && spoken.ValueKind == JsonValueKind.Array)
         {
-            using var seasonJson = await GetJsonAsync($"tv/{tmdbId}/season/{seasonNumber}", ct);
-            return new TmdbSeasonMetadata(seasonNumber, ParseSeasonEpisodes(seasonJson.RootElement, seasonNumber));
+            foreach (var item in spoken.EnumerateArray())
+            {
+                if (item.TryGetProperty("iso_639_1", out var iso) && iso.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(iso.GetString()))
+                {
+                    return iso.GetString();
+                }
+
+                if (item.TryGetProperty("english_name", out var enName) && enName.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(enName.GetString()))
+                {
+                    return enName.GetString();
+                }
+            }
         }
-        catch (TmdbRequestException ex)
-        {
-            // A missing/unavailable season must not fail the whole import.
-            _logger?.Warn($"TMDb season fetch failed for series {tmdbId} season {seasonNumber}: {ex.Message}");
-            return null;
-        }
+
+        return null;
     }
 
     private async Task<IReadOnlyList<TmdbEpisodeInfo>> FetchSeasonEpisodesAsync(long tmdbId, int seasonNumber, CancellationToken ct)
     {
-        var season = await GetSeriesSeasonAsync(tmdbId, seasonNumber, ct);
-        return season?.Episodes ?? [];
-    }
-
-    private static IReadOnlyList<TmdbEpisodeInfo> ParseSeasonEpisodes(JsonElement root, int seasonNumber)
-    {
-        var episodes = new List<TmdbEpisodeInfo>();
-        if (root.ValueKind != JsonValueKind.Object ||
-            !root.TryGetProperty("episodes", out var list) || list.ValueKind != JsonValueKind.Array)
+        try
         {
-            return episodes;
-        }
-
-        foreach (var ep in list.EnumerateArray())
-        {
-            if (!ep.TryGetProperty("episode_number", out var en) || en.ValueKind != JsonValueKind.Number)
+            using var seasonJson = await GetJsonAsync($"tv/{tmdbId}/season/{seasonNumber}", ct);
+            var episodes = new List<TmdbEpisodeInfo>();
+            if (seasonJson.RootElement.TryGetProperty("episodes", out var list) && list.ValueKind == JsonValueKind.Array)
             {
-                continue;
+                foreach (var ep in list.EnumerateArray())
+                {
+                    if (!ep.TryGetProperty("episode_number", out var en) || en.ValueKind != JsonValueKind.Number)
+                    {
+                        continue;
+                    }
+
+                    episodes.Add(new TmdbEpisodeInfo(
+                        seasonNumber,
+                        en.GetInt32(),
+                        ep.TryGetProperty("name", out var name) ? name.GetString() : null));
+                }
             }
 
-            episodes.Add(new TmdbEpisodeInfo(
-                seasonNumber,
-                en.GetInt32(),
-                ep.TryGetProperty("name", out var name) ? name.GetString() : null,
-                ep.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number ? id.GetInt64() : null));
+            return episodes;
         }
-
-        return episodes;
+        catch (TmdbRequestException ex)
+        {
+            _logger?.Warn($"TMDb season fetch failed for series {tmdbId} season {seasonNumber}: {ex.Message}");
+            return [];
+        }
     }
 
     private async Task<Stream> DownloadImageAsync(string imagePath, string size, CancellationToken ct)
@@ -442,6 +434,22 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
         return DateTime.TryParse(text, out var value) ? value : null;
     }
 
+    private static (long? Id, string? Name) ReadCollection(JsonElement root)
+    {
+        if (!root.TryGetProperty("belongs_to_collection", out var col) || col.ValueKind != JsonValueKind.Object)
+        {
+            return (null, null);
+        }
+
+        var id = col.TryGetProperty("id", out var cid) && cid.ValueKind == JsonValueKind.Number
+            ? cid.GetInt64()
+            : (long?)null;
+        var name = col.TryGetProperty("name", out var cname) && cname.ValueKind == JsonValueKind.String
+            ? cname.GetString()
+            : null;
+        return string.IsNullOrWhiteSpace(name) ? (null, null) : (id, name);
+    }
+
     private static string? ReadImdbId(JsonElement root)
     {
         if (!root.TryGetProperty("external_ids", out var external) || external.ValueKind != JsonValueKind.Object)
@@ -478,7 +486,6 @@ public sealed class TmdbMetadataProvider : ITmdbMetadataProvider, IDisposable
                 chosen = video;
             }
 
-            // Prefer an official trailer.
             var official = video.TryGetProperty("official", out var of) && of.ValueKind == JsonValueKind.True;
             if (isTrailer && official)
             {

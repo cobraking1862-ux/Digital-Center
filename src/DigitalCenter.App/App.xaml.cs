@@ -1,5 +1,8 @@
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
+using System.Windows.Interop;
 using DigitalCenter.App.Services;
 using DigitalCenter.Core.Configuration;
 using DigitalCenter.Core.Data;
@@ -16,13 +19,45 @@ namespace DigitalCenter.App;
 
 public partial class App : Application
 {
+    private const string SingleInstanceMutexName = @"Local\DigitalCenter.App.SingleInstance";
+    private const string ActivateEventName = @"Local\DigitalCenter.App.ActivateEvent";
+    private const int SwRestore = 9;
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
     public IServiceProvider Services { get; private set; } = null!;
 
     private WatchFolderService? _watchFolder;
+    private DramaWatchFolderService? _dramaWatchFolder;
+    private Mutex? _singleInstanceMutex;
+    private EventWaitHandle? _activateEvent;
+    private RegisteredWaitHandle? _activateWaitHandle;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            try
+            {
+                using var existingEvent = EventWaitHandle.OpenExisting(ActivateEventName);
+                existingEvent.Set();
+            }
+            catch (Exception) { }
+
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            Shutdown(0);
+            return;
+        }
+
+        RegisterActivationListener();
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -46,35 +81,15 @@ public partial class App : Application
             await Services.GetRequiredService<DatabaseInitializer>().InitializeAsync();
 
             var mainViewModel = Services.GetRequiredService<MainViewModel>();
-
-            // Details screens are created per title, so the shell receives a
-            // factory from the container. Without this assignment the shell
-            // silently ignores card activation (that is why double-clicking a
-            // poster used to do nothing at all).
-            mainViewModel.DetailsFactory = Services.GetRequiredService<Func<int, DetailsViewModel>>();
-
             var mainWindow = new MainWindow
             {
                 DataContext = mainViewModel
             };
 
             MainWindow = mainWindow;
-
-            Services.GetRequiredService<ActivityFeed>().Publish("DigitalCenter started.", ActivityKind.System);
-
-            // Rehydrate the first screens BEFORE showing the view and BEFORE any
-            // maintenance work. Showing first raised LibraryPage.Loaded, which
-            // started another refresh while this one was still running; the
-            // coalesced call then returned immediately and startup continued as
-            // though Home had loaded. InitializeAsync now owns the one startup
-            // query and its task represents the completed homepage load.
-            await mainViewModel.InitializeAsync();
-
             mainWindow.Show();
 
-            // Complete interrupted imports in the background, then start
-            // Watch Folder monitoring. Both are non-blocking for the UI.
-            _ = RunStartupMaintenanceAsync(logger);
+            _ = StartupSequenceAsync(mainViewModel, logger);
         }
         catch (Exception ex)
         {
@@ -88,19 +103,68 @@ public partial class App : Application
         }
     }
 
-    /// <summary>
-    /// Background startup work. Every step has its own guard: a failed recovery
-    /// or an unreachable TMDb must not stop the steps that follow (and must
-    /// never stop the screens from loading — that already happened).
-    /// </summary>
-    private async Task RunStartupMaintenanceAsync(IAppLogger logger)
+    private void RegisterActivationListener()
     {
-        var mainViewModel = Services.GetRequiredService<MainViewModel>();
-        var importService = Services.GetRequiredService<ImportService>();
-
-        // 1. Finish imports that were interrupted by a crash or a shutdown.
         try
         {
+            _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName);
+            _activateWaitHandle = ThreadPool.RegisterWaitForSingleObject(
+                _activateEvent,
+                (_, _) => Dispatcher.Invoke(BringMainWindowToFront),
+                state: null,
+                millisecondsTimeOutInterval: Timeout.Infinite,
+                executeOnlyOnce: false);
+        }
+        catch (Exception) { }
+    }
+
+    private void BringMainWindowToFront()
+    {
+        var window = MainWindow;
+        if (window is null) return;
+
+        if (!window.IsVisible) window.Show();
+
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (window.WindowState == WindowState.Minimized)
+        {
+            if (hwnd != IntPtr.Zero) ShowWindow(hwnd, SwRestore);
+            else window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+        window.Topmost = true;
+        window.Topmost = false;
+        window.Focus();
+
+        if (hwnd != IntPtr.Zero) SetForegroundWindow(hwnd);
+    }
+
+    private async Task StartupSequenceAsync(MainViewModel mainViewModel, IAppLogger logger)
+    {
+        try { await mainViewModel.Library.RefreshSafeAsync(); }
+        catch (Exception ex) { logger.Warn($"Initial library catalog load warning: {ex.Message}"); }
+
+        try { await mainViewModel.Drama.RefreshSafeAsync(); }
+        catch (Exception ex) { logger.Warn($"Initial drama catalog load warning: {ex.Message}"); }
+
+        try { await mainViewModel.Tickets.RefreshAsync(); }
+        catch (Exception ex) { logger.Warn($"Initial tickets load warning: {ex.Message}"); }
+
+        try { await mainViewModel.UsbCart.RefreshCartAsync(); }
+        catch (Exception ex) { logger.Warn($"Initial USB cart load warning: {ex.Message}"); }
+
+        await Task.Run(() => RunStartupMaintenanceAsync(logger));
+    }
+
+    private async Task RunStartupMaintenanceAsync(IAppLogger logger)
+    {
+        try
+        {
+            var importService = Services.GetRequiredService<ImportService>();
+            _watchFolder = Services.GetRequiredService<WatchFolderService>();
+            _dramaWatchFolder = Services.GetRequiredService<DramaWatchFolderService>();
+
             var report = await importService.RecoverInterruptedAsync();
             foreach (var line in report)
             {
@@ -109,71 +173,68 @@ public partial class App : Application
 
             if (report.Count > 0)
             {
-                Services.GetRequiredService<ActivityFeed>().Publish(
-                    $"Recovered {report.Count} interrupted import(s); refreshing the library.",
-                    ActivityKind.Background);
-
-                // Recovered rows can change the catalog: refresh what is on screen.
-                await mainViewModel.Library.RefreshSafeAsync();
+                _watchFolder.NotifyPendingImportsChanged();
             }
-        }
-        catch (Exception ex)
-        {
-            logger.Error("Recovering interrupted imports failed.", ex);
-        }
 
-        // 2. Retry automatic matching for files detected while TMDb was offline,
-        //    then file the matched ones into the library (under their language).
-        try
-        {
-            await importService.MatchPendingAsync();
-            var organized = await importService.AutoOrganizeAsync();
-            if (organized.Moved > 0)
-            {
-                // Files moved while the UI was starting: show the new library.
-                await mainViewModel.Library.RefreshSafeAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error("Retrying automatic metadata matching failed; the files stay pending.", ex);
-        }
-
-        // 3. Start the single Watch Folder monitor — the only startup path for it.
-        try
-        {
             var settings = Services.GetRequiredService<SettingsService>().Load();
-            _watchFolder = Services.GetRequiredService<WatchFolderService>();
-            _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
-            var feed = Services.GetRequiredService<ActivityFeed>();
-            if (settings.WatchFolderEnabled && !string.IsNullOrWhiteSpace(settings.WatchFolderPath) && !_watchFolder.IsRunning)
+            var stability = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
+            _watchFolder.StabilityDelay = stability;
+            _dramaWatchFolder.StabilityDelay = stability;
+
+            var watchPathIssues = SettingsService.ValidateWatchFolderPath(settings);
+            var canMonitor = settings.WatchFolderEnabled &&
+                             !string.IsNullOrWhiteSpace(settings.WatchFolderPath) &&
+                             watchPathIssues.Count == 0;
+
+            if (canMonitor)
             {
-                _watchFolder.Start(settings.WatchFolderPath);
-                feed.Publish($"Watching '{settings.WatchFolderPath}' for new files.", ActivityKind.Background);
+                if (!_watchFolder.IsRunning)
+                {
+                    _watchFolder.Start(settings.WatchFolderPath!);
+                }
             }
             else
             {
-                logger.Info("Watch Folder monitoring not started (disabled or not configured in Management).");
-                feed.Publish("Watch Folder monitoring is off (start it in Management).", ActivityKind.System);
+                if (_watchFolder.IsRunning) _watchFolder.Stop();
+                var matched = await importService.MatchPendingAsync();
+                if (matched > 0) _watchFolder.NotifyPendingImportsChanged();
+            }
+
+            if (settings.DramaWatchFolderEnabled &&
+                !string.IsNullOrWhiteSpace(settings.DramaWatchFolderPath) &&
+                Directory.Exists(settings.DramaWatchFolderPath) &&
+                !string.IsNullOrWhiteSpace(settings.DramaRoot))
+            {
+                _dramaWatchFolder.Start(settings.DramaWatchFolderPath);
             }
         }
         catch (Exception ex)
         {
-            logger.Error("Starting Watch Folder monitoring failed.", ex);
+            logger.Error("Startup maintenance (import recovery / watch folders) failed.", ex);
         }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _watchFolder?.Stop();
+        _dramaWatchFolder?.Stop();
+
+        try
+        {
+            _activateWaitHandle?.Unregister(null);
+            _activateEvent?.Dispose();
+            if (_singleInstanceMutex is not null)
+            {
+                _singleInstanceMutex.ReleaseMutex();
+                _singleInstanceMutex.Dispose();
+            }
+        }
+        catch (Exception) { }
+
         base.OnExit(e);
     }
 
-    /// <summary>Closes the in-application details screen (Back button).</summary>
-    public void CloseDetails()
-    {
-        (Services.GetService<MainViewModel>())?.CloseDetails();
-    }
+    public void CloseDetails() => (Services.GetService<MainViewModel>())?.CloseDetails();
 
     private static IServiceProvider BuildServices()
     {
@@ -184,9 +245,6 @@ public partial class App : Application
         services.AddSingleton<IAppLogger>(new FileLogger(paths.LogsDirectory));
         services.AddSingleton<SettingsService>();
 
-        // TMDb token: appsettings.json next to the exe → environment
-        // variables (Tmdb__ReadAccessToken) → user secrets (development).
-        // The token never reaches the UI or the log files.
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
@@ -205,44 +263,53 @@ public partial class App : Application
                 sp.GetRequiredService<IAppLogger>()));
 
         services.AddDbContextFactory<DigitalCenterDbContext>(options =>
-            options.UseSqlite($"Data Source={paths.DatabaseFile}"));
+            options.UseSqlite($"Data Source={paths.DatabaseFile};Default Timeout=30;Pooling=True"));
 
         services.AddSingleton<DatabaseInitializer>();
         services.AddSingleton<FilenameParser>();
         services.AddSingleton<LibraryScanner>();
         services.AddSingleton<BackupService>();
         services.AddSingleton<PosterCache>();
+        services.AddSingleton<IPortableDeviceTransfer, WindowsMtpTransfer>();
         services.AddSingleton<IDriveProbe, DriveProbe>();
+        services.AddSingleton<WatchFolderIssueService>();
         services.AddSingleton<ImportService>();
         services.AddSingleton<WatchFolderService>();
         services.AddSingleton<UsbCopyService>();
+        services.AddSingleton<DramaLibraryService>();
+        services.AddSingleton<DramaWatchFolderService>();
+        services.AddSingleton<DramaCopyService>();
+        services.AddSingleton<ImdbLookupService>();
+        services.AddSingleton<TicketService>();
         services.AddSingleton<MaintenanceService>();
 
-        // Resolved lazily on first use, after DatabaseInitializer has decided
-        // whether FTS5 is available in this SQLite build.
         services.AddSingleton(sp => new LibraryQueryService(
             sp.GetRequiredService<IDbContextFactory<DigitalCenterDbContext>>(),
             sp.GetRequiredService<DatabaseInitializer>().FullTextSearchEnabled));
 
         services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
-
-        // The single consolidated activity feed every screen publishes to; the
-        // shell shows it in the sidebar ("Current Activity & Status").
-        services.AddSingleton<ActivityFeed>();
+        services.AddSingleton<ActivityFeedService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAppControl, AppControl>();
 
-        // One details view model per opened title: transient, built through a
-        // factory that supplies the title id (the rest comes from the container).
-        services.AddTransient<Func<int, DetailsViewModel>>(sp =>
-            titleId => ActivatorUtilities.CreateInstance<DetailsViewModel>(sp, titleId));
-
         services.AddSingleton<LibraryViewModel>();
+        services.AddSingleton<DramaViewModel>();
+        services.AddSingleton<LookupViewModel>();
+        services.AddSingleton<TicketsViewModel>();
         services.AddSingleton<UsbCartViewModel>();
         services.AddSingleton<ManagementViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MaintenanceViewModel>();
-        services.AddSingleton<MainViewModel>();
+
+        services.AddSingleton<MainViewModel>(sp =>
+        {
+            var mainViewModel = ActivatorUtilities.CreateInstance<MainViewModel>(sp);
+            mainViewModel.DetailsFactory = titleId =>
+                ActivatorUtilities.CreateInstance<DetailsViewModel>(sp, titleId);
+            mainViewModel.DramaDetailsFactory = dramaId =>
+                ActivatorUtilities.CreateInstance<DramaDetailsViewModel>(sp, dramaId);
+            return mainViewModel;
+        });
 
         return services.BuildServiceProvider();
     }

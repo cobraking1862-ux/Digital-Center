@@ -49,20 +49,55 @@ public sealed class DialogService : IDialogService
 
     public void OpenInExplorer(string path)
     {
-        if (File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            // Select the actual media file inside its containing folder.
-            Process.Start("explorer.exe", $"/select,\"{path}\"");
+            Error("Open in Explorer", "No folder or file path is configured yet.");
             return;
         }
 
-        if (Directory.Exists(path))
+        try
         {
-            Process.Start("explorer.exe", path);
-            return;
-        }
+            var fullPath = Path.GetFullPath(path.Trim());
+            if (File.Exists(fullPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{fullPath}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
 
-        Error("Not found", $"The path does not exist:\n{path}");
+            if (Directory.Exists(fullPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{fullPath}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            var parentDir = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(parentDir) && Directory.Exists(parentDir))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{parentDir}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            Error("Not found", $"The file or folder does not exist on disk:\n{fullPath}");
+        }
+        catch (Exception ex)
+        {
+            Error("Open in Explorer", $"Could not open Windows Explorer: {ex.Message}");
+        }
     }
 
     public void OpenUrl(string url)

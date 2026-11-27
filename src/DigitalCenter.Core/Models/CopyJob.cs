@@ -15,6 +15,8 @@ public static class ImportStatuses
     /// <summary>Skipped (or rejected) by the operator; the file stays in place.</summary>
     public const string Rejected = "Rejected";
     public const string Imported = "Imported";
+    /// <summary>File was manually relocated from the Watch Folder without importing it into the library.</summary>
+    public const string ManuallyMoved = "ManuallyMoved";
     public const string Failed = "Failed";
 }
 
@@ -30,6 +32,7 @@ public static class ImportStatusLabels
         ImportStatuses.Approved => "Moving…",
         ImportStatuses.Rejected => "Skipped",
         ImportStatuses.Imported => "Imported",
+        ImportStatuses.ManuallyMoved => "Moved to folder",
         ImportStatuses.Failed => "Failed",
         _ => status
     };

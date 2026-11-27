@@ -10,296 +10,485 @@ using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.ViewModels;
 
+/// <summary>One row of the Movie Watch Folder activity log.</summary>
+public sealed class ActivityItemViewModel
+{
+    public ActivityItemViewModel(MetadataImportLog log)
+    {
+        Id = log.Id;
+        FileName = log.SourceFile;
+        SourcePath = log.SourcePath ?? string.Empty;
+        SizeText = log.FileSize is { } size ? UiFormat.FormatBytes(size) : "—";
+        Status = log.Status;
+        StatusText = ImportStatusLabels.For(log.Status);
+        StatusKey = log.Status switch
+        {
+            ImportStatuses.Imported => "Ok",
+            ImportStatuses.ManuallyMoved => "Ok",
+            ImportStatuses.Failed => "Bad",
+            ImportStatuses.Matched => "Active",
+            ImportStatuses.Pending => "Pending",
+            ImportStatuses.Approved => "Pending",
+            _ => "Neutral"
+        };
+        DetectedType = !string.IsNullOrWhiteSpace(log.CategoryName) && !LanguageResolver.IsKnownLanguageName(log.CategoryName) && log.CategoryName != "Unknown" ? "Collection" : "Movie";
+        LanguageDisplay = string.IsNullOrWhiteSpace(log.CategoryName) ? "—" : log.CategoryName!;
+        MatchedTitle = string.IsNullOrWhiteSpace(log.ParsedTitle) ? "—" : log.ParsedTitle!;
+        MatchSummary = log.TmdbId is not null
+            ? $"{log.ParsedTitle}{(log.ParsedYear is { } y ? $" ({y})" : "")} · {LanguageDisplay}" +
+              (log.TargetPath is { Length: > 0 } tp ? $" → {tp}" : "")
+            : ImportStatusLabels.For(log.Status);
+        Detail = log.ErrorDetails ?? log.Note ?? string.Empty;
+        HasDetail = Detail.Length > 0;
+        MediaTitleId = log.MediaTitleId;
+        TimestampText = log.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    }
+
+    public int Id { get; }
+    public string FileName { get; }
+    public string SourcePath { get; }
+    public string SizeText { get; }
+    public string Status { get; }
+    public string StatusText { get; }
+    public string StatusKey { get; }
+    public string DetectedType { get; }
+    public string LanguageDisplay { get; }
+    public string MatchedTitle { get; }
+    public string MatchSummary { get; }
+    public string Detail { get; }
+    public bool HasDetail { get; }
+    public int? MediaTitleId { get; }
+    public string TimestampText { get; }
+
+    public MetadataImportLog Log { get; internal set; } = null!;
+}
+
+/// <summary>One row of the Drama Watch Folder activity log (persisted in SQLite).</summary>
+public sealed class DramaActivityItemViewModel
+{
+    public DramaActivityItemViewModel(DramaWatchHistoryEntry entry)
+    {
+        Id = entry.Id;
+        DramaTitle = entry.DramaTitle;
+        EpisodeBadge = entry.EpisodeNumber > 0
+            ? $"S{entry.SeasonNumber:00}E{entry.EpisodeNumber:00}"
+            : $"S{entry.SeasonNumber:00}";
+        SourceFileName = entry.SourceFileName;
+        TargetPath = entry.TargetPath;
+        SizeText = entry.FileSize > 0 ? UiFormat.FormatBytes(entry.FileSize) : "—";
+        StatusText = string.IsNullOrWhiteSpace(entry.Status) ? "Imported" : entry.Status;
+        TimestampText = entry.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        DestinationSummary = $"Moved → {entry.TargetPath}";
+    }
+
+    public int Id { get; }
+    public string DramaTitle { get; }
+    public string EpisodeBadge { get; }
+    public string SourceFileName { get; }
+    public string TargetPath { get; }
+    public string SizeText { get; }
+    public string StatusText { get; }
+    public string TimestampText { get; }
+    public string DestinationSummary { get; }
+}
+
 /// <summary>
-/// Management workspace: the ONE place where the single default Watch Folder is
-/// configured and monitored — its path, the monitoring switches, start/stop,
-/// rescan, import statistics, recent activity with the automatic match results,
-/// a file preview and the destination-selection / confirmation workflow.
-/// Settings no longer holds a Watch Folder path or any monitoring state, so
-/// there is exactly one authoritative saved value
-/// (<see cref="AppSettings.WatchFolderPath"/>) and one monitoring state.
-/// There is deliberately no metadata editing here — that belongs to the details
-/// screen. Changing the path never moves media and never erases records.
+/// Redesigned Watch Folder workspace: separate Status section (Movies &amp; Dramas, no Awaiting Info,
+/// plus clickable Maintenance issues badge when &gt; 0) and two side-by-side import log panels
+/// (Movie Imports on the left, Drama Imports on the right) with per-panel action buttons.
+/// Folder locations are configured in Settings.
 /// </summary>
 public partial class ManagementViewModel : ObservableObject
 {
     private readonly WatchFolderService _watchFolder;
+    private readonly DramaWatchFolderService _dramaWatchFolder;
     private readonly ImportService _imports;
+    private readonly DramaLibraryService _dramaLibrary;
+    private readonly WatchFolderIssueService _issues;
     private readonly SettingsService _settingsService;
-    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly IAppLogger _logger;
+    private readonly ActivityFeedService _activityFeed;
 
-    /// <summary>Raised after an import completed so the shell can refresh the library.</summary>
+    private DateTime? _lastMovieScanUtc;
+
     public event Action? ImportCompleted;
+    public event Action? DramaImportCompleted;
+    public event Action? OpenMaintenanceIssuesRequested;
 
     public ManagementViewModel(
         WatchFolderService watchFolder,
+        DramaWatchFolderService dramaWatchFolder,
         ImportService imports,
+        DramaLibraryService dramaLibrary,
+        WatchFolderIssueService issues,
         SettingsService settingsService,
-        ActivityFeed activity,
         IDialogService dialogs,
-        IAppLogger logger)
+        IAppLogger logger,
+        ActivityFeedService activityFeed)
     {
         _watchFolder = watchFolder;
+        _dramaWatchFolder = dramaWatchFolder;
         _imports = imports;
+        _dramaLibrary = dramaLibrary;
+        _issues = issues;
         _settingsService = settingsService;
-        _activity = activity;
         _dialogs = dialogs;
         _logger = logger;
+        _activityFeed = activityFeed;
 
-        WatchPathDisplay = string.Empty;
-        MonitorStatusText = string.Empty;
         StatusText = string.Empty;
-        DestinationPreviewText = string.Empty;
-        ImportSummary = string.Empty;
-        WatchFolderPath = string.Empty;
-        StabilityDelaySeconds = 8;
-        LoadWatchFolderSettings();
+        MovieWatchStateText = "Idle";
+        MovieWatchPathSummary = "Configure in Settings";
+        MovieLastScanText = "Not scanned yet";
+        DramaWatchStateText = "Idle";
+        DramaWatchPathSummary = "Configure in Settings";
+        DramaLastScanText = "Not scanned yet";
     }
 
     public ObservableCollection<ActivityItemViewModel> Activity { get; } = [];
+    public ObservableCollection<DramaActivityItemViewModel> DramaActivity { get; } = [];
 
-    [ObservableProperty] public partial string WatchPathDisplay { get; set; }
-    [ObservableProperty] public partial string MonitorStatusText { get; set; }
     [ObservableProperty] public partial string StatusText { get; set; }
-
-    // ------------------------------------------------ Watch Folder (the only
-    // place these values are edited; they are persisted through SettingsService)
-    [ObservableProperty] public partial string WatchFolderPath { get; set; }
-    [ObservableProperty] public partial bool WatchFolderEnabled { get; set; }
-    [ObservableProperty] public partial bool ScanOnStartup { get; set; }
-    [ObservableProperty] public partial bool IncludeSubfolders { get; set; }
-    [ObservableProperty] public partial int StabilityDelaySeconds { get; set; }
-    [ObservableProperty] public partial bool HasWatchFolderChanges { get; set; }
-
-    /// <summary>The saved Watch Folder path, so unsaved edits can be detected.</summary>
-    private string _savedWatchFolderPath = string.Empty;
-
-    /// <summary>The saved file-stability delay, so unsaved edits can be detected.</summary>
-    private int _savedStabilityDelaySeconds = 8;
-
-    partial void OnWatchFolderPathChanged(string value) => UpdateWatchFolderDirtyState();
-    partial void OnWatchFolderEnabledChanged(bool value) => UpdateWatchFolderDirtyState();
-    partial void OnScanOnStartupChanged(bool value) => UpdateWatchFolderDirtyState();
-    partial void OnIncludeSubfoldersChanged(bool value) => UpdateWatchFolderDirtyState();
-    partial void OnStabilityDelaySecondsChanged(int value) => UpdateWatchFolderDirtyState();
-
-    /// <summary>
-    /// "Save Watch Folder" is enabled as soon as anything in this card differs
-    /// from the saved configuration — the path or the stability delay.
-    /// </summary>
-    private void UpdateWatchFolderDirtyState() =>
-        HasWatchFolderChanges =
-            !string.Equals(WatchFolderPath.Trim(), _savedWatchFolderPath, StringComparison.OrdinalIgnoreCase) ||
-            StabilityDelaySeconds != _savedStabilityDelaySeconds;
-    [ObservableProperty] public partial string DestinationPreviewText { get; set; }
-    [ObservableProperty] public partial string ImportSummary { get; set; }
     [ObservableProperty] public partial bool IsBusy { get; set; }
-    [ObservableProperty] public partial ActivityItemViewModel? SelectedItem { get; set; }
 
-    // Statistics
-    [ObservableProperty] public partial int TotalCount { get; set; }
-    [ObservableProperty] public partial int ImportedCount { get; set; }
-    [ObservableProperty] public partial int SkippedCount { get; set; }
-    [ObservableProperty] public partial int FailedCount { get; set; }
-    [ObservableProperty] public partial int NoMatchCount { get; set; }
-    [ObservableProperty] public partial int UnsupportedCount { get; set; }
-    [ObservableProperty] public partial int AwaitingCount { get; set; }
+    // Separate Status section — Movies
+    [ObservableProperty] public partial string MovieWatchStateText { get; set; }
+    [ObservableProperty] public partial bool IsMovieWatcherRunning { get; set; }
+    [ObservableProperty] public partial string MovieWatchPathSummary { get; set; }
+    [ObservableProperty] public partial int MovieImportedCount { get; set; }
+    [ObservableProperty] public partial string MovieLastScanText { get; set; }
 
-    // Selected-file preview
-    [ObservableProperty] public partial bool HasPreview { get; set; }
-    [ObservableProperty] public partial string PreviewFileName { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewSourcePath { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewSizeText { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewTypeText { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewMatchText { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewDetailText { get; set; } = string.Empty;
-    [ObservableProperty] public partial string PreviewTargetText { get; set; } = string.Empty;
-    [ObservableProperty] public partial bool PreviewHasTarget { get; set; }
-    [ObservableProperty] public partial bool PreviewIsMedia { get; set; }
-    [ObservableProperty] public partial bool CanConfirmSelected { get; set; }
-    [ObservableProperty] public partial bool CanSkipSelected { get; set; }
+    // Separate Status section — Dramas
+    [ObservableProperty] public partial string DramaWatchStateText { get; set; }
+    [ObservableProperty] public partial bool IsDramaWatcherRunning { get; set; }
+    [ObservableProperty] public partial string DramaWatchPathSummary { get; set; }
+    [ObservableProperty] public partial int DramaImportedCount { get; set; }
+    [ObservableProperty] public partial string DramaLastScanText { get; set; }
 
-    public bool IsMonitoring => _watchFolder.IsRunning;
+    // Unified Maintenance Issues indicator (shown only when > 0)
+    [ObservableProperty] public partial int UnresolvedIssuesCount { get; set; }
 
-    partial void OnSelectedItemChanged(ActivityItemViewModel? value) => _ = RefreshPreviewAsync();
+    public bool HasUnresolvedIssues => UnresolvedIssuesCount > 0;
+    public string UnresolvedIssuesBadgeText => UnresolvedIssuesCount == 1
+        ? "1 issue → View in Maintenance"
+        : $"{UnresolvedIssuesCount} issues → View in Maintenance";
 
-    /// <summary>Navigation hook (also used after watch-folder events).</summary>
-    public async Task OnNavigatedToAsync()
+    public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
+    public bool HasNoMovieActivity => Activity.Count == 0;
+    public bool HasNoDramaActivity => DramaActivity.Count == 0;
+
+    partial void OnUnresolvedIssuesCountChanged(int value)
     {
-        LoadWatchFolderSettings();
-        await RefreshAsync();
+        OnPropertyChanged(nameof(HasUnresolvedIssues));
+        OnPropertyChanged(nameof(UnresolvedIssuesBadgeText));
     }
 
-    /// <summary>Reads the single authoritative Watch Folder configuration into the editor fields.</summary>
-    private void LoadWatchFolderSettings()
-    {
-        var settings = _settingsService.Load();
-        _savedWatchFolderPath = (settings.WatchFolderPath ?? string.Empty).Trim();
-        WatchFolderPath = _savedWatchFolderPath;
-        WatchFolderEnabled = settings.WatchFolderEnabled;
-        ScanOnStartup = settings.ScanOnStartup;
-        IncludeSubfolders = settings.WatchFolderIncludeSubfolders;
-        StabilityDelaySeconds = Math.Clamp(settings.StabilityDelaySeconds, 2, 600);
-        _savedStabilityDelaySeconds = StabilityDelaySeconds;
-        HasWatchFolderChanges = false;
-    }
+    partial void OnStatusTextChanged(string value) => OnPropertyChanged(nameof(HasStatusText));
 
-    /// <summary>True while a dashboard refresh is running on the UI thread.</summary>
-    private bool _refreshRunning;
+    public Task OnNavigatedToAsync() => RefreshAsync();
 
-    /// <summary>Set when another refresh was requested while one was running.</summary>
-    private bool _refreshAgain;
-
-    /// <summary>
-    /// Refreshes the dashboard, coalescing bursts. A watch-folder event, a
-    /// navigation and a finished rescan can all land within a few milliseconds;
-    /// instead of rebuilding the same rows three times (which is what made the
-    /// screen look frozen) the running pass is simply repeated once at the end.
-    /// </summary>
+    [RelayCommand]
     public async Task RefreshAsync()
     {
-        if (_refreshRunning)
-        {
-            _refreshAgain = true;
-            return;
-        }
-
-        _refreshRunning = true;
-        try
-        {
-            do
-            {
-                _refreshAgain = false;
-                await RefreshCoreAsync();
-            }
-            while (_refreshAgain);
-        }
-        finally
-        {
-            _refreshRunning = false;
-        }
-    }
-
-    private async Task RefreshCoreAsync()
-    {
-        var settings = _settingsService.Load();
-        var configured = !string.IsNullOrWhiteSpace(settings.WatchFolderPath);
-        WatchPathDisplay = configured
-            ? settings.WatchFolderPath!
-            : "No Watch Folder yet — choose the folder below and save it.";
-        OnPropertyChanged(nameof(IsMonitoring));
-        MonitorStatusText = IsMonitoring
-            ? $"Monitoring active{(_watchFolder.CurrentPath is { } p ? $" · {p}" : string.Empty)}"
-            : !configured
-                ? "No Watch Folder configured — choose and save one below"
-                : "Monitoring stopped — press Start Monitoring to watch the folder now";
+        UpdateStatusMetadata();
 
         try
         {
             var stats = await _imports.GetStatsAsync();
-            TotalCount = stats.Total;
-            ImportedCount = stats.Imported;
-            SkippedCount = stats.Skipped;
-            FailedCount = stats.Failed;
-            NoMatchCount = stats.NoMatch;
-            UnsupportedCount = stats.Unsupported;
-            AwaitingCount = stats.AwaitingDestination;
-            ImportSummary = stats.Total == 0
-                ? string.Empty
-                : $"{stats.Imported} imported · {stats.NoMatch} no match · {stats.Failed} failed";
+            MovieImportedCount = stats.Imported;
 
             var logs = await _imports.GetActivityAsync();
-
-            // Update or insert rows in place so the list does not flicker.
-            var byId = Activity.ToDictionary(a => a.Id);
+            Activity.Clear();
             foreach (var log in logs)
             {
-                if (byId.TryGetValue(log.Id, out var existing))
+                // Keep Watch Folder Movie Imports panel focused on active/imported activity;
+                // failed/no-match issues are tracked centrally in Maintenance → Watch Folder Issues.
+                if (log.Status is ImportStatuses.Failed or ImportStatuses.NoMatch)
                 {
-                    var index = Activity.IndexOf(existing);
-                    var updated = new ActivityItemViewModel(log) { Log = log };
-                    Activity[index] = updated;
-                    byId[log.Id] = updated;
-                    if (ReferenceEquals(SelectedItem, existing))
-                    {
-                        SelectedItem = updated;
-                    }
+                    continue;
                 }
-                else
-                {
-                    Activity.Insert(0, new ActivityItemViewModel(log) { Log = log });
-                }
+                Activity.Add(new ActivityItemViewModel(log) { Log = log });
             }
+            OnPropertyChanged(nameof(HasNoMovieActivity));
 
-            while (Activity.Count > logs.Count)
+            var dramaHistory = await Task.Run(() => _dramaLibrary.GetWatchHistoryAsync());
+            DramaActivity.Clear();
+            foreach (var entry in dramaHistory)
             {
-                Activity.RemoveAt(Activity.Count - 1);
+                DramaActivity.Add(new DramaActivityItemViewModel(entry));
             }
+            DramaImportedCount = await Task.Run(() => _dramaLibrary.GetWatchHistoryCountAsync());
+            OnPropertyChanged(nameof(HasNoDramaActivity));
+
+            await RefreshIssueCountAsync();
         }
         catch (Exception ex)
         {
-            _logger.Error("Refreshing the Management dashboard failed.", ex);
+            _logger.Error("Refreshing Watch Folder activity failed.", ex);
             StatusText = $"Refresh failed: {ex.Message}";
-            _activity.Publish(StatusText, ActivityKind.Error);
         }
     }
 
-    private async Task RefreshPreviewAsync()
+    public async Task RefreshIssueCountAsync()
     {
-        DestinationPreviewText = string.Empty;
-        if (SelectedItem is null)
+        try
         {
-            HasPreview = false;
+            UnresolvedIssuesCount = await Task.Run(() => _issues.GetUnresolvedCountAsync());
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Refreshing Watch Folder issues count failed: {ex.Message}");
+        }
+    }
+
+    private void UpdateStatusMetadata()
+    {
+        var settings = _settingsService.Load();
+
+        var hasMoviePath = !string.IsNullOrWhiteSpace(settings.WatchFolderPath);
+        IsMovieWatcherRunning = _watchFolder.IsRunning;
+        MovieWatchStateText = !hasMoviePath
+            ? "Not Configured"
+            : _watchFolder.IsRunning ? "Watching" : "Idle";
+        MovieWatchPathSummary = hasMoviePath
+            ? settings.WatchFolderPath!
+            : "Set Movies Watch Folder in Settings";
+        MovieLastScanText = _lastMovieScanUtc.HasValue
+            ? $"Last scan: {_lastMovieScanUtc.Value.ToLocalTime():HH:mm:ss}"
+            : "Not scanned yet";
+
+        var hasDramaPath = !string.IsNullOrWhiteSpace(settings.DramaWatchFolderPath);
+        IsDramaWatcherRunning = _dramaWatchFolder.IsRunning;
+        DramaWatchStateText = !hasDramaPath
+            ? "Not Configured"
+            : _dramaWatchFolder.IsRunning ? "Watching" : "Idle";
+        DramaWatchPathSummary = hasDramaPath
+            ? settings.DramaWatchFolderPath!
+            : "Set Drama Watch Folder in Settings";
+        DramaLastScanText = _dramaWatchFolder.LastScanUtc.HasValue
+            ? $"Last scan: {_dramaWatchFolder.LastScanUtc.Value.ToLocalTime():HH:mm:ss}"
+            : "Not scanned yet";
+    }
+
+    // --------------------------------------------------------- Movie Watch Folder Actions
+
+    [RelayCommand]
+    private async Task ScanMoviesAsync()
+    {
+        var settings = _settingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.WatchFolderPath))
+        {
+            _dialogs.Info("Movies Watch Folder", "Configure your Movies Watch Folder in Settings first.");
             return;
         }
 
+        var issues = SettingsService.ValidateWatchFolderPath(settings);
+        if (issues.Count > 0)
+        {
+            _dialogs.Error("Invalid Movies Watch Folder", string.Join(Environment.NewLine, issues));
+            return;
+        }
+
+        IsBusy = true;
+        StatusText = "Scanning Movies Watch Folder…";
         try
         {
-            var log = await _imports.GetLogAsync(SelectedItem.Id);
-            if (log is null)
+            var watchPath = settings.WatchFolderPath!;
+            _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
+
+            var scan = await Task.Run(() => _watchFolder.RescanOnceAsync(watchPath, retryUnmatched: true));
+            _lastMovieScanUtc = DateTime.UtcNow;
+
+            if (settings.WatchFolderEnabled && !_watchFolder.IsRunning)
             {
-                HasPreview = false;
-                return;
+                _watchFolder.Start(watchPath);
             }
 
-            var isMedia = LibraryScanner.MediaExtensions.Contains(Path.GetExtension(log.SourceFile));
-            PreviewIsMedia = isMedia;
-            PreviewFileName = log.SourceFile;
-            PreviewSourcePath = log.SourcePath ?? "—";
-            PreviewSizeText = log.FileSize is { } size ? UiFormat.FormatBytes(size) : "unknown";
-            PreviewTypeText = isMedia ? (log.IsSeries ? "Series" : "Movie") : "Not a video file";
-            PreviewMatchText = log.TmdbId is not null
-                ? $"{log.ParsedTitle}{(log.ParsedYear is { } y ? $" ({y})" : "")} — TMDb {log.TmdbId}, confidence {log.Confidence:P0}"
-                : ImportStatusLabels.For(log.Status);
-            PreviewDetailText = log.ErrorDetails ?? log.Note ?? string.Empty;
-
-            var settings = _settingsService.Load();
-            var defaultFolder = _imports.GetDefaultDestinationFolder(log.IsSeries, settings);
-            if (log.Status == ImportStatuses.Matched)
+            if (scan.FilesSeen == 0)
             {
-                var preview = await _imports.PreviewImportAsync(log, destinationFolder: null);
-                DestinationPreviewText = preview.DestinationFolder;
-                PreviewTargetText = preview.PlannedTargetPath;
-                PreviewHasTarget = true;
+                StatusText = $"Movies scan complete: no files found in '{watchPath}'.";
+            }
+            else if (scan.Unstable > 0 && scan.NewPending == 0 && scan.Retried == 0)
+            {
+                StatusText = $"Movies scan saw {scan.FilesSeen} file(s), but {scan.Unstable} file(s) are still copying or locked — try again in a moment.";
             }
             else
             {
-                PreviewTargetText = log.TargetPath ?? string.Empty;
-                PreviewHasTarget = !string.IsNullOrEmpty(PreviewTargetText);
-                DestinationPreviewText = log.ChosenFolder ?? defaultFolder ?? string.Empty;
+                StatusText = $"Movies scan complete ({scan.FilesSeen} file(s) seen): {scan.NewPending} new, {scan.Retried} retried, {scan.AlreadyKnown} known.";
             }
 
-            CanConfirmSelected = log.Status is ImportStatuses.Matched or ImportStatuses.Approved;
-            CanSkipSelected = log.Status is ImportStatuses.Matched or ImportStatuses.Pending or ImportStatuses.NoMatch;
-            HasPreview = true;
+            ImportCompleted?.Invoke();
+            await RefreshAsync();
         }
         catch (Exception ex)
         {
-            _logger.Warn($"Preview refresh failed: {ex.Message}");
-            HasPreview = true; // Show what we have; the detail explains the rest.
-            PreviewDetailText = $"Preview incomplete: {ex.Message}";
+            _logger.Error("Movies Watch Folder scan failed.", ex);
+            StatusText = $"Movies scan failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
+
+    [RelayCommand]
+    private void OpenMoviesWatchFolder()
+    {
+        var settings = _settingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.WatchFolderPath))
+        {
+            _dialogs.Info("Movies Watch Folder", "No Movies Watch Folder is configured yet. Set it in Settings.");
+            return;
+        }
+
+        Directory.CreateDirectory(settings.WatchFolderPath);
+        _dialogs.OpenInExplorer(settings.WatchFolderPath);
+    }
+
+    [RelayCommand]
+    private async Task ClearMovieHistoryAsync()
+    {
+        if (MovieImportedCount == 0 && Activity.Count == 0)
+        {
+            StatusText = "Movie import history is already empty.";
+            return;
+        }
+
+        var confirmed = _dialogs.Confirm(
+            "Clear Movie Import History",
+            "Clear all Movie Watch Folder import history?\n\nThis only clears the activity log. No movies, files, or library entries will be deleted.");
+        if (!confirmed) return;
+
+        IsBusy = true;
+        try
+        {
+            var cleared = await _imports.ClearHistoryAsync();
+            StatusText = cleared > 0
+                ? $"Cleared {cleared} Movie import history item(s)."
+                : "No Movie import history items were cleared.";
+            if (cleared > 0)
+            {
+                _activityFeed.Publish($"Movie import history cleared ({cleared})");
+            }
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Clearing Movie Watch Folder history failed.", ex);
+            StatusText = $"Clear Movie history failed: {ex.Message}";
+            _dialogs.Error("Clear Movie History", StatusText);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // --------------------------------------------------------- Drama Watch Folder Actions
+
+    [RelayCommand]
+    private async Task ScanDramasAsync()
+    {
+        var settings = _settingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.DramaWatchFolderPath) || !Directory.Exists(settings.DramaWatchFolderPath))
+        {
+            _dialogs.Info("Drama Watch Folder", "Configure your Drama Watch Folder and Drama Root in Settings first.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.DramaRoot))
+        {
+            _dialogs.Info("Drama Root", "Configure your Drama library root folder in Settings first.");
+            return;
+        }
+
+        IsBusy = true;
+        StatusText = "Scanning Drama Watch Folder…";
+        try
+        {
+            var dramaWatchPath = settings.DramaWatchFolderPath!;
+            var moved = await Task.Run(() => _dramaWatchFolder.RescanOnceAsync(dramaWatchPath));
+
+            if (settings.DramaWatchFolderEnabled && !_dramaWatchFolder.IsRunning)
+            {
+                _dramaWatchFolder.Start(dramaWatchPath);
+            }
+
+            StatusText = moved > 0
+                ? $"Drama scan complete: imported {moved} episode(s)."
+                : "Drama scan complete: no new episodes found.";
+
+            if (moved > 0)
+            {
+                DramaImportCompleted?.Invoke();
+            }
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Drama Watch Folder scan failed.", ex);
+            StatusText = $"Drama scan failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenDramaWatchFolder()
+    {
+        var settings = _settingsService.Load();
+        if (string.IsNullOrWhiteSpace(settings.DramaWatchFolderPath))
+        {
+            _dialogs.Info("Drama Watch Folder", "No Drama Watch Folder is configured yet. Set it in Settings.");
+            return;
+        }
+
+        Directory.CreateDirectory(settings.DramaWatchFolderPath);
+        _dialogs.OpenInExplorer(settings.DramaWatchFolderPath);
+    }
+
+    [RelayCommand]
+    private async Task ClearDramaHistoryAsync()
+    {
+        if (DramaImportedCount == 0 && DramaActivity.Count == 0)
+        {
+            StatusText = "Drama import history is already empty.";
+            return;
+        }
+
+        var confirmed = _dialogs.Confirm(
+            "Clear Drama Import History",
+            "Clear all Drama Watch Folder import history?\n\nThis only clears the activity log. No dramas, episodes, or files on disk will be deleted.");
+        if (!confirmed) return;
+
+        IsBusy = true;
+        try
+        {
+            var cleared = await Task.Run(() => _dramaLibrary.ClearWatchHistoryAsync());
+            StatusText = cleared > 0
+                ? $"Cleared {cleared} Drama import history item(s)."
+                : "No Drama import history items were cleared.";
+            if (cleared > 0)
+            {
+                _activityFeed.Publish($"Drama import history cleared ({cleared})");
+            }
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Clearing Drama Watch Folder history failed.", ex);
+            StatusText = $"Clear Drama history failed: {ex.Message}";
+            _dialogs.Error("Clear Drama History", StatusText);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenMaintenanceIssues() => OpenMaintenanceIssuesRequested?.Invoke();
 }

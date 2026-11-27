@@ -6,9 +6,9 @@ using DigitalCenter.ViewModels.Services;
 namespace DigitalCenter.ViewModels;
 
 /// <summary>
-/// Display row for one catalog title on the Library screen. A row is observable
-/// so the grid can show which card is selected: one click selects, two clicks
-/// open the details screen.
+/// Display row for one catalog title on the Library screen. Single click
+/// selects the card (visual ring); double-click or Enter opens the details
+/// screen — the two gestures are intentionally separate.
 /// </summary>
 public sealed partial class LibraryItemViewModel : ObservableObject
 {
@@ -18,9 +18,11 @@ public sealed partial class LibraryItemViewModel : ObservableObject
         Title = item.Title;
         Type = item.Type;
         YearDisplay = item.ReleaseYear?.ToString() ?? "—";
-        TypeDisplay = item.Type.ToString();
+        var colTag = item.Categories.FirstOrDefault(c => c.StartsWith("Collection:", StringComparison.OrdinalIgnoreCase));
+        TypeDisplay = colTag is not null ? colTag["Collection:".Length..].Trim() : "Movie";
         PosterPath = item.PosterPath;
         Initials = UiFormat.Initials(item.Title);
+        Categories = item.Categories;
         Genres = item.Genres;
         FileSummary = item.FileCount == 1 ? "1 file" : $"{item.FileCount} files";
         SizeSummary = UiFormat.FormatBytes(item.TotalSize);
@@ -56,7 +58,9 @@ public sealed partial class LibraryItemViewModel : ObservableObject
     public string TypeDisplay { get; }
     public string? PosterPath { get; }
     public string Initials { get; }
+    public IReadOnlyList<string> Categories { get; }
     public IReadOnlyList<string> Genres { get; }
+    public string CategoriesText => Categories.Count == 0 ? "—" : string.Join(", ", Categories);
     public string GenresText => Genres.Count == 0 ? "—" : string.Join(", ", Genres);
     public string FileSummary { get; }
     public string SizeSummary { get; }
@@ -67,7 +71,7 @@ public sealed partial class LibraryItemViewModel : ObservableObject
     /// <summary>Available / Partial / Missing — used by UI triggers for the status dot color.</summary>
     public string AvailabilityState { get; }
 
-    /// <summary>True while this card is the selected one in the grid.</summary>
+    /// <summary>Visual selection ring driven by a single click on the card.</summary>
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
 }

@@ -1,5 +1,5 @@
-using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DigitalCenter.Core.Configuration;
@@ -10,61 +10,59 @@ using DigitalCenter.ViewModels.Services;
 namespace DigitalCenter.ViewModels;
 
 /// <summary>
-/// Settings workspace: library roots, metadata/artwork, file-operation, USB and
-/// naming preferences. Save Settings validates and applies the changes;
-/// Discard Changes restores the last saved values. Changing paths never moves
-/// files or rewrites library records.
-///
-/// The Watch Folder is deliberately NOT configured here: Management owns the
-/// single default Watch Folder (path + monitoring), so this screen never
-/// maintains a second path or a conflicting monitoring state. Saving works on
-/// the loaded settings (see <see cref="SettingsService.Update"/>) and therefore
-/// cannot clobber the values Management owns.
+/// Settings workspace: library roots &amp; watch folder locations for both Movies and Dramas,
+/// automatic language subfolder organization, TMDb metadata preferences, and USB options.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
+    private readonly WatchFolderService _watchFolder;
+    private readonly DramaWatchFolderService _dramaWatchFolder;
     private readonly ITmdbMetadataProvider _tmdb;
-    private readonly ActivityFeed _activity;
     private readonly IDialogService _dialogs;
     private readonly AppPaths _paths;
+    private readonly ActivityFeedService _activityFeed;
 
     public SettingsViewModel(
         SettingsService settingsService,
+        WatchFolderService watchFolder,
+        DramaWatchFolderService dramaWatchFolder,
         ITmdbMetadataProvider tmdb,
-        ActivityFeed activity,
         IDialogService dialogs,
         AppPaths paths,
-        MaintenanceViewModel maintenance)
+        ActivityFeedService activityFeed)
     {
         _settingsService = settingsService;
+        _watchFolder = watchFolder;
+        _dramaWatchFolder = dramaWatchFolder;
         _tmdb = tmdb;
-        _activity = activity;
         _dialogs = dialogs;
         _paths = paths;
-        Maintenance = maintenance;
+        _activityFeed = activityFeed;
 
         ConflictOptions = ["Skip", "Overwrite", "Rename"];
+        StatusText = string.Empty;
         LoadFromService();
         TmdbConfigured = tmdb.IsConfigured;
     }
 
-    /// <summary>Existing maintenance tooling (scan, backup/restore, reports), embedded as the Application section.</summary>
-    public MaintenanceViewModel Maintenance { get; }
-
     public IReadOnlyList<string> ConflictOptions { get; }
 
-    // ----------------------------------------------------------- library
+    // ----------------------------------------------------------- movies & watch folder
     [ObservableProperty] public partial string MoviesRoot { get; set; }
+    [ObservableProperty] public partial string CollectionsRoot { get; set; }
     [ObservableProperty] public partial string SeriesRoot { get; set; }
+    [ObservableProperty] public partial string WatchFolderPath { get; set; }
+    [ObservableProperty] public partial bool WatchFolderEnabled { get; set; }
+
+    // ------------------------------------------------------------ dramas & watch folder
+    [ObservableProperty] public partial string DramaRoot { get; set; }
+    [ObservableProperty] public partial string DramaWatchFolderPath { get; set; }
+    [ObservableProperty] public partial bool DramaWatchFolderEnabled { get; set; }
+    [ObservableProperty] public partial string DramaCopySubfolder { get; set; }
 
     // ---------------------------------------------------------- metadata
-    // MinimumMatchConfidence is deliberately not editable here any more: the
-    // threshold is a fixed matching safeguard (validated 0.30-0.95 by
-    // SettingsService and applied by MetadataMatcher). It is read from and
-    // written back to settings.json untouched, so a value configured by an
-    // earlier version keeps working.
-
+    [ObservableProperty] public partial int MinimumMatchConfidencePercent { get; set; }
     [ObservableProperty] public partial bool DownloadPosters { get; set; }
     [ObservableProperty] public partial bool DownloadBackdrops { get; set; }
     [ObservableProperty] public partial bool DownloadCastProfiles { get; set; }
@@ -74,12 +72,8 @@ public partial class SettingsViewModel : ObservableObject
     public bool TmdbConfigured { get; }
 
     // ----------------------------------------------------- file operations
-    /// <summary>Move matched Watch Folder files into the library without asking.</summary>
-    [ObservableProperty] public partial bool AutoImportMatchedFiles { get; set; }
-
-    /// <summary>File imports into "&lt;root&gt;\&lt;detected language&gt;", creating the folder when missing.</summary>
-    [ObservableProperty] public partial bool OrganizeLibraryByLanguage { get; set; }
-
+    [ObservableProperty] public partial bool AutoOrganizeByLanguage { get; set; }
+    [ObservableProperty] public partial bool AskForDestination { get; set; }
     [ObservableProperty] public partial bool CleanFilenames { get; set; }
     [ObservableProperty] public partial int ConflictIndex { get; set; }
     [ObservableProperty] public partial bool VerifyHashes { get; set; }
@@ -92,7 +86,17 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string MovieFilenameTemplate { get; set; }
     [ObservableProperty] public partial string SeriesFilenameTemplate { get; set; }
 
-    public string AppVersion => $"DigitalCenter 5.0.0";
+    public string AppVersion
+    {
+        get
+        {
+            var version = Assembly.GetEntryAssembly()?.GetName().Version;
+            return version is not null
+                ? $"DigitalCenter {version.Major}.{version.Minor}.{version.Build}"
+                : "DigitalCenter";
+        }
+    }
+
     public string DatabaseLocation => _paths.DatabaseFile;
     public string SettingsLocation => _paths.SettingsFile;
 
@@ -100,13 +104,21 @@ public partial class SettingsViewModel : ObservableObject
     {
         var settings = _settingsService.Load();
         MoviesRoot = settings.MoviesRoot ?? string.Empty;
+        CollectionsRoot = settings.CollectionsRoot ?? settings.GetEffectiveCollectionsRoot() ?? string.Empty;
         SeriesRoot = settings.SeriesRoot ?? string.Empty;
+        WatchFolderPath = settings.WatchFolderPath ?? string.Empty;
+        WatchFolderEnabled = settings.WatchFolderEnabled;
+        DramaRoot = settings.DramaRoot ?? string.Empty;
+        DramaWatchFolderPath = settings.DramaWatchFolderPath ?? string.Empty;
+        DramaWatchFolderEnabled = settings.DramaWatchFolderEnabled;
+        DramaCopySubfolder = string.IsNullOrWhiteSpace(settings.DramaCopySubfolder) ? "Dramas" : settings.DramaCopySubfolder;
+        MinimumMatchConfidencePercent = (int)Math.Round(Math.Clamp(settings.MinimumMatchConfidence, 0.30, 0.95) * 100.0);
         DownloadPosters = settings.DownloadPosters;
         DownloadBackdrops = settings.DownloadBackdrops;
         DownloadCastProfiles = settings.DownloadCastProfiles;
         FetchTrailers = settings.FetchTrailers;
-        AutoImportMatchedFiles = settings.AutoImportMatchedFiles;
-        OrganizeLibraryByLanguage = settings.OrganizeLibraryByLanguage;
+        AutoOrganizeByLanguage = settings.AutoOrganizeByLanguage;
+        AskForDestination = settings.AskForDestination;
         CleanFilenames = settings.CleanFilenames;
         VerifyHashes = settings.VerifyHashes;
         UsbCopySubfolder = settings.UsbCopySubfolder;
@@ -121,21 +133,25 @@ public partial class SettingsViewModel : ObservableObject
         };
     }
 
-    /// <summary>
-    /// Applies the values this screen owns onto the loaded settings. Everything
-    /// owned elsewhere — above all the Watch Folder path and its monitoring
-    /// switches, which Management owns — is left exactly as it is.
-    /// </summary>
-    private void ApplyTo(AppSettings settings)
+    private AppSettings BuildSettings()
     {
+        var settings = _settingsService.Load();
         settings.MoviesRoot = NullIfEmpty(MoviesRoot);
+        settings.CollectionsRoot = NullIfEmpty(CollectionsRoot);
         settings.SeriesRoot = NullIfEmpty(SeriesRoot);
+        settings.WatchFolderPath = NullIfEmpty(WatchFolderPath);
+        settings.WatchFolderEnabled = WatchFolderEnabled && !string.IsNullOrWhiteSpace(settings.WatchFolderPath);
+        settings.DramaRoot = NullIfEmpty(DramaRoot);
+        settings.DramaWatchFolderPath = NullIfEmpty(DramaWatchFolderPath);
+        settings.DramaWatchFolderEnabled = DramaWatchFolderEnabled && !string.IsNullOrWhiteSpace(settings.DramaWatchFolderPath);
+        settings.DramaCopySubfolder = string.IsNullOrWhiteSpace(DramaCopySubfolder) ? "Dramas" : DramaCopySubfolder.Trim();
+        settings.MinimumMatchConfidence = Math.Round(Math.Clamp(MinimumMatchConfidencePercent, 30, 95) / 100.0, 2);
         settings.DownloadPosters = DownloadPosters;
         settings.DownloadBackdrops = DownloadBackdrops;
         settings.DownloadCastProfiles = DownloadCastProfiles;
         settings.FetchTrailers = FetchTrailers;
-        settings.AutoImportMatchedFiles = AutoImportMatchedFiles;
-        settings.OrganizeLibraryByLanguage = OrganizeLibraryByLanguage;
+        settings.AutoOrganizeByLanguage = AutoOrganizeByLanguage;
+        settings.AskForDestination = AskForDestination;
         settings.CleanFilenames = CleanFilenames;
         settings.UsbConflictAction = ConflictIndex switch
         {
@@ -152,13 +168,6 @@ public partial class SettingsViewModel : ObservableObject
         settings.SeriesFilenameTemplate = string.IsNullOrWhiteSpace(SeriesFilenameTemplate)
             ? "{Title} - S{Season:00}E{Episode:00}"
             : SeriesFilenameTemplate;
-    }
-
-    /// <summary>The settings as they would be saved (used for validation before writing).</summary>
-    private AppSettings BuildSettings()
-    {
-        var settings = _settingsService.Load();
-        ApplyTo(settings);
         return settings;
     }
 
@@ -166,39 +175,102 @@ public partial class SettingsViewModel : ObservableObject
     private void BrowseMoviesRoot()
     {
         var picked = _dialogs.PickFolder(MoviesRoot, "Choose the movies library root");
-        if (picked is not null)
-        {
-            MoviesRoot = picked;
-        }
+        if (picked is not null) MoviesRoot = picked;
     }
 
     [RelayCommand]
-    private void BrowseSeriesRoot()
+    private void BrowseCollectionsRoot()
     {
-        var picked = _dialogs.PickFolder(SeriesRoot, "Choose the series library root");
-        if (picked is not null)
-        {
-            SeriesRoot = picked;
-        }
+        var picked = _dialogs.PickFolder(CollectionsRoot, "Choose the movie collections root folder");
+        if (picked is not null) CollectionsRoot = picked;
     }
+
+    [RelayCommand]
+    private void BrowseWatchFolder()
+    {
+        var picked = _dialogs.PickFolder(WatchFolderPath, "Choose the Movies Watch Folder");
+        if (picked is not null) WatchFolderPath = picked;
+    }
+
+    [RelayCommand]
+    private void BrowseDramaRoot()
+    {
+        var picked = _dialogs.PickFolder(DramaRoot, "Choose the Drama library root folder");
+        if (picked is not null) DramaRoot = picked;
+    }
+
+    [RelayCommand]
+    private void BrowseDramaWatchFolder()
+    {
+        var picked = _dialogs.PickFolder(DramaWatchFolderPath, "Choose the Drama Watch Folder");
+        if (picked is not null) DramaWatchFolderPath = picked;
+    }
+
+    [RelayCommand]
+    private void BrowseSeriesRoot() => BrowseCollectionsRoot();
 
     [RelayCommand]
     private void OpenMoviesRoot()
     {
-        if (Directory.Exists(MoviesRoot))
+        if (string.IsNullOrWhiteSpace(MoviesRoot))
         {
-            _dialogs.OpenInExplorer(MoviesRoot);
+            _dialogs.Info("Movies Library Root", "Choose a Movies library root folder first.");
+            return;
         }
+        Directory.CreateDirectory(MoviesRoot);
+        _dialogs.OpenInExplorer(MoviesRoot);
     }
 
     [RelayCommand]
-    private void OpenSeriesRoot()
+    private void OpenCollectionsRoot()
     {
-        if (Directory.Exists(SeriesRoot))
+        if (string.IsNullOrWhiteSpace(CollectionsRoot))
         {
-            _dialogs.OpenInExplorer(SeriesRoot);
+            _dialogs.Info("Collections Library Root", "Choose a Movie Collections root folder first.");
+            return;
         }
+        Directory.CreateDirectory(CollectionsRoot);
+        _dialogs.OpenInExplorer(CollectionsRoot);
     }
+
+    [RelayCommand]
+    private void OpenWatchFolder()
+    {
+        if (string.IsNullOrWhiteSpace(WatchFolderPath))
+        {
+            _dialogs.Info("Movies Watch Folder", "Choose a Movies Watch Folder first.");
+            return;
+        }
+        Directory.CreateDirectory(WatchFolderPath);
+        _dialogs.OpenInExplorer(WatchFolderPath);
+    }
+
+    [RelayCommand]
+    private void OpenDramaRoot()
+    {
+        if (string.IsNullOrWhiteSpace(DramaRoot))
+        {
+            _dialogs.Info("Drama Root", "Choose a Drama library root folder first.");
+            return;
+        }
+        Directory.CreateDirectory(DramaRoot);
+        _dialogs.OpenInExplorer(DramaRoot);
+    }
+
+    [RelayCommand]
+    private void OpenDramaWatchFolder()
+    {
+        if (string.IsNullOrWhiteSpace(DramaWatchFolderPath))
+        {
+            _dialogs.Info("Drama Watch Folder", "Choose a Drama Watch Folder first.");
+            return;
+        }
+        Directory.CreateDirectory(DramaWatchFolderPath);
+        _dialogs.OpenInExplorer(DramaWatchFolderPath);
+    }
+
+    [RelayCommand]
+    private void OpenSeriesRoot() => OpenCollectionsRoot();
 
     [RelayCommand]
     private void OpenDataFolder() => _dialogs.OpenInExplorer(_paths.DataRoot);
@@ -208,57 +280,73 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (!TmdbConfigured)
         {
-            StatusText = "TMDb is not configured. Set the Tmdb:ReadAccessToken value in appsettings.json, " +
-                         "as an environment variable (Tmdb__ReadAccessToken), or via .NET user secrets.";
+            StatusText = "TMDb is not configured. Set Tmdb:ReadAccessToken in appsettings.json, environment variables, or user secrets.";
             _dialogs.Error("TMDb", StatusText);
             return;
         }
 
-        StatusText = "Testing the TMDb connection…";
-        _activity.Publish("Testing the TMDb connection…", ActivityKind.Background);
+        StatusText = "Testing TMDb connection…";
         var reachable = await _tmdb.TestConnectionAsync();
         StatusText = reachable
             ? "TMDb connection OK."
-            : "TMDb could not be reached (offline, or the token is invalid). The rest of the app keeps working.";
-        _activity.Publish(StatusText, reachable ? ActivityKind.Success : ActivityKind.Warning);
+            : "TMDb could not be reached. Offline features remain available.";
     }
 
     [RelayCommand]
     private void Save()
     {
+        var previous = _settingsService.Load();
         var settings = BuildSettings();
         var issues = SettingsService.Validate(settings);
         if (issues.Count > 0)
         {
             StatusText = "Settings were not saved — fix the highlighted problems first.";
-            _activity.Publish($"Settings not saved: {string.Join(" ", issues)}", ActivityKind.Warning);
             _dialogs.Error("Invalid settings", string.Join(Environment.NewLine, issues));
             return;
         }
 
         try
         {
-            // Update (load → apply → save) keeps the Watch Folder configuration
-            // that Management owns intact.
-            _settingsService.Update(ApplyTo);
-            StatusText = "Settings saved. Changing paths never moves files or modifies library records. " +
-                         "The Watch Folder is managed in the Management workspace.";
-            _activity.Publish("Settings saved successfully.", ActivityKind.Success);
+            _settingsService.Save(settings);
+            ApplyWatchers(previous, settings);
+            StatusText = "Settings saved.";
+            _activityFeed.Publish("Settings saved");
         }
         catch (Exception ex)
         {
             StatusText = $"Settings could not be saved: {ex.Message}";
-            _activity.Publish(StatusText, ActivityKind.Error);
             _dialogs.Error("Settings", StatusText);
         }
     }
 
-    [RelayCommand]
-    private void DiscardChanges()
+    private void ApplyWatchers(AppSettings previous, AppSettings current)
     {
-        LoadFromService();
-        StatusText = "Changes discarded — the last saved settings are shown.";
-        _activity.Publish(StatusText, ActivityKind.System);
+        var stability = TimeSpan.FromSeconds(Math.Clamp(current.StabilityDelaySeconds, 2, 600));
+        _watchFolder.StabilityDelay = stability;
+        _dramaWatchFolder.StabilityDelay = stability;
+
+        var moviePathChanged = !string.Equals(previous.WatchFolderPath, current.WatchFolderPath, StringComparison.OrdinalIgnoreCase);
+        if (!current.WatchFolderEnabled || string.IsNullOrWhiteSpace(current.WatchFolderPath) || moviePathChanged)
+        {
+            if (_watchFolder.IsRunning) _watchFolder.Stop();
+        }
+        if (current.WatchFolderEnabled && !string.IsNullOrWhiteSpace(current.WatchFolderPath) && Directory.Exists(current.WatchFolderPath))
+        {
+            if (!_watchFolder.IsRunning) _watchFolder.Start(current.WatchFolderPath);
+        }
+
+        var dramaPathChanged = !string.Equals(previous.DramaWatchFolderPath, current.DramaWatchFolderPath, StringComparison.OrdinalIgnoreCase);
+        if (!current.DramaWatchFolderEnabled || string.IsNullOrWhiteSpace(current.DramaWatchFolderPath) || dramaPathChanged)
+        {
+            if (_dramaWatchFolder.IsRunning) _dramaWatchFolder.Stop();
+        }
+        if (current.DramaWatchFolderEnabled &&
+            !string.IsNullOrWhiteSpace(current.DramaWatchFolderPath) &&
+            Directory.Exists(current.DramaWatchFolderPath) &&
+            !string.IsNullOrWhiteSpace(current.DramaRoot))
+        {
+            if (!_dramaWatchFolder.IsRunning) _dramaWatchFolder.Start(current.DramaWatchFolderPath);
+        }
     }
 
     private static string? NullIfEmpty(string? text) =>

@@ -1,13 +1,12 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using DigitalCenter.Core.Logging;
 using DigitalCenter.Core.Services;
 using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.ViewModels;
 
-/// <summary>One entry in the navigation sidebar, with an optional badge (" (3)").</summary>
+/// <summary>One entry in the navigation sidebar, with an optional badge.</summary>
 public sealed partial class NavItem : ObservableObject
 {
     public NavItem(string title, string glyph, ObservableObject page)
@@ -27,11 +26,9 @@ public sealed partial class NavItem : ObservableObject
     [ObservableProperty]
     public partial string Badge { get; set; }
 
-    /// <summary>Badge count shown in the sidebar pill (0 hides the pill).</summary>
     [ObservableProperty]
     public partial int BadgeCount { get; set; }
 
-    /// <summary>Text shown in the sidebar; combines title and badge.</summary>
     public string DisplayTitle => Badge.Length == 0 ? Title : $"{Title}{Badge}";
 
     partial void OnBadgeChanged(string value) => OnPropertyChanged(nameof(DisplayTitle));
@@ -40,116 +37,167 @@ public sealed partial class NavItem : ObservableObject
 }
 
 /// <summary>
-/// Application shell: hamburger-controlled sidebar with the four primary
-/// destinations (Home, USB Cart, Management, Settings), in-application
-/// navigation to the details screen, and the wiring between the Watch Folder
-/// and the Management dashboard.
+/// Application shell: sidebar with Library, Drama, Lookup, Tickets, USB Cart,
+/// Watch Folder, Maintenance, and Settings, plus in-application navigation to
+/// Movie Details and Drama Details.
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
+    private readonly WatchFolderService _watchFolder;
+    private readonly DramaWatchFolderService _dramaWatchFolder;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly IAppLogger _logger;
-    private bool _navigationReady;
+    private readonly ActivityFeedService _activityFeed;
+    private readonly NavItem _maintenanceNav;
 
     public MainViewModel(
         LibraryViewModel library,
+        DramaViewModel drama,
+        LookupViewModel lookup,
+        TicketsViewModel tickets,
         UsbCartViewModel usbCart,
         ManagementViewModel management,
+        MaintenanceViewModel maintenance,
         SettingsViewModel settings,
         WatchFolderService watchFolder,
+        DramaWatchFolderService dramaWatchFolder,
+        WatchFolderIssueService watchFolderIssues,
         ImportService imports,
-        ActivityFeed activity,
         IUiDispatcher uiDispatcher,
-        IAppLogger logger)
+        IAppLogger logger,
+        ActivityFeedService activityFeed)
     {
         Library = library;
+        Drama = drama;
+        Lookup = lookup;
+        Tickets = tickets;
         UsbCart = usbCart;
         Management = management;
+        Maintenance = maintenance;
         Settings = settings;
-        Activity = activity;
+        _watchFolder = watchFolder;
+        _dramaWatchFolder = dramaWatchFolder;
         _uiDispatcher = uiDispatcher;
         _logger = logger;
+        _activityFeed = activityFeed;
+
+        watchFolder.StatusChanged += message => _activityFeed.Publish(message);
+        dramaWatchFolder.StatusChanged += message => _activityFeed.Publish(message);
+        imports.StatusChanged += message => _activityFeed.Publish(message);
+        imports.ActivityChanged += () => _uiDispatcher.Post(() =>
+        {
+            _ = Management.RefreshAsync();
+            _ = Maintenance.RefreshWatchFolderIssuesAsync();
+        });
+        watchFolderIssues.IssuesChanged += () => _uiDispatcher.Post(() =>
+        {
+            _ = Management.RefreshIssueCountAsync();
+            _ = Maintenance.RefreshWatchFolderIssuesAsync();
+        });
+
+        var ticketsNav = new NavItem("Tickets", "\uE73A", tickets);
+        var usbCartNav = new NavItem("USB Cart", "\uE7BF", usbCart);
+        _maintenanceNav = new NavItem("Maintenance", "\uE90F", maintenance);
 
         NavItems =
         [
-            new NavItem("Home", "\uE80F", library),
-            new NavItem("USB Cart", "\uE7BF", usbCart),
-            new NavItem("Management", "\uE8B7", management),
+            new NavItem("Library", "\uE80F", library),
+            new NavItem("Drama", "\uE714", drama),
+            new NavItem("Lookup", "\uE721", lookup),
+            ticketsNav,
+            usbCartNav,
+            new NavItem("Watch Folder", "\uE8B7", management),
+            _maintenanceNav,
             new NavItem("Settings", "\uE713", settings)
         ];
 
-        // Establish the initial navigation state without starting a query from
-        // the constructor. App.OnStartup explicitly awaits InitializeAsync;
-        // constructor/Loaded-triggered loads used to race that startup load.
+        _isInitializing = true;
         SelectedNavItem = NavItems[0];
         CurrentPage = library;
         IsSidebarOpen = true;
-        _navigationReady = true;
+        _isInitializing = false;
 
-        // Sidebar badge: number of titles waiting in the USB cart.
+        tickets.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TicketsViewModel.OpenTicketCount))
+            {
+                ticketsNav.Badge = tickets.OpenTicketCount > 0 ? $" ({tickets.OpenTicketCount})" : string.Empty;
+                ticketsNav.BadgeCount = tickets.OpenTicketCount;
+            }
+        };
+
         usbCart.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(UsbCartViewModel.CartCount))
             {
-                NavItems[1].Badge = usbCart.CartCount > 0 ? $" ({usbCart.CartCount})" : string.Empty;
-                NavItems[1].BadgeCount = usbCart.CartCount;
+                usbCartNav.Badge = usbCart.CartCount > 0 ? $" ({usbCart.CartCount})" : string.Empty;
+                usbCartNav.BadgeCount = usbCart.CartCount;
             }
         };
 
-        // Background import work (automatic metadata matching) reports into the
-        // same feed as everything else.
-        imports.ActivityReported += message => activity.Publish(message, ActivityKind.Background);
-
-        // Refresh the Management dashboard whenever the Watch Folder finds something.
-        watchFolder.PendingImportsChanged += () =>
+        watchFolder.PendingImportsChanged += () => _uiDispatcher.Post(() =>
         {
-            activity.Publish("Fetching files from the Watch Folder — new file(s) detected.", ActivityKind.Background);
-            _uiDispatcher.Post(() =>
+            try
             {
-                try
-                {
-                    _ = Management.RefreshAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.Warn($"Management refresh after watch-folder event failed: {ex.Message}");
-                    activity.Publish($"Management refresh failed: {ex.Message}", ActivityKind.Error);
-                }
-            });
-        };
-
-        // A confirmed import changes the library → refresh the Home grid.
-        management.ImportCompleted += () => _uiDispatcher.Post(() =>
-        {
-            activity.Publish("Library changed — refreshing Home.", ActivityKind.Background);
-            _ = Library.RefreshSafeAsync();
+                _ = Management.RefreshAsync();
+                _ = Library.RefreshSafeAsync();
+                _ = Maintenance.RefreshWatchFolderIssuesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"Refresh after watch-folder event failed: {ex.Message}");
+            }
         });
 
-        // Card clicks in the library open the details page inside the window.
-        library.DetailsRequested += titleId => ShowDetails(titleId);
+        dramaWatchFolder.DramaIngested += () => _uiDispatcher.Post(() =>
+        {
+            _ = Drama.RefreshSafeAsync();
+            _ = Management.RefreshAsync();
+            _ = Maintenance.RefreshWatchFolderIssuesAsync();
+        });
 
-        // Adding to the cart updates the cart view + badge.
+        management.ImportCompleted += () => _uiDispatcher.Post(() => _ = Library.RefreshSafeAsync());
+        management.DramaImportCompleted += () => _uiDispatcher.Post(() => _ = Drama.RefreshSafeAsync());
+        management.OpenMaintenanceIssuesRequested += () => _uiDispatcher.Post(OpenMaintenanceWatchFolderIssues);
+
+        maintenance.CatalogChanged += () => _uiDispatcher.Post(() =>
+        {
+            _ = Library.RefreshSafeAsync();
+            _ = Drama.RefreshSafeAsync();
+        });
+        maintenance.LookupSitesChanged += () => _uiDispatcher.Post(Lookup.ReloadSites);
+        maintenance.WatchFolderIssuesChanged += () => _uiDispatcher.Post(() => _ = Management.RefreshAsync());
+
+        library.DetailsRequested += titleId => ShowDetails(titleId);
         library.CartChanged += () => _uiDispatcher.Post(() => _ = UsbCart.RefreshCartAsync());
+        drama.DetailsRequested += dramaId => ShowDramaDetails(dramaId);
+        lookup.OpenLocalTitleRequested += titleId => ShowDetails(titleId);
     }
 
     public IReadOnlyList<NavItem> NavItems { get; }
 
     public LibraryViewModel Library { get; }
 
+    public DramaViewModel Drama { get; }
+
+    public LookupViewModel Lookup { get; }
+
+    public TicketsViewModel Tickets { get; }
+
     public UsbCartViewModel UsbCart { get; }
 
     public ManagementViewModel Management { get; }
 
+    public MaintenanceViewModel Maintenance { get; }
+
     public SettingsViewModel Settings { get; }
 
-    /// <summary>
-    /// The consolidated "Current Activity &amp; Status" feed shown in the sidebar.
-    /// Every screen publishes its runtime messages here.
-    /// </summary>
-    public ActivityFeed Activity { get; }
+    public ObservableCollection<ActivityFeedItem> ActivityFeed => _activityFeed.Items;
 
     [ObservableProperty]
     public partial bool IsSidebarOpen { get; set; }
+
+    private bool _isInitializing;
 
     [ObservableProperty]
     public partial NavItem SelectedNavItem { get; set; }
@@ -157,33 +205,37 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial ObservableObject CurrentPage { get; set; }
 
-    /// <summary>True while the details screen is shown instead of a navigation destination.</summary>
-    public bool IsShowingDetails => ReferenceEquals(CurrentPage, Details);
+    public bool IsShowingDetails => ReferenceEquals(CurrentPage, Details) || ReferenceEquals(CurrentPage, DramaDetails);
 
     public DetailsViewModel? Details { get; private set; }
 
+    public DramaDetailsViewModel? DramaDetails { get; private set; }
+
     partial void OnSelectedNavItemChanged(NavItem value)
     {
-        if (_navigationReady)
-        {
-            ApplyNav(value);
-        }
-    }
-
-    /// <summary>Puts a destination on screen and loads it (one place only).</summary>
-    private void ApplyNav(NavItem value)
-    {
         Details = null;
+        DramaDetails = null;
         CurrentPage = value.Page;
-        OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IsShowingDetails));
 
-        Activity.Publish($"Browsing {value.Title}.", ActivityKind.Navigation);
+        if (_isInitializing)
+        {
+            return;
+        }
 
-        switch (value.Page)
+        switch (CurrentPage)
         {
             case LibraryViewModel:
                 _ = Library.RefreshSafeAsync();
+                break;
+            case DramaViewModel:
+                _ = Drama.OnNavigatedToAsync();
+                break;
+            case LookupViewModel:
+                Lookup.ReloadSites();
+                break;
+            case TicketsViewModel:
+                _ = Tickets.OnNavigatedToAsync();
                 break;
             case UsbCartViewModel:
                 _ = UsbCart.OnNavigatedToAsync();
@@ -191,44 +243,28 @@ public partial class MainViewModel : ObservableObject
             case ManagementViewModel:
                 _ = Management.OnNavigatedToAsync();
                 break;
+            case MaintenanceViewModel:
+                Maintenance.OnNavigatedTo();
+                break;
         }
     }
 
-    /// <summary>
-    /// Navigates to a destination from a click on the sidebar. Clicking the row
-    /// that is ALREADY selected has to work as well: while the details screen is
-    /// open the selection never changes, so the ListBox raises no
-    /// SelectionChanged and the click used to do nothing at all — the user had
-    /// to pick another destination and come back to see the library again.
-    /// </summary>
-    public void NavigateTo(NavItem item)
+    private void OpenMaintenanceWatchFolderIssues()
     {
-        if (!ReferenceEquals(item, SelectedNavItem))
-        {
-            SelectedNavItem = item;   // raises OnSelectedNavItemChanged -> ApplyNav
-            return;
-        }
-
-        if (!ReferenceEquals(CurrentPage, item.Page))
-        {
-            // Same destination, another screen on top (the details page).
-            ApplyNav(item);
-        }
+        Maintenance.SelectedTabIndex = 1;
+        SelectedNavItem = _maintenanceNav;
     }
 
-    /// <summary>Factory for detail view models; wired by the composition root (DI).</summary>
     public Func<int, DetailsViewModel>? DetailsFactory { get; set; }
 
-    /// <summary>Opens the details screen for a title inside the main window.</summary>
+    public Func<int, DramaDetailsViewModel>? DramaDetailsFactory { get; set; }
+
     public void ShowDetails(int mediaTitleId)
     {
-        if (DetailsFactory is null)
-        {
-            return;
-        }
+        if (DetailsFactory is null) return;
 
+        DramaDetails = null;
         Details = DetailsFactory(mediaTitleId);
-        Activity.Publish($"Opening title #{mediaTitleId} …", ActivityKind.Navigation);
         Details.CloseRequested += (_, _) => _uiDispatcher.Post(CloseDetails);
         Details.SavedChanges += () => _uiDispatcher.Post(() => _ = Library.RefreshSafeAsync());
         CurrentPage = Details;
@@ -237,62 +273,90 @@ public partial class MainViewModel : ObservableObject
         _ = Details.InitializeAsync();
     }
 
-    /// <summary>
-    /// Returns from the details screen to the selected destination and reloads
-    /// it, so metadata edits, an added cart item or a completed import are
-    /// visible immediately — no extra click on another destination needed.
-    /// </summary>
+    public void ShowDramaDetails(int dramaId)
+    {
+        if (DramaDetailsFactory is null) return;
+
+        Details = null;
+        DramaDetails = DramaDetailsFactory(dramaId);
+        DramaDetails.CloseRequested += (_, _) => _uiDispatcher.Post(CloseDetails);
+        DramaDetails.SavedChanges += () => _uiDispatcher.Post(() => _ = Drama.RefreshSafeAsync());
+        CurrentPage = DramaDetails;
+        OnPropertyChanged(nameof(DramaDetails));
+        OnPropertyChanged(nameof(IsShowingDetails));
+        _ = DramaDetails.InitializeAsync();
+    }
+
     public void CloseDetails()
     {
-        if (Details is null)
+        Details = null;
+        DramaDetails = null;
+        CurrentPage = SelectedNavItem.Page;
+        OnPropertyChanged(nameof(Details));
+        OnPropertyChanged(nameof(DramaDetails));
+        OnPropertyChanged(nameof(IsShowingDetails));
+
+        if (CurrentPage is LibraryViewModel)
+        {
+            _ = Library.RefreshSafeAsync();
+        }
+        else if (CurrentPage is DramaViewModel)
+        {
+            _ = Drama.RefreshSafeAsync();
+        }
+    }
+
+    public void NotifyNavReactivated(NavItem item)
+    {
+        if (item is null || !ReferenceEquals(item, SelectedNavItem))
         {
             return;
         }
 
-        Details = null;
-        CurrentPage = SelectedNavItem.Page;
-        OnPropertyChanged(nameof(Details));
-        OnPropertyChanged(nameof(IsShowingDetails));
-        Activity.Publish($"Back to {SelectedNavItem.Title}.", ActivityKind.Navigation);
-
-        switch (SelectedNavItem.Page)
+        if (IsShowingDetails)
         {
-            case LibraryViewModel:
-                _ = Library.RefreshSafeAsync();
-                break;
-            case UsbCartViewModel:
-                _ = UsbCart.RefreshCartAsync();
-                break;
-            case ManagementViewModel:
-                _ = Management.RefreshAsync();
-                break;
+            CloseDetails();
+        }
+        else if (item.Page is LibraryViewModel)
+        {
+            _ = Library.RefreshSafeAsync();
+        }
+        else if (item.Page is DramaViewModel)
+        {
+            _ = Drama.OnNavigatedToAsync();
+        }
+        else if (item.Page is TicketsViewModel)
+        {
+            _ = Tickets.OnNavigatedToAsync();
         }
     }
 
-    /// <summary>Empties the consolidated activity feed (sidebar "Clear").</summary>
-    [RelayCommand]
-    private void ClearActivity() => Activity.Clear();
+    public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
 
-    /// <summary>Flips the navigation rail and reports the new state.</summary>
-    public bool ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
-
-    /// <summary>
-    /// Called once at startup for the initial screen loads. Watch Folder
-    /// monitoring is deliberately NOT started here: <c>App.RunStartupMaintenanceAsync</c>
-    /// is the single startup path for it, so the monitor can never be started
-    /// twice from two places with two different ideas of the settings.
-    /// </summary>
-    public async Task InitializeAsync()
+    public async Task InitializeAsync(Core.Configuration.AppSettings settings)
     {
-        // The two loads are independent, so they run together; both are awaited
-        // so the first screens are guaranteed to be filled (an empty Home grid
-        // until the user touched a filter was exactly this being skipped).
-        var library = Library.RefreshSafeAsync();
-        var cart = UsbCart.RefreshCartAsync();
-        await Task.WhenAll(library, cart);
+        _ = Library.RefreshSafeAsync();
+        _ = Drama.RefreshSafeAsync();
+        _ = Tickets.RefreshAsync();
+        await UsbCart.RefreshCartAsync();
 
-        Activity.Publish(
-            $"Home loaded: {Library.HomeMovies.Count} movie(s) and {Library.HomeSeries.Count} series ready to browse.",
-            ActivityKind.Success);
+        var path = settings.WatchFolderPath;
+        if (settings.WatchFolderEnabled && !string.IsNullOrWhiteSpace(path))
+        {
+            _watchFolder.StabilityDelay = TimeSpan.FromSeconds(Math.Clamp(settings.StabilityDelaySeconds, 2, 600));
+            if (!_watchFolder.IsRunning)
+            {
+                _watchFolder.Start(path);
+            }
+
+            if (settings.ScanOnStartup)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await _watchFolder.RescanOnceAsync(path); }
+                    catch (Exception ex) { _logger.Warn($"Startup watch-folder scan failed: {ex.Message}"); }
+                });
+            }
+        }
     }
 }

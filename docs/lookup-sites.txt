@@ -1,0 +1,2 @@
+https://new1.bollyflix.tours/?s={imdb_id}
+https://wwv1.mkvcinemas.la/?s={title}

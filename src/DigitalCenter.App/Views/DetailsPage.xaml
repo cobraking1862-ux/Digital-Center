@@ -9,220 +9,270 @@
         <conv:NullToVisibilityConverter x:Key="NullToVis"/>
         <conv:PosterPathToImageConverter x:Key="PosterToImage"/>
 
-        <!-- One action button in the fixed top bar: icon + label, identical
-             metrics everywhere so the bar never looks assembled from leftovers. -->
-        <Style x:Key="ActionBarButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Margin" Value="0,0,8,0"/>
-            <Setter Property="Padding" Value="{StaticResource ControlPaddingCompact}"/>
-        </Style>
+        <LinearGradientBrush x:Key="HeroBackdropFallback" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#0F172A" Offset="0"/>
+            <GradientStop Color="#1E293B" Offset="0.55"/>
+            <GradientStop Color="#334155" Offset="1"/>
+        </LinearGradientBrush>
     </UserControl.Resources>
 
-    <!-- ==================================================================
-         Two independent areas, no nested scrolling:
-
-         Row 0  action bar      - fixed, always reachable
-         Row 1  hero            - fixed: backdrop, poster, title, overview
-         Row 2  ScrollViewer    - the only scrolling region: editor or the
-                                  cast / seasons / episodes / files sections
-
-         The hero used to live INSIDE the scroll region (pulled up over the
-         backdrop with a -240 margin), so the title and poster scrolled away
-         and two scrollable areas fought each other. They are separate now.
-         ================================================================== -->
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- ==================== fixed action bar ==================== -->
-        <Border Grid.Row="0" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1"
-                Padding="28,11,28,11">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Button Grid.Column="0" Style="{StaticResource ActionBarButton}" Margin="0"
-                        Command="{Binding BackCommand}"
-                        ToolTip="Back to the library"
-                        AutomationProperties.Name="Back to library">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Back}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                        <TextBlock Text="Back to Library" FontSize="13"/>
-                    </StackPanel>
-                </Button>
-
-                <TextBlock Grid.Column="1" Text="{Binding Title}" Style="{StaticResource CaptionText}"
-                           VerticalAlignment="Center" Margin="18,0,18,0" TextTrimming="CharacterEllipsis"
-                           HorizontalAlignment="Center" MaxWidth="420" ToolTip="{Binding Title}"/>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal"
-                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
-                    <Button Style="{StaticResource ActionBarButton}"
-                            Command="{Binding StartEditCommand}"
-                            ToolTip="Edit the stored metadata for this title">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.Edit}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                            <TextBlock Text="Edit Metadata" FontSize="13"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource ActionBarButton}"
-                            Command="{Binding RefreshFromTmdbCommand}"
-                            ToolTip="Re-read this title from TMDb (manual edits are kept)">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                            <TextBlock Text="Refresh from TMDb" FontSize="13"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource ActionBarButton}" Margin="0"
-                            Command="{Binding AddToCartCommand}"
-                            ToolTip="Queue every registered file of this title for the USB cart">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.Cart}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                            <TextBlock Text="Add to USB Cart" FontSize="13"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- ==================== fixed hero ====================
-             Backdrop + poster + title block. Stays put while row 2 scrolls.
-             Missing artwork falls back to the placeholder tile, a long title
-             wraps inside its column, and a long overview is clamped to three
-             lines with the full text in a tooltip. -->
-        <Grid Grid.Row="1" Height="340" ClipToBounds="True"
-              Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
-            <Border>
-                <Image Source="{Binding BackdropPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
-                       Stretch="UniformToFill" Opacity="0.45" VerticalAlignment="Center"/>
-            </Border>
-            <Border>
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0.15,0" EndPoint="0.15,1">
-                        <GradientStop Color="#33FFFFFF" Offset="0"/>
-                        <GradientStop Color="#B8FFFFFF" Offset="0.5"/>
-                        <GradientStop Color="#F5FFFFFF" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-            </Border>
-            <Border>
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                        <GradientStop Color="#59FFFFFF" Offset="0"/>
-                        <GradientStop Color="#F2FFFFFF" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-            </Border>
-
-            <Grid Margin="30,20,30,20">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Portrait poster 2:3, lifted off the backdrop -->
-                <Grid Width="200" Height="300" VerticalAlignment="Center" Margin="0,0,28,0">
-                    <Border Background="#14000000" CornerRadius="{StaticResource Radius.Art}"
-                            Margin="0,12,-6,-6" Effect="{StaticResource ShadowElevated}"/>
-                    <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="{StaticResource Radius.Art}">
-                        <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphHero}"
-                                   Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
+    <ScrollViewer Background="{StaticResource WindowBackground}"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Focusable="False">
+        <StackPanel>
+            <!-- ================= Cinematic Hero Banner with Visible Backdrop ================= -->
+            <Border Background="{StaticResource HeroBackdropFallback}"
+                    BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1"
+                    ClipToBounds="True">
+                <Grid>
+                    <!-- Full-bleed Backdrop Artwork (clearly visible on the right & behind content) -->
+                    <Border MaxHeight="400" ClipToBounds="True" IsHitTestVisible="False">
+                        <Image Source="{Binding BackdropPath, Converter={StaticResource PosterToImage}, ConverterParameter=Backdrop, Mode=OneWay}"
+                               Stretch="UniformToFill" Opacity="0.92" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
-                    <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True"
-                            BorderBrush="{StaticResource BorderHighBrush}" BorderThickness="1">
-                        <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
-                               Stretch="UniformToFill"/>
+
+                    <!-- Left-to-Right Cinema Gradient Scrim: Crisp White Text on Left, Clear Backdrop on Right -->
+                    <Border IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#E60F172A" Offset="0"/>
+                                <GradientStop Color="#C40F172A" Offset="0.48"/>
+                                <GradientStop Color="#660F172A" Offset="0.82"/>
+                                <GradientStop Color="#380F172A" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
                     </Border>
-                </Grid>
+                    <Border IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#440F172A" Offset="0"/>
+                                <GradientStop Color="#100F172A" Offset="0.55"/>
+                                <GradientStop Color="#CC0F172A" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
 
-                <!-- Title block -->
-                <Grid Grid.Column="1" VerticalAlignment="Center">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Border Style="{StaticResource StatusChip}" Background="{StaticResource AccentGradientSoft}"
-                                BorderBrush="{StaticResource AccentBorderBrush}">
-                            <TextBlock Text="{Binding TypeDisplay}" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
-                        </Border>
-                        <TextBlock Text="{Binding YearDisplay}" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextBrush}" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding ReleaseDateText, StringFormat= · Released {0}}"
-                                   Style="{StaticResource SubText}" FontSize="12.5" VerticalAlignment="Center"
-                                   Visibility="{Binding ReleaseDateText, Converter={StaticResource NullToVis}}"/>
-                    </StackPanel>
-
-                    <!-- Two lines maximum: a long title trims instead of pushing
-                         the overview and the hero actions out of the fixed hero. -->
-                    <TextBlock Grid.Row="1" Text="{Binding Title}" Style="{StaticResource HeroTitle}"
-                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                               Margin="0,8,0,0" MaxWidth="820" MaxHeight="92"
-                               ToolTip="{Binding Title}"/>
-
-                    <TextBlock Grid.Row="2" Text="{Binding GenresText}" Foreground="{StaticResource CyanBrush}"
-                               FontSize="13" FontWeight="SemiBold" Margin="0,8,0,0" TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis" MaxWidth="820"/>
-
-                    <TextBlock Grid.Row="3" Text="{Binding Synopsis}" FontSize="13.5" TextWrapping="Wrap"
-                               MaxWidth="760" Margin="0,12,0,0" Foreground="{StaticResource BodySoftBrush}"
-                               LineHeight="21" MaxHeight="63" TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding Synopsis}"/>
-
-                    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,16,0,0">
-                        <Button Style="{StaticResource ActionBarButton}"
-                                Command="{Binding OpenInExplorerCommand}"
-                                ToolTip="Open the folder that holds the local file">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                <TextBlock Text="Open in Explorer" FontSize="13"/>
+                    <!-- Hero Foreground Content -->
+                    <StackPanel Margin="30,18,30,26">
+                        <!-- Top Action Bar -->
+                        <Grid>
+                            <Button Style="{StaticResource SecondaryButton}" Click="OnBackClick"
+                                    HorizontalAlignment="Left" ToolTip="Back to the library"
+                                    AutomationProperties.Name="Back to Library">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{StaticResource Icon.Back}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Back to Library" FontSize="12.5"/>
+                                </StackPanel>
+                            </Button>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                        Command="{Binding StartEditCommand}"
+                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{StaticResource Icon.Edit}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Edit Metadata" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                        Command="{Binding RefreshFromTmdbCommand}"
+                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Refresh TMDb" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding AddToCartCommand}"
+                                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{StaticResource Icon.Cart}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Add to USB Cart" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ActionBarButton}" Margin="0"
-                                Command="{Binding OpenTrailerCommand}"
-                                Visibility="{Binding HasTrailer, Converter={StaticResource BoolToVis}}"
-                                ToolTip="Open the trailer link in the browser">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{StaticResource Icon.Play}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                <TextBlock Text="Watch Trailer" FontSize="13"/>
+                        </Grid>
+
+                        <!-- Poster + Title + Badges + Overview -->
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Portrait Poster -->
+                            <Grid Width="188" Height="282" Margin="0,0,28,0" VerticalAlignment="Top"
+                                  Effect="{StaticResource ShadowElevated}">
+                                <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="8">
+                                    <TextBlock Text="{StaticResource Icon.Film}" Style="{StaticResource GlyphHero}" FontSize="36"
+                                               Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <Border CornerRadius="8" ClipToBounds="True"
+                                        BorderBrush="#CCFFFFFF" BorderThickness="2">
+                                    <Image Source="{Binding PosterPath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
+                                           Stretch="UniformToFill"/>
+                                </Border>
+                            </Grid>
+
+                            <!-- Right Column: Title, Badges, Synopsis, Actions -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource HeroTitle}"
+                                           Foreground="#FFFFFF"
+                                           TextWrapping="Wrap" MaxHeight="86" ClipToBounds="True"
+                                           MaxWidth="880" HorizontalAlignment="Left"
+                                           ToolTip="{Binding Title}"
+                                           AutomationProperties.Name="{Binding Title}"/>
+
+                                <WrapPanel Orientation="Horizontal" Margin="0,10,0,0" VerticalAlignment="Center">
+                                    <!-- Media / Collection Badge -->
+                                    <Border Background="{StaticResource PrimaryBrush}" CornerRadius="5" Padding="9,3.5" Margin="0,0,8,6">
+                                        <TextBlock Text="{Binding TypeDisplay}" FontSize="11.5" FontWeight="Bold" Foreground="#FFFFFF"/>
+                                    </Border>
+
+                                    <!-- Rating Badge -->
+                                    <Border Background="#CC1E293B" BorderBrush="#66FFFFFF" BorderThickness="1"
+                                            CornerRadius="5" Padding="9,3.5" Margin="0,0,8,6"
+                                            Visibility="{Binding HasRating, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding RatingDisplay, StringFormat=★ {0}}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="#FBBF24"/>
+                                    </Border>
+
+                                    <!-- Year Badge -->
+                                    <Border Background="#CC1E293B" BorderBrush="#44FFFFFF" BorderThickness="1"
+                                            CornerRadius="5" Padding="9,3.5" Margin="0,0,8,6"
+                                            Visibility="{Binding YearDisplay, Converter={StaticResource NullToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource Icon.Calendar}" Style="{StaticResource GlyphSmall}"
+                                                       FontSize="11" Foreground="#CBD5E1" Margin="0,0,5,0"/>
+                                            <TextBlock Text="{Binding YearDisplay}" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="#FFFFFF"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Genres Chips -->
+                                    <ItemsControl ItemsSource="{Binding Genres}"
+                                                  Visibility="{Binding HasGenres, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#B31E293B" BorderBrush="#44FFFFFF" BorderThickness="1"
+                                                        CornerRadius="5" Padding="9,3.5" Margin="0,0,8,6">
+                                                    <TextBlock Text="{Binding}" FontSize="11.5" FontWeight="SemiBold"
+                                                               Foreground="#E2E8F0"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- Tags Chips -->
+                                    <ItemsControl ItemsSource="{Binding Tags}"
+                                                  Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#CC1D4ED8" CornerRadius="5" Padding="9,3.5" Margin="0,0,8,6">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="#" FontSize="11" FontWeight="Bold"
+                                                                   Foreground="#BFDBFE" Margin="0,0,2,0"/>
+                                                        <TextBlock Text="{Binding}" FontSize="11.5" FontWeight="SemiBold"
+                                                                   Foreground="#FFFFFF"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </WrapPanel>
+
+                                <!-- Synopsis -->
+                                <TextBlock Text="{Binding Synopsis}"
+                                           FontSize="15.5"
+                                           LineHeight="24"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="820"
+                                           HorizontalAlignment="Left"
+                                           Margin="0,12,0,0"
+                                           Foreground="#F1F5F9"/>
+
+                                <!-- Hero Actions -->
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                            Command="{Binding OpenInExplorerCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Open in Explorer" FontSize="12.5"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                            Command="{Binding OpenTrailerCommand}"
+                                            Visibility="{Binding HasTrailer, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{StaticResource Icon.Play}" Style="{StaticResource GlyphSmall}" FontSize="12" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Watch Trailer" FontSize="12.5"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Text="{Binding StatusText}" Foreground="#E2E8F0" FontSize="12.5"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
                             </StackPanel>
-                        </Button>
-                        <TextBlock Text="{Binding MetaText}" Style="{StaticResource SubText}" FontSize="12"
-                                   VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap" MaxWidth="360"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
-            </Grid>
-        </Grid>
+            </Border>
 
-        <!-- ============ the ONLY scrolling region ============ -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="{StaticResource PageMargin}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- ============ metadata editor (replaces the sections) ============ -->
-                <Border Grid.Row="0" Style="{StaticResource CardBorder}"
+            <!-- ================= Below-Hero Content (Edit Metadata OR Movie Details -> Cast -> Local Files) ================= -->
+            <Grid Margin="30,22,30,32">
+                <!-- ================= 1. Metadata Editor ================= -->
+                <Border Style="{StaticResource CardBorder}" Padding="24"
                         Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
-                        <TextBlock Text="Edit metadata" Style="{StaticResource SubPageTitle}"/>
-                        <TextBlock Text="Saved edits are remembered: a later TMDb refresh will not overwrite them."
-                                   Style="{StaticResource SubText}" Margin="0,6,0,0"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Edit Movie Metadata" Style="{StaticResource PageTitle}" FontSize="20"/>
+                                <TextBlock Text="Manual edits, custom poster artwork, collection assignment, and tags are preserved during future TMDb refreshes."
+                                           Style="{StaticResource SubText}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Command="{Binding SaveCommand}" Content="Save Changes" Margin="0,0,10,0"/>
+                                <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Command="{Binding CancelEditCommand}"/>
+                            </StackPanel>
+                        </Grid>
 
-                        <Grid Margin="0,16,0,0">
+                        <!-- Poster Update Section -->
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,16,0,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Movie Poster Artwork" FontWeight="SemiBold" FontSize="13.5"/>
+                                    <TextBlock Text="{Binding EditPosterDisplay}" Style="{StaticResource SubText}" Margin="0,3,12,0"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding BrowsePosterCommand}"
+                                            Content="Choose Poster Image…"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Command="{Binding ClearSelectedPosterCommand}" Content="Reset"
+                                            Visibility="{Binding HasEditPosterSelection, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="16"/>
@@ -233,306 +283,236 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Grid.Column="0">
-                                <TextBlock Text="Title" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Movie Title" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding EditTitle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="2">
-                                <TextBlock Text="Original title" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditOriginalTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Original Title" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding EditOriginalTitle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="0">
-                                <TextBlock Text="Release year" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditYear, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Release Year" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding EditYear, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2">
-                                <TextBlock Text="Original language" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditLanguage, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Original Language" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding EditLanguage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="0">
-                                <TextBlock Text="TMDb id" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditTmdbId, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Movie Collection (e.g. Harry Potter)" Style="{StaticResource FieldLabel}"/>
+                                <TextBox Text="{Binding EditCollectionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="2">
-                                <TextBlock Text="IMDb id" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditImdbId, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="TMDb ID / IMDb ID" Style="{StaticResource FieldLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding EditTmdbId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="TMDb ID"/>
+                                    <TextBox Grid.Column="2" Text="{Binding EditImdbId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="IMDb ID (e.g. tt1234567)"/>
+                                </Grid>
                             </StackPanel>
                             <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3">
                                 <TextBlock Text="Synopsis" Style="{StaticResource FieldLabel}"/>
-                                <TextBox Text="{Binding EditSynopsis, UpdateSourceTrigger=PropertyChanged}"
-                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90"
+                                <TextBox Text="{Binding EditSynopsis, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96"
+                                         FontSize="14" Padding="10,8"
                                          VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3">
+                                <TextBlock Text="Trailer (Name &amp; YouTube URL)" Style="{StaticResource FieldLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="2*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding EditTrailerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox Grid.Column="2" Text="{Binding EditTrailerUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
                             </StackPanel>
                         </Grid>
 
-                        <TextBlock Text="Trailer link (opens in the browser)" Style="{StaticResource FieldLabel}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding EditTrailerName, UpdateSourceTrigger=PropertyChanged}"/>
-                            <TextBox Grid.Column="2" Text="{Binding EditTrailerUrl, UpdateSourceTrigger=PropertyChanged}"/>
-                        </Grid>
-
-                        <!-- Cast and crew -->
-                        <TextBlock Text="Cast &amp; crew" Style="{StaticResource FieldLabel}"/>
-                        <!-- No inner ScrollViewer: the page has exactly one
-                             scrolling region, so the wheel never fights itself. -->
-                        <ItemsControl ItemsSource="{Binding EditCast}">
+                        <!-- Tags Editor -->
+                        <TextBlock Text="Tags" Style="{StaticResource FieldLabel}"/>
+                        <ItemsControl ItemsSource="{Binding EditTags}" Margin="0,2,0,8">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="0,3">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="2*"/>
-                                            <ColumnDefinition Width="2*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                                        <TextBox Grid.Column="1" Text="{Binding Character, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                                        <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="34" Height="34"
-                                                ToolTip="Remove this row"
-                                                Command="{Binding DataContext.RemoveCastRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                CommandParameter="{Binding}">
-                                            <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphXs}"
-                                                       Foreground="{StaticResource DangerBrush}"/>
-                                        </Button>
-                                    </Grid>
+                                    <Border Style="{StaticResource TagChip}" Padding="10,4" Margin="0,0,8,8">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource PrimaryDarkBrush}" VerticalAlignment="Center"/>
+                                            <Button Style="{StaticResource IconButton}" Width="20" Height="20" Margin="6,0,0,0"
+                                                    ToolTip="Remove tag"
+                                                    Command="{Binding DataContext.RemoveTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphSmall}" FontSize="9.5"
+                                                           Foreground="{StaticResource DangerBrush}"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Grid Margin="0,8,0,0">
+                        <Grid Width="420" HorizontalAlignment="Left">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*"/>
-                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding NewCastName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding NewCastCharacter, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                            <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Command="{Binding AddCastRowCommand}">
+                            <TextBox Text="{Binding NewTagName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"
+                                     AutomationProperties.Name="New tag name"/>
+                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Command="{Binding AddTagCommand}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                                    <TextBlock Text="Add"/>
+                                    <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphSmall}" FontSize="11" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Add Tag"/>
                                 </StackPanel>
                             </Button>
                         </Grid>
 
-                        <!-- Series episodes -->
-                        <StackPanel Visibility="{Binding IsSeries, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="Episodes" Style="{StaticResource FieldLabel}"/>
-                            <ItemsControl ItemsSource="{Binding EditEpisodes}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,3">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox Text="{Binding SeasonNumber}" Margin="0,0,8,0"/>
-                                            <TextBox Grid.Column="1" Text="{Binding EpisodeNumber}" Margin="0,0,8,0"/>
-                                            <TextBox Grid.Column="2" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                                            <Button Grid.Column="3" Style="{StaticResource IconButton}" Width="34" Height="34"
-                                                    ToolTip="Remove this row"
-                                                    Command="{Binding DataContext.RemoveEpisodeRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                    CommandParameter="{Binding}">
-                                                <TextBlock Text="{StaticResource Icon.Clear}" Style="{StaticResource GlyphXs}"
-                                                           Foreground="{StaticResource DangerBrush}"/>
-                                            </Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="80"/>
-                                    <ColumnDefinition Width="80"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Text="{Binding NewEpisodeSeason}" Margin="0,0,8,0"/>
-                                <TextBox Grid.Column="1" Text="{Binding NewEpisodeNumber}" Margin="0,0,8,0"/>
-                                <TextBox Grid.Column="2" Text="{Binding NewEpisodeTitle, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                                <Button Grid.Column="3" Style="{StaticResource SecondaryButton}" Command="{Binding AddEpisodeRowCommand}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{StaticResource Icon.Add}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                                        <TextBlock Text="Add"/>
-                                    </StackPanel>
-                                </Button>
-                            </Grid>
-                            <TextBlock Text="Episodes that already have files registered are kept even if removed from this list."
-                                       Style="{StaticResource CaptionText}" Margin="0,8,0,0"/>
-                        </StackPanel>
-
                         <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
-                            <Button Command="{Binding SaveCommand}" Margin="0,0,10,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                    <TextBlock Text="Save"/>
-                                </StackPanel>
-                            </Button>
+                            <Button Command="{Binding SaveCommand}" Content="Save Changes" Margin="0,0,10,0"/>
                             <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Command="{Binding CancelEditCommand}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <!-- ================= read-only: cast + seasons + files ================= -->
-                <StackPanel Grid.Row="0" Margin="0,0,0,0"
-                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
-                    <!-- Cast & crew: the same card + header treatment as every
-                         other section on this screen. -->
-                    <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12"
-                            Visibility="{Binding HasCast, Converter={StaticResource BoolToVis}}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{StaticResource Icon.People}" Style="{StaticResource GlyphIcon}"
-                                           Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Cast &amp; Crew" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <ItemsControl ItemsSource="{Binding Cast}" Margin="0,14,0,0">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Width="138" Margin="0,0,14,16"
-                                                Background="{StaticResource CardBrush}"
-                                                BorderBrush="{StaticResource BorderLowBrush}"
-                                                BorderThickness="1" CornerRadius="{StaticResource Radius.Card}" Padding="12">
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.10" Color="#1B1726"/>
-                                            </Border.Effect>
-                                            <StackPanel>
-                                                <Grid Width="112" Height="112" HorizontalAlignment="Center">
-                                                    <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="{StaticResource Radius.Art}">
-                                                        <TextBlock Text="{StaticResource Icon.Person}" Style="{StaticResource GlyphLarge}"
-                                                                   Foreground="{StaticResource PlaceholderGlyphBrush}" HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <Border CornerRadius="{StaticResource Radius.Art}" ClipToBounds="True" Width="112" Height="112"
-                                                            BorderBrush="{StaticResource BorderLowBrush}" BorderThickness="1">
-                                                        <Image Source="{Binding ProfilePath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
-                                                               Stretch="UniformToFill"/>
-                                                    </Border>
+                <!-- ================= 2. Read-Only Sections: Highlighted Movie Details -> Horizontal Cast -> Local Files ================= -->
+                <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisInverted}}">
+
+                    <!-- Highlighted Vertical Movie Details Card (Primary Focus) -->
+                    <Border Style="{StaticResource CardBorder}" Padding="0"
+                            BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="1.2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" CornerRadius="7,0,0,7"/>
+                            <StackPanel Grid.Column="1" Margin="20,18,20,18">
+                                <TextBlock Text="Movie Details" Style="{StaticResource SectionTitle}" FontSize="17"
+                                           Foreground="{StaticResource PrimaryDarkBrush}"/>
+                                <ItemsControl ItemsSource="{Binding DetailFields}" Margin="0,12,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="180"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                               Style="{StaticResource SubText}" FontSize="13" FontWeight="SemiBold"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Value}"
+                                                               Foreground="{StaticResource TextBrush}" FontSize="13.5" FontWeight="Medium"
+                                                               TextWrapping="Wrap"/>
                                                 </Grid>
-                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                                                           Margin="2,9,2,0" TextTrimming="CharacterEllipsis" TextAlignment="Center"
-                                                           ToolTip="{Binding Name}"/>
-                                                <TextBlock Text="{Binding RoleDisplay}" Style="{StaticResource CaptionText}"
-                                                           TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="2,2,2,2"
-                                                           ToolTip="{Binding RoleDisplay}"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Cast Section: Single Horizontal Scrollable Row Below Movie Details -->
+                    <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Cast" Style="{StaticResource SectionTitle}"/>
+                            <ScrollViewer Margin="0,12,0,0"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          Focusable="False"
+                                          Visibility="{Binding HasCast, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl ItemsSource="{Binding Cast}" Padding="0,0,0,6">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="132" Margin="0,0,12,0"
+                                                    Background="{StaticResource PanelBrush}"
+                                                    BorderBrush="{StaticResource BorderLowBrush}"
+                                                    BorderThickness="1" CornerRadius="8" Padding="10">
+                                                <StackPanel>
+                                                    <Grid Width="104" Height="104" HorizontalAlignment="Center">
+                                                        <Border Style="{StaticResource PosterPlaceholder}" CornerRadius="6">
+                                                            <TextBlock Text="{StaticResource Icon.Person}" Style="{StaticResource GlyphLarge}" FontSize="24"
+                                                                       Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <Border CornerRadius="6" ClipToBounds="True" Width="104" Height="104"
+                                                                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                                                            <Image Source="{Binding ProfilePath, Converter={StaticResource PosterToImage}, Mode=OneWay}"
+                                                                   Stretch="UniformToFill"/>
+                                                        </Border>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold"
+                                                               Margin="2,8,2,0" TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                                                               ToolTip="{Binding Name}"/>
+                                                    <TextBlock Text="{Binding RoleDisplay}" Style="{StaticResource CaptionText}"
+                                                               TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="2,2,2,0"
+                                                               ToolTip="{Binding RoleDisplay}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock Text="No cast information is stored for this movie yet. Click 'Refresh TMDb' to fetch cast credits."
+                                       Style="{StaticResource SubText}" Margin="0,8,0,0"
+                                       Visibility="{Binding HasCast, Converter={StaticResource BoolToVisInverted}}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- Seasons & episodes (series only) -->
-                    <ItemsControl ItemsSource="{Binding Seasons}"
-                                  Visibility="{Binding HasSeasons, Converter={StaticResource BoolToVis}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,12">
-                                    <StackPanel>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{StaticResource Icon.Tv}" Style="{StaticResource GlyphIcon}"
-                                                           Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding SeasonHeaderText}" Style="{StaticResource SectionTitle}"
-                                                           Margin="9,0,0,0" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{Binding AvailabilityText}"
-                                                       Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
-                                        </Grid>
-                                        <ItemsControl ItemsSource="{Binding Episodes}" Margin="0,10,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <!-- Available episodes get a green-tinted row and a solid
-                                                         marker; missing ones stay neutral, so a season can be
-                                                         scanned at a glance for what is actually on disk. -->
-                                                    <Border x:Name="RowChrome" Background="Transparent"
-                                                            BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
-                                                            CornerRadius="{StaticResource Radius.Sm}" Padding="10,7" Margin="0,0,0,6">
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="52"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <Border Background="{StaticResource AccentGradientSoft}" CornerRadius="{StaticResource Radius.Xs}"
-                                                                    Padding="7,3" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding EpisodeLabel, Mode=OneWay}" FontSize="11"
-                                                                           FontWeight="SemiBold" Foreground="White"/>
-                                                            </Border>
-                                                            <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis"
-                                                                       VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold"
-                                                                       ToolTip="{Binding Title}"/>
-                                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                                                                <Border x:Name="AvailabilityMark" Width="8" Height="8" VerticalAlignment="Center"
-                                                                        CornerRadius="{StaticResource Radius.Xs}" Background="{StaticResource FaintTextBrush}"/>
-                                                                <TextBlock x:Name="FileSummaryText" Text="{Binding FileSummary}"
-                                                                           Style="{StaticResource CaptionText}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </Grid>
-                                                    </Border>
-                                                    <DataTemplate.Triggers>
-                                                        <DataTrigger Binding="{Binding HasFile}" Value="True">
-                                                            <Setter TargetName="RowChrome" Property="Background" Value="{StaticResource OkSoftBrush}"/>
-                                                            <Setter TargetName="RowChrome" Property="BorderBrush" Value="#4D15803D"/>
-                                                            <Setter TargetName="AvailabilityMark" Property="Background" Value="{StaticResource OkBrush}"/>
-                                                            <Setter TargetName="FileSummaryText" Property="Foreground" Value="{StaticResource OkBrush}"/>
-                                                        </DataTrigger>
-                                                    </DataTemplate.Triggers>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <!-- Files (movies) -->
-                    <Border Style="{StaticResource CardBorder}"
-                            Visibility="{Binding HasSeasons, Converter={StaticResource BoolToVisInverted}}">
+                    <!-- Local Files Card -->
+                    <Border Style="{StaticResource CardBorder}" Padding="18" Margin="0,16,0,0">
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{StaticResource Icon.Copy}" Style="{StaticResource GlyphIcon}"
-                                           Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Local Files" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
-                            </StackPanel>
+                            <TextBlock Text="Local Files" Style="{StaticResource SectionTitle}"/>
                             <ItemsControl ItemsSource="{Binding Files}" Margin="0,10,0,0"
                                           Visibility="{Binding HasFiles, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="0,5">
-                                            <Ellipse Style="{StaticResource AvailabilityDot}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding FileName}" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"
-                                                       MaxWidth="520" ToolTip="{Binding FilePath}"/>
-                                            <TextBlock Text="{Binding SizeText}" Style="{StaticResource SubText}" Margin="12,0,0,0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                                            <Ellipse>
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse" BasedOn="{StaticResource AvailabilityDot}">
+                                                        <Setter Property="Fill" Value="{StaticResource DangerBrush}"/>
+                                                        <Setter Property="ToolTip" Value="Missing on disk"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Exists}" Value="True">
+                                                                <Setter Property="Fill" Value="{StaticResource OkBrush}"/>
+                                                                <Setter Property="ToolTip" Value="Available on disk"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+                                            <TextBlock Text="{Binding FilePath}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="780" ToolTip="{Binding FilePath}"/>
+                                            <TextBlock Text="{Binding SizeText, StringFormat= ({0})}" Style="{StaticResource SubText}" Margin="6,0,0,0"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Text="No media file is registered for this title yet." Style="{StaticResource SubText}" Margin="0,8,0,0"
+                            <TextBlock Text="No media file is registered for this movie yet." Style="{StaticResource SubText}" Margin="0,8,0,0"
                                        Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisInverted}}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
             </Grid>
-        </ScrollViewer>
-    </Grid>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

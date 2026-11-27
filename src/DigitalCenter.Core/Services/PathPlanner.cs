@@ -4,10 +4,8 @@ using DigitalCenter.Core.Models;
 namespace DigitalCenter.Core.Services;
 
 /// <summary>
-/// Plans file system paths for the import workflow and the USB copy queue.
-/// Library layout: Movies/{Category}/{Title (Year)}/ and
-/// Series/{Category}/{Title (Year)}/Season NN/. USB destinations mirror the
-/// library-relative path below the chosen drive root.
+/// Plans file system paths for the language-based Watch Folder auto-organization
+/// workflow and the USB copy queue.
 /// </summary>
 public static partial class PathPlanner
 {
@@ -17,7 +15,7 @@ public static partial class PathPlanner
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
 
-    /// <summary>Turns an arbitrary title into a safe folder name.</summary>
+    /// <summary>Turns an arbitrary title or language into a safe folder name.</summary>
     public static string SanitizeName(string? name, int maxLength = 90)
     {
         var cleaned = InvalidCharacters().Replace(name ?? string.Empty, " ");
@@ -48,42 +46,55 @@ public static partial class PathPlanner
         year.HasValue ? $"{SanitizeName(title)} ({year.Value})" : SanitizeName(title);
 
     /// <summary>
-    /// Full target path for an approved import. The file name is kept from the
-    /// source; if the folder already contains a file with that name a numeric
-    /// suffix is appended so nothing is ever overwritten silently.
+    /// Resolves the language subfolder path inside the given library root
+    /// (e.g. &lt;LibraryRoot&gt;/English). Avoids double-nesting if the base
+    /// path already points at that language subfolder.
     /// </summary>
-    public static string PlanImportTargetPath(
-        string libraryRoot,
-        MediaKind kind,
-        string categoryName,
-        string title,
-        int? year,
-        int? season,
-        string sourceFileName)
+    public static string PlanLanguageFolderPath(string libraryRoot, string? language)
     {
-        var domain = kind == MediaKind.Series ? "Series" : "Movies";
-        var category = SanitizeName(categoryName, 60);
-        var titleFolder = GetTitleFolderName(title, year);
+        var fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(libraryRoot));
+        var safeLanguage = SanitizeName(
+            string.IsNullOrWhiteSpace(language) ? LanguageResolver.DefaultLanguageFolder : language,
+            60);
 
-        var directory = kind == MediaKind.Series && season.HasValue
-            ? Path.Combine(libraryRoot, domain, category, titleFolder, $"Season {season.Value:00}")
-            : Path.Combine(libraryRoot, domain, category, titleFolder);
+        var trailingName = Path.GetFileName(fullRoot);
+        if (string.Equals(trailingName, safeLanguage, StringComparison.OrdinalIgnoreCase))
+        {
+            return fullRoot;
+        }
 
-        var fileName = SanitizeFileName(sourceFileName);
-        return Path.Combine(directory, fileName);
+        return Path.Combine(fullRoot, safeLanguage);
     }
 
     /// <summary>
-    /// Target path for the 5.0 workflow: the operator chooses the destination
-    /// folder, so only the directory plus a clean file name are planned.
-    /// There is no imposed category/year/genre hierarchy anywhere in this path.
+    /// Resolves the movie collection subfolder path (e.g. &lt;CollectionsRoot&gt;/Harry Potter
+    /// or &lt;MoviesRoot&gt;/Collections/Harry Potter). Avoids double-nesting if the base path
+    /// already points at the Collections folder or the specific collection folder.
     /// </summary>
-    public static string PlanImportTargetPath(
-        string destinationFolder,
-        string cleanFileName)
+    public static string PlanCollectionFolderPath(string baseRoot, string collectionName)
     {
-        return Path.Combine(destinationFolder, SanitizeFileName(cleanFileName));
+        var fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(baseRoot));
+        var safeCollection = SanitizeName(collectionName, 70);
+
+        var trailingName = Path.GetFileName(fullRoot);
+        if (string.Equals(trailingName, safeCollection, StringComparison.OrdinalIgnoreCase))
+        {
+            return fullRoot;
+        }
+
+        if (string.Equals(trailingName, CollectionResolver.DefaultCollectionsFolder, StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(fullRoot, safeCollection);
+        }
+
+        return Path.Combine(fullRoot, CollectionResolver.DefaultCollectionsFolder, safeCollection);
     }
+
+    /// <summary>
+    /// Plans the full destination file path inside the target folder.
+    /// </summary>
+    public static string PlanImportTargetPath(string destinationFolder, string cleanFileName) =>
+        Path.Combine(destinationFolder, SanitizeFileName(cleanFileName));
 
     /// <summary>
     /// Builds the clean import file name from the configured templates:
@@ -109,6 +120,8 @@ public static partial class PathPlanner
             .Replace("{Season}", season?.ToString() ?? string.Empty)
             .Replace("{Episode}", episode?.ToString() ?? string.Empty);
 
+        // Clean up empty parentheses "()" if year was missing.
+        stem = stem.Replace("()", string.Empty);
         stem = Whitespace().Replace(stem, " ").Trim(' ', '-', '_');
         if (stem.Length == 0)
         {

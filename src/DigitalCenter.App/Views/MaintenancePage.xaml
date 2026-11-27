@@ -4,137 +4,132 @@
              xmlns:conv="clr-namespace:DigitalCenter.App.Converters">
 
     <UserControl.Resources>
-        <conv:BoolToVisibilityConverter x:Key="BusyToVisibility"/>
-        <conv:BoolToVisibilityConverter x:Key="InverseVisibility" Invert="True"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
 
-    <Grid Margin="2,0,2,10">
+    <Grid Margin="26,20,26,20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="2,0,0,12">
-            <TextBlock Text="Tools &amp; data" Style="{StaticResource EyebrowText}"/>
-            <TextBlock Text="Application" Style="{StaticResource SubPageTitle}" Margin="0,4,0,0"/>
+        <!-- ============ Page Header ============ -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Maintenance &amp; Diagnostics" Style="{StaticResource PageTitle}"/>
+            <TextBlock Text="Audit and repair Movies &amp; Drama catalogs, resolve Watch Folder issues, run SQLite health &amp; optimization tools, and manage Lookup workflows, IDM defaults, and backups."
+                       Style="{StaticResource SubText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
-        <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
+        <!-- ============ Global Activity Bar ============ -->
+        <StackPanel Grid.Row="1" Margin="0,12,0,10">
+            <ProgressBar IsIndeterminate="True" Height="4"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding ProgressText}" Style="{StaticResource StatusBarText}" Margin="0,5,0,0"
+                       Visibility="{Binding HasProgressText, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
 
-            <!-- ================= Scan & Reports ================= -->
-            <TabItem Header="Scan &amp; reports">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+        <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0"
+                    SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+
+            <!-- ================= Tab 0: Library & Diagnostics ================= -->
+            <TabItem Header="Library &amp; Diagnostics">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
                     <StackPanel>
+
+                        <!-- ============ Card 1: Movies Management ============ -->
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                             <StackPanel>
-                                <Grid>
+                                <Grid Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphIcon}"
-                                                       Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Scan library folders" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
-                                        </StackPanel>
-                                        <TextBlock Text="Registers every media file found under the configured library root. Scanning never moves, renames or deletes files; it only reads the filesystem and updates the catalog."
-                                                   Style="{StaticResource SubText}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,6,12,0"/>
+                                        <TextBlock Text="Movies Management" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Index new or moved movie files, audit missing files on disk, and maintain the full-text search index."
+                                                   Style="{StaticResource SubText}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
-                                    <Button Grid.Column="1"
-                                            VerticalAlignment="Top"
-                                            Command="{Binding ScanCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Scan}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                            <TextBlock Text="Scan now"/>
-                                        </StackPanel>
-                                    </Button>
+                                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                            Command="{Binding ClearMovieDiagnosticsCommand}" Content="Clear Output"
+                                            Visibility="{Binding HasAnyMovieOutput, Converter={StaticResource BoolToVis}}"/>
                                 </Grid>
 
-                                <ProgressBar IsIndeterminate="True"
-                                             Height="5"
-                                             Margin="0,14,0,0"
-                                             Visibility="{Binding IsBusy, Converter={StaticResource BusyToVisibility}}"/>
-                                <TextBlock Text="{Binding ProgressText}"
-                                           Style="{StaticResource CaptionText}"
-                                           Margin="0,9,0,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           Visibility="{Binding IsBusy, Converter={StaticResource BusyToVisibility}}"/>
-                                <Border Background="{StaticResource PanelBrush}" CornerRadius="{StaticResource Radius.Tile}" Padding="12,9" Margin="0,10,0,0"
-                                        Visibility="{Binding HasScanSummary, Converter={StaticResource BusyToVisibility}}">
-                                    <TextBox Text="{Binding ScanSummary, Mode=OneWay}"
-                                             IsReadOnly="True"
-                                             TextWrapping="Wrap"
-                                             AcceptsReturn="True"
-                                             MaxHeight="200"
-                                             VerticalScrollBarVisibility="Auto"
-                                             BorderThickness="0"
-                                             Background="Transparent"
-                                             FontFamily="Consolas"
-                                             FontSize="12"/>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Reports -->
-                        <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphIcon}"
-                                                       Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Reports" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Scan Movies &amp; Collections Folders" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Registers new files under your configured Movies and Collections roots and automatically updates paths for moved files."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                         </StackPanel>
-                                        <TextBlock Text="Missing files and duplicate candidates are reported for the operator to decide — nothing is deleted automatically."
-                                                   Style="{StaticResource SubText}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,6,12,0"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                                        <Button Command="{Binding FindMissingFilesCommand}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{StaticResource Icon.Error}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                                                <TextBlock Text="Missing files"/>
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Content="Duplicates"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Margin="8,0,0,0"
-                                                Command="{Binding FindDuplicatesCommand}"/>
-                                        <Button Content="Rebuild search index"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Margin="8,0,0,0"
-                                                Command="{Binding RebuildSearchIndexCommand}"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <Border Background="{StaticResource PanelBrush}" CornerRadius="{StaticResource Radius.Tile}" Padding="12,9" Margin="0,12,0,0"
-                                        Visibility="{Binding HasReportSummary, Converter={StaticResource BusyToVisibility}}">
-                                    <TextBox Text="{Binding ReportSummary, Mode=OneWay}"
-                                             IsReadOnly="True"
-                                             TextWrapping="Wrap"
-                                             AcceptsReturn="True"
-                                             MaxHeight="90"
-                                             BorderThickness="0"
-                                             Background="Transparent"
-                                             FontFamily="Consolas"
-                                             FontSize="12"/>
+                                        <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="170"
+                                                Command="{Binding ScanCommand}" Content="Scan Movies Library"/>
+                                    </Grid>
                                 </Border>
 
-                                <ListBox ItemsSource="{Binding MissingFiles}"
-                                         MinHeight="60"
-                                         MaxHeight="200"
-                                         Margin="0,10,0,0"
-                                         BorderBrush="{StaticResource DividerBrush}"
-                                         BorderThickness="1"
-                                         Visibility="{Binding HasMissingFiles, Converter={StaticResource BusyToVisibility}}">
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Audit &amp; Prune Missing Movie Files" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Checks whether every cataloged movie exists on disk. If files were permanently deleted, prune them safely from the database."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource SecondaryButton}" MinWidth="170"
+                                                    Command="{Binding FindMissingFilesCommand}" Content="Check Missing Movies"/>
+                                            <Button Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                                                    Command="{Binding RemoveMissingMovieFilesCommand}" Content="Prune Missing"
+                                                    Visibility="{Binding HasMissingFiles, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Rebuild Movie Search Index (FTS5)" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Drops, recreates, and repopulates the SQLite full-text search index for movie titles and cast."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" MinWidth="170"
+                                                Command="{Binding RebuildSearchIndexCommand}" Content="Rebuild Search Index"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,10,0,0"
+                                        Visibility="{Binding HasScanSummary, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding ScanSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,8,0,0"
+                                        Visibility="{Binding HasReportSummary, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding ReportSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="110" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <ListBox ItemsSource="{Binding MissingFiles}" MinHeight="50" MaxHeight="190" Margin="0,8,0,0"
+                                         BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                         Visibility="{Binding HasMissingFiles, Converter={StaticResource BoolToVis}}">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Margin="2">
@@ -144,23 +139,107 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                            </StackPanel>
+                        </Border>
 
-                                <ListBox ItemsSource="{Binding Duplicates}"
-                                         MinHeight="60"
-                                         MaxHeight="200"
-                                         Margin="0,10,0,0"
-                                         BorderBrush="{StaticResource DividerBrush}"
-                                         BorderThickness="1"
-                                         Visibility="{Binding HasDuplicates, Converter={StaticResource BusyToVisibility}}">
+                        <!-- ============ Card 2: Drama Management ============ -->
+                        <Border Style="{StaticResource CardBorder}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Drama Management" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Discover new drama episodes, re-analyze episode numbering &amp; TMDb metadata, and clean up deleted episodes."
+                                                   Style="{StaticResource SubText}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                            Command="{Binding ClearDramaDiagnosticsCommand}" Content="Clear Output"
+                                            Visibility="{Binding HasAnyDramaOutput, Converter={StaticResource BoolToVis}}"/>
+                                </Grid>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Scan Drama Root Folder" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Indexes new drama subfolders and episodes in your Drama Root, relocates moved episodes, and matches new dramas on TMDb."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="170"
+                                                Command="{Binding ScanDramaLibraryCommand}" Content="Scan Drama Library"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Re-analyze Episodes &amp; Sync TMDb" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Re-parses episode numbers from filenames, relocates moved files, and refreshes TMDb metadata while preserving locked titles and statuses."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" MinWidth="170"
+                                                Command="{Binding ReanalyzeDramasCommand}" Content="Re-analyze Dramas"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Audit &amp; Prune Missing Episodes" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Lists cataloged episodes whose files no longer exist on disk, with a safe option to remove deleted entries from the database."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource SecondaryButton}" MinWidth="170"
+                                                    Command="{Binding FindMissingDramaEpisodesCommand}" Content="Check Missing Episodes"/>
+                                            <Button Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                                                    Command="{Binding CleanMissingDramaEpisodesCommand}" Content="Prune Missing"
+                                                    Visibility="{Binding HasMissingDramaEpisodes, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,10,0,0"
+                                        Visibility="{Binding HasDramaScanSummary, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding DramaScanSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="150" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,8,0,0"
+                                        Visibility="{Binding HasDramaReportSummary, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding DramaReportSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="130" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
+
+                                <ListBox ItemsSource="{Binding MissingDramaEpisodes}" MinHeight="50" MaxHeight="190" Margin="0,8,0,0"
+                                         BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                         Visibility="{Binding HasMissingDramaEpisodes, Converter={StaticResource BoolToVis}}">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Margin="2">
-                                                <TextBlock FontWeight="SemiBold">
-                                                    <Run Text="{Binding TitleDisplay}"/>
-                                                    <Run Text=" — " Foreground="{StaticResource SubTextBrush}"/>
-                                                    <Run Text="{Binding Reason}" Foreground="{StaticResource WarnBrush}"/>
-                                                </TextBlock>
-                                                <TextBlock Text="{Binding Paths}" Style="{StaticResource SubText}" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding TitleDisplay}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding FilePath}" Style="{StaticResource SubText}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
@@ -171,111 +250,519 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ================= CSV ================= -->
-            <TabItem Header="CSV import / export">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+            <!-- ================= Tab 1: Unified Watch Folder Issues (Keep at Index 1) ================= -->
+            <TabItem Header="{Binding WatchFolderIssuesTabHeader}">
+                <Border Style="{StaticResource CardBorder}" Margin="0,12,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                <TextBlock Text="Watch Folder Issues (Movies &amp; Dramas)" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="Failed, interrupted, and low-confidence files from both watch folders appear here. Files are left untouched on disk; once fixed and re-imported, their issue clears automatically."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Margin="0,0,8,0"
+                                        Command="{Binding RetryAllIssuesCommand}" Content="Retry All Issues"
+                                        Visibility="{Binding HasWatchFolderIssues, Converter={StaticResource BoolToVis}}"/>
+                                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                        Command="{Binding RefreshWatchFolderIssuesCommand}" Content="Refresh"/>
+                                <Button Style="{StaticResource DangerButton}"
+                                        Command="{Binding ClearWatchFolderIssuesCommand}" Content="Clear All Issues"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1" Text="{Binding WatchFolderIssuesStatusText}" Style="{StaticResource StatusBarText}"
+                                   Margin="0,8,0,0"
+                                   Visibility="{Binding HasWatchFolderIssuesStatus, Converter={StaticResource BoolToVis}}"/>
+
+                        <Grid Grid.Row="2" Margin="0,12,0,0">
+                            <TextBlock Text="No Watch Folder issues — all recent Movie and Drama imports succeeded cleanly."
+                                       Style="{StaticResource SubText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       TextAlignment="Center" Margin="20"
+                                       Visibility="{Binding HasNoWatchFolderIssues, Converter={StaticResource BoolToVis}}"/>
+
+                            <ListBox ItemsSource="{Binding WatchFolderIssues}"
+                                     BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                     Background="{StaticResource PanelBrush}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     Visibility="{Binding HasWatchFolderIssues, Converter={StaticResource BoolToVis}}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#FFFFFF" BorderBrush="{StaticResource DividerBrush}"
+                                                BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="4,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Style="{StaticResource StatusPill}" Background="{StaticResource PrimaryDimBrush}" Margin="0,0,6,0">
+                                                            <TextBlock Text="{Binding MediaType}" FontSize="10.5" FontWeight="Bold"
+                                                                       Foreground="{StaticResource PrimaryDarkBrush}"/>
+                                                        </Border>
+
+                                                        <Border Style="{StaticResource StatusPill}" Background="#FEE2E2" Margin="0,0,8,0"
+                                                                Visibility="{Binding IsFailed, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="Failed" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
+                                                        </Border>
+                                                        <Border Style="{StaticResource StatusPill}" Background="#FEF3C7" Margin="0,0,8,0"
+                                                                Visibility="{Binding IsInterrupted, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="Interrupted" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource WarnBrush}"/>
+                                                        </Border>
+                                                        <Border Style="{StaticResource StatusPill}" Background="#E0E7FF" Margin="0,0,8,0"
+                                                                Visibility="{Binding IsLowConfidence, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="Low Confidence" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource PrimaryDarkBrush}"/>
+                                                        </Border>
+
+                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding SourcePath}"/>
+                                                    </StackPanel>
+
+                                                    <TextBlock Text="{Binding Reason}" Style="{StaticResource SubText}" FontSize="12"
+                                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding SourcePath}">
+                                                        <Run Text="{Binding TimestampText, Mode=OneWay}"/>
+                                                        <Run Text=" · "/>
+                                                        <Run Text="{Binding SourcePath, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Style="{StaticResource SecondaryButton}" Padding="9,4" Margin="0,0,6,0" Content="Open Folder"
+                                                            Command="{Binding DataContext.OpenIssueFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                    <Button Padding="9,4" Margin="0,0,6,0" Content="Retry"
+                                                            Command="{Binding DataContext.RetryIssueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                    <Button Style="{StaticResource SecondaryButton}" Padding="8,4" Content="Dismiss"
+                                                            Command="{Binding DataContext.DismissIssueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <!-- ================= Tab 2: Database & System Health ================= -->
+            <TabItem Header="Database &amp; System">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
                     <StackPanel>
+
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.ExternalLink}" Style="{StaticResource GlyphIcon}"
-                                               Foreground="{StaticResource OkBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Export the catalog" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
-                                </StackPanel>
-                                <TextBlock Text="Writes every title, its metadata lists and file paths as RFC-4180 CSV (one row per file). Multi-value columns are separated by '; '."
-                                           Style="{StaticResource SubText}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,6,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <Button Command="{Binding ExportCsvCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                            <TextBlock Text="Export as CSV…"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Database Health Overview" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Live SQLite storage, catalog record counts, error queue size, and reclaimable space."
+                                                   Style="{StaticResource SubText}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                            Command="{Binding RefreshDatabaseHealthCommand}" Content="Refresh Stats"/>
+                                </Grid>
+
+                                <UniformGrid Rows="1" Columns="4">
+                                    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Database Size" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding DbSizeText}" Style="{StaticResource StatValue}" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding DbJournalDetailText}" Style="{StaticResource CaptionText}"
+                                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding DbJournalDetailText}"/>
                                         </StackPanel>
-                                    </Button>
-                                </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Catalog Titles" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding CatalogRecordsText}" Style="{StaticResource StatValue}"
+                                                       Foreground="{StaticResource PrimaryBrush}" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding CatalogRecordsDetailText}" Style="{StaticResource CaptionText}"
+                                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding CatalogRecordsDetailText}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Errors &amp; Issues" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding ErrorsAndLogsText}" Style="{StaticResource StatValue}"
+                                                       Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ErrorsAndLogsDetailText}" Style="{StaticResource CaptionText}"
+                                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding ErrorsAndLogsDetailText}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="12,10">
+                                        <StackPanel>
+                                            <TextBlock Text="Reclaimable Space" Style="{StaticResource CaptionText}"/>
+                                            <TextBlock Text="{Binding ReclaimableSpaceText}" Style="{StaticResource StatValue}"
+                                                       Foreground="{StaticResource OkBrush}" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ReclaimableSpaceDetailText}" Style="{StaticResource CaptionText}"
+                                                       Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding ReclaimableSpaceDetailText}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphIcon}"
-                                               Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Import a catalog" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
-                                </StackPanel>
-                                <TextBlock Text="Additive import: titles are created or merged (matched by type, title and year), metadata lists are extended, never replaced. Files are only registered — they are never moved or copied. Series files need Season/Episode columns to be linkable."
-                                           Style="{StaticResource SubText}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,6,0,0"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                    <Button Command="{Binding ImportCsvCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                            <TextBlock Text="Import CSV…"/>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="SQLite Maintenance &amp; Cleanup" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Run major database diagnostics, optimization, and log cleanup directly without opening an external SQLite query tool."
+                                                   Style="{StaticResource SubText}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" VerticalAlignment="Center"
+                                            Command="{Binding ClearDatabaseDiagnosticsCommand}" Content="Clear Output"
+                                            Visibility="{Binding HasDatabaseDiagnosticsSummary, Converter={StaticResource BoolToVis}}"/>
+                                </Grid>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Verify Database Integrity" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Runs SQLite PRAGMA integrity_check and foreign_key_check to detect database corruption or broken table references."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                         </StackPanel>
-                                    </Button>
-                                </StackPanel>
+                                        <Button Grid.Column="1" VerticalAlignment="Center" MinWidth="185"
+                                                Command="{Binding RunIntegrityCheckCommand}" Content="Run Integrity Check"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Optimize &amp; Compact Database" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Flushes the WAL journal (CHECKPOINT), reclaims unused pages (VACUUM), and updates SQLite query planner statistics (ANALYZE)."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" MinWidth="185"
+                                                Command="{Binding OptimizeDatabaseCommand}" Content="Optimize &amp; Compact DB"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Clean Orphaned Poster Cache" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Deletes cached poster, backdrop, and cast images that are no longer referenced by any Movie or Drama in the database."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" MinWidth="185"
+                                                Command="{Binding CleanOrphanedPostersCommand}" Content="Clean Poster Cache"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Clear Error Logs &amp; Diagnostic Reports" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Purges failed/unmatched import error rows, Watch Folder issue records, and archived application log files from disk."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" VerticalAlignment="Center" MinWidth="185"
+                                                Command="{Binding PurgeErrorLogsCommand}" Content="Clear Error Logs"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1" CornerRadius="6" Padding="14,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                                            <TextBlock Text="Application Diagnostic Logs" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="Open the DigitalCenter Logs folder in File Explorer to inspect detailed runtime logs."
+                                                       Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" MinWidth="185"
+                                                Command="{Binding OpenLogsFolderCommand}" Content="Open Logs Folder"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,10,0,0"
+                                        Visibility="{Binding HasDatabaseDiagnosticsSummary, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding DatabaseDiagnosticsSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ================= Backup ================= -->
-            <TabItem Header="Backup &amp; restore">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+            <!-- ================= Tab 3: Lookup Sites & Download Workflows ================= -->
+            <TabItem Header="Lookup Sites">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
                     <StackPanel>
+
+                        <!-- Download Manager & Default Quality (v14.0.0) -->
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphIcon}"
-                                               Foreground="{StaticResource WarnBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Database backup &amp; restore" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"/>
-                                </StackPanel>
-                                <TextBlock Text="Backups use the SQLite online backup API and are validated before a restore. Restoring keeps a safety copy of the current database and requires an application restart."
-                                           Style="{StaticResource SubText}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,6,0,0"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Download Manager &amp; Default Quality (Movies)" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Configure IDM hand-off and your single default quality preference (automatically falls back to the next-best lower quality when unavailable)."
+                                                   Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,12,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" VerticalAlignment="Center"
+                                            Command="{Binding SaveDownloadSettingsCommand}" Content="Save Download Settings"/>
+                                </Grid>
 
-                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                                    <Button Command="{Binding BackupCommand}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{StaticResource Icon.Shield}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                            <TextBlock Text="Back up now"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Content="Restore from backup…"
-                                            Style="{StaticResource SecondaryButton}"
-                                            Margin="10,0,0,0"
-                                            Command="{Binding RestoreCommand}"/>
-                                    <Button Content="Open backups folder"
-                                            Style="{StaticResource SecondaryButton}"
-                                            Margin="10,0,0,0"
-                                            Command="{Binding OpenBackupsFolderCommand}"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="180"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Internet Download Manager (IDMan.exe)" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding IdmExecutablePath, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Leave blank or click Auto-Detect to locate IDMan.exe automatically"/>
+                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
+                                                    Command="{Binding AutoDetectIdmCommand}" Content="Auto-Detect"/>
+                                            <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
+                                                    Command="{Binding BrowseIdmCommand}" Content="Browse…"/>
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Default Preferred Quality" Style="{StaticResource FieldLabel}"/>
+                                        <ComboBox ItemsSource="{Binding QualityOptions}"
+                                                  SelectedItem="{Binding PreferredDownloadQuality, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Margin="0,10,0,0">
+                                    <CheckBox Content="Default IDM save folder to Movies Watch Folder (opens IDM confirmation dialog, never silent)"
+                                              IsChecked="{Binding RouteIdmToMoviesWatchFolder}" Style="{StaticResource ToggleSwitch}"/>
+                                    <CheckBox Content="Automatically mark matching Open Tickets Completed when movies are imported"
+                                              IsChecked="{Binding AutoCompleteTicketsOnImport}" Style="{StaticResource ToggleSwitch}" Margin="0,6,0,0"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding DownloadSettingsStatusText}" Style="{StaticResource StatusBarText}" Margin="0,8,0,0"
+                                           Visibility="{Binding HasDownloadSettingsStatus, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Configured Lookup Sites + Per-Site Workflow Selector -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Configured Lookup Sites &amp; Workflows" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock Text="Tick sites for background availability checks and optionally assign a download workflow. Sites left on 'None (Lookup-only)' never show a Download button."
+                                                   Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,12,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center"
+                                            Command="{Binding ResetDefaultLookupSitesCommand}" Content="Reset Defaults"/>
+                                </Grid>
+
+                                <ListBox ItemsSource="{Binding LookupSites}" MinHeight="80" MaxHeight="280" Margin="0,12,0,0"
+                                         BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                         Background="{StaticResource PanelBrush}"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="200"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                          VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding UrlTemplate}" Style="{StaticResource CaptionText}"
+                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding UrlTemplate}"/>
+                                                    <TextBlock Text="{Binding NoResultsMarker, StringFormat=No-results marker: {0}}"
+                                                               Style="{StaticResource CaptionText}"
+                                                               Visibility="{Binding HasNoResultsMarker, Converter={StaticResource BoolToVis}}"/>
+                                                </StackPanel>
+                                                <ComboBox Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                          ItemsSource="{Binding AvailableWorkflows}"
+                                                          DisplayMemberPath="DisplayName"
+                                                          SelectedValuePath="ProviderId"
+                                                          SelectedValue="{Binding SelectedProviderId, Mode=TwoWay}"
+                                                          ToolTip="Assign an authorized download workflow for this site"/>
+                                                <Button Grid.Column="3" Style="{StaticResource SecondaryButton}" Content="Remove" Padding="10,4"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.RemoveLookupSiteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <TextBlock Text="{Binding LookupSitesStatusText}" Style="{StaticResource StatusBarText}" Margin="0,8,0,0"
+                                           Visibility="{Binding HasLookupSitesStatus, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Add Lookup Site" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="Add a site with placeholders {imdb_id}, {query}, {title}, {title_plus}, or {year} — or paste a search prefix like https://example.com/?s= to auto-append the IMDb ID."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Site Name" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding NewLookupSiteName, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Search URL Template" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding NewLookupSiteUrlTemplate, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Optional 'No Results' text on that site (leave blank for automatic detection)" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding NewLookupNoResultsMarker, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" VerticalAlignment="Bottom" Command="{Binding AddLookupSiteCommand}" Content="+ Add Site"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================= Tab 4: Data & Backups ================= -->
+            <TabItem Header="Data &amp; Backups">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+                    <StackPanel>
+
+                        <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Database Backup &amp; Restore" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="Create validated SQLite backups using the Online Backup API or restore a previous snapshot (keeps an automatic safety copy before restoring)."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Button Command="{Binding BackupCommand}" Content="Create Backup Now"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Command="{Binding RestoreCommand}" Content="Restore Selected Backup…"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                            Command="{Binding OpenBackupsFolderCommand}" Content="Open Backups Folder"/>
                                 </StackPanel>
 
                                 <TextBlock Text="Available backups" Style="{StaticResource FieldLabel}"/>
-                                <ListBox ItemsSource="{Binding Backups}"
-                                         SelectedItem="{Binding SelectedBackup, Mode=TwoWay}"
-                                         MinHeight="80"
-                                         MaxHeight="220"
-                                         BorderBrush="{StaticResource DividerBrush}"
-                                         BorderThickness="1">
+                                <ListBox ItemsSource="{Binding Backups}" SelectedItem="{Binding SelectedBackup, Mode=TwoWay}"
+                                         MinHeight="70" MaxHeight="240" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" Margin="2">
-                                                <TextBlock Text="{Binding CreatedAtText}"/>
-                                                <TextBlock Text="  ·  " Foreground="{StaticResource SubTextBrush}"/>
-                                                <TextBlock Text="{Binding SizeText}" Foreground="{StaticResource SubTextBrush}"/>
-                                                <TextBlock Text="  ·  " Foreground="{StaticResource SubTextBrush}"/>
-                                                <TextBlock Text="{Binding FilePathText}"
-                                                           Foreground="{StaticResource SubTextBrush}"
-                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding CreatedAtText}" FontWeight="SemiBold" Margin="0,0,12,0"/>
+                                                <TextBlock Text="{Binding SizeText}" Style="{StaticResource SubText}" Margin="0,0,12,0"/>
+                                                <TextBlock Text="{Binding FileNameText}" Style="{StaticResource CaptionText}" ToolTip="{Binding FilePathText}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Catalog CSV Import &amp; Export" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="Export your movie catalog to RFC-4180 CSV or additively import rows from an existing CSV file without moving or deleting files on disk."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Command="{Binding ExportCsvCommand}" Content="Export Catalog to CSV…"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"
+                                            Command="{Binding ImportCsvCommand}" Content="Import Catalog from CSV…"/>
+                                </StackPanel>
+
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+                                        CornerRadius="5" Padding="10,8" Margin="0,12,0,0"
+                                        Visibility="{Binding HasCsvStatusText, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Text="{Binding CsvStatusText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                             AcceptsReturn="True" MaxHeight="100" VerticalScrollBarVisibility="Auto"
+                                             BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12"/>
+                                </Border>
                             </StackPanel>
                         </Border>
                     </StackPanel>

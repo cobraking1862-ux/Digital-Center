@@ -94,12 +94,15 @@ public sealed class MaintenanceService
             .Where(g => g.Count() > 1);
         foreach (var group in movieMulti)
         {
-            var title = group.First().MovieTitle!;
+            var title = group.First().MovieTitle;
+            var display = title is not null
+                ? title.Title + (title.ReleaseYear.HasValue ? $" ({title.ReleaseYear.Value})" : string.Empty)
+                : $"Movie #{group.Key}";
             groups.Add(new DuplicateGroupInfo(
                 $"{group.Count()} files for one movie (possible alternate versions)",
                 group.Sum(f => f.FileSize),
                 group.Select(f => f.FilePath).OrderBy(p => p).ToList(),
-                title.Title + (title.ReleaseYear.HasValue ? $" ({title.ReleaseYear.Value})" : string.Empty)));
+                display));
         }
 
         var episodeMulti = files
@@ -108,19 +111,23 @@ public sealed class MaintenanceService
             .Where(g => g.Count() > 1);
         foreach (var group in episodeMulti)
         {
-            var episode = group.First().Episode!;
-            var seriesTitle = episode.Season?.SeriesDetails?.MediaTitle?.Title ?? "Series";
+            var episode = group.First().Episode;
+            var seriesTitle = episode?.Season?.SeriesDetails?.MediaTitle?.Title ?? "Series";
             groups.Add(new DuplicateGroupInfo(
                 $"{group.Count()} files for one episode (possible alternate versions)",
                 group.Sum(f => f.FileSize),
                 group.Select(f => f.FilePath).OrderBy(p => p).ToList(),
-                $"{seriesTitle} - S{episode.Season?.SeasonNumber ?? 0:00}E{episode.EpisodeNumber:00}"));
+                $"{seriesTitle} - S{episode?.Season?.SeasonNumber ?? 0:00}E{episode?.EpisodeNumber ?? 0:00}"));
         }
 
         return groups;
     }
 
-    /// <summary>Rebuilds the FTS5 index from the catalog. Throws when FTS5 is unavailable (LIKE fallback active).</summary>
+    /// <summary>
+    /// Drops and recreates the FTS5 virtual table and sync triggers, then
+    /// repopulates every title and its cast/crew cleanly inside one transaction.
+    /// Throws when FTS5 is unavailable (LIKE fallback active).
+    /// </summary>
     public async Task<int> RebuildSearchIndexAsync(CancellationToken ct = default)
     {
         await using var db = await _factory.CreateDbContextAsync(ct);
@@ -129,22 +136,30 @@ public sealed class MaintenanceService
             throw new NotSupportedException("FTS5 is not available in this SQLite build; the LIKE fallback needs no index.");
         }
 
-        await db.Database.ExecuteSqlRawAsync($"DELETE FROM {FtsSupport.FtsTableName};", ct);
-
         var titles = await db.MediaTitles
             .AsNoTracking()
             .Include(t => t.People).ThenInclude(tp => tp.Person)
             .ToListAsync(ct);
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        await db.Database.ExecuteSqlRawAsync($"DROP TABLE IF EXISTS {FtsSupport.FtsTableName};", ct);
+        await FtsSupport.EnsureInstalledAsync(db, ct);
+
         foreach (var title in titles)
         {
             ct.ThrowIfCancellationRequested();
-            var people = string.Join(' ', title.People.Select(p => p.Person.Name).Distinct());
+            var people = string.Join(' ', title.People
+                .Where(p => p.Person is not null && !string.IsNullOrWhiteSpace(p.Person.Name))
+                .Select(p => p.Person.Name)
+                .Distinct());
             await db.Database.ExecuteSqlRawAsync(
                 $"INSERT INTO {FtsSupport.FtsTableName}(Title, People, MediaTitleId) VALUES ({{0}}, {{1}}, {{2}});",
                 new object[] { title.Title, people, title.Id }, ct);
         }
+
+        await db.Database.ExecuteSqlRawAsync(
+            $"INSERT INTO {FtsSupport.FtsTableName}({FtsSupport.FtsTableName}) VALUES('rebuild');", ct);
 
         await transaction.CommitAsync(ct);
         _logger?.Info($"Search index rebuilt for {titles.Count} title(s).");
@@ -363,8 +378,6 @@ public sealed class MaintenanceService
                         MediaFile file;
                         if (kind == MediaKind.Series)
                         {
-                            // Episodes without season/episode columns cannot be
-                            // linked; count them as missing rather than guessing.
                             summary = summary with { FilesMissing = summary.FilesMissing + 1 };
                             errors.Add($"Row {lineIndex + 1}: series file '{filePath}' cannot be linked without Season/Episode columns; not registered.");
                             continue;
@@ -393,7 +406,6 @@ public sealed class MaintenanceService
         return summary;
     }
 
-    /// <summary>Additively links the "; "-separated category names to the title.</summary>
     private static async Task MergeCategoriesAsync(DigitalCenterDbContext db, MediaTitle title, MediaKind kind, string multiValue, CancellationToken ct)
     {
         foreach (var name in SplitMulti(multiValue))

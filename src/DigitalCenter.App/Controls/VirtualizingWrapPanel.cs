@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -151,7 +152,32 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     protected override void OnItemsChanged(object sender, ItemsChangedEventArgs args)
     {
         base.OnItemsChanged(sender, args);
-        RemoveAllRealized();
+
+        // A collection change (Clear/Add/Reset) can arrive while the panel is
+        // detached or the generator is mid-reset. Dropping the realized book-
+        // keeping must never throw into the caller (a VM refresh would catch
+        // it as a load failure and leave the grid empty until the next
+        // manual refresh) — so this is deliberately defensive.
+        try
+        {
+            if (args.Action == NotifyCollectionChangedAction.Reset)
+            {
+                _realized.Clear();
+                if (InternalChildren.Count > 0)
+                {
+                    RemoveInternalChildRange(0, InternalChildren.Count);
+                }
+            }
+            else
+            {
+                RemoveAllRealized();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            _realized.Clear();
+        }
+
         InvalidateMeasure();
     }
 
@@ -164,29 +190,36 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var generator = ItemContainerGenerator as ItemContainerGenerator;
+        // CRITICAL WPF REQUIREMENT:
+        // In WPF's VirtualizingPanel/Panel implementation, ItemContainerGenerator is null
+        // until InternalChildren is accessed for the first time (which invokes
+        // Panel.VerifyBoundState() -> EnsureGenerator() -> ConnectToGenerator()).
+        // Without touching InternalChildren first, ItemContainerGenerator evaluates to null
+        // on cold startup when Items is already populated, causing MeasureOverride to bail
+        // out with Size(0, 0) and never subscribe OnItemsChanged.
+        var children = InternalChildren;
+
+        var generator = ItemContainerGenerator;
         if (generator is null)
         {
-            // Transitional state: the panel is not currently registered as the
-            // items host of an ItemsControl (pre-attach measurement, template
-            // re-application, or detach), so no containers can be realized.
-            //
-            // Never echo `availableSize` back here. WPF measures panels with
-            // unbounded constraints in exactly these states, and returning
-            // PositiveInfinity as DesiredSize violates the layout contract —
-            // UIElement.Measure then throws on every layout pass
-            // ("Layout measurement override ... should not return
-            // PositiveInfinity as its DesiredSize"). Without a generator the
-            // panel has no measurable content, so an empty size is correct.
             return new Size(0, 0);
         }
 
-        var itemCount = generator.Items.Count;
+        var itemsOwner = ItemsControl.GetItemsOwner(this);
+        var itemCount = itemsOwner?.Items.Count
+                        ?? (generator as ItemContainerGenerator)?.Items.Count
+                        ?? 0;
         if (itemCount == 0)
         {
             RemoveAllRealized();
             UpdateScrollInfo(availableSize, new Size(0, 0));
             return new Size(0, 0);
+        }
+
+        var ancestorScroller = FindParentScrollViewer(this);
+        if (ancestorScroller is not null)
+        {
+            EnsureHookedToAncestorScrollViewer(ancestorScroller);
         }
 
         // ---- cell size: fixed, or probed from a realized child ---------------
@@ -198,11 +231,15 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         var stepX = _cellWidth + SpacingX;
         var stepY = _cellHeight + SpacingY;
 
-        // ---- columns: fit the viewport (or one long row when unbounded) ------
-        var viewportWidth = double.IsInfinity(availableSize.Width) ? 0 : availableSize.Width;
+        // ---- columns: fit the viewport (or fallback to ancestor ScrollViewer width)
+        var viewportWidth = double.IsInfinity(availableSize.Width) || availableSize.Width <= 0
+            ? (ancestorScroller is { ViewportWidth: > 0 } ? ancestorScroller.ViewportWidth
+                : ancestorScroller is { ActualWidth: > 0 } ? ancestorScroller.ActualWidth : 0)
+            : availableSize.Width;
+
         var columns = viewportWidth > 0
             ? Math.Max(1, (int)Math.Floor((viewportWidth + SpacingX) / stepX))
-            : itemCount;
+            : Math.Max(1, (int)Math.Floor((1080 + SpacingX) / stepX));
 
         var rows = (int)Math.Ceiling(itemCount / (double)columns);
         var extent = new Size(
@@ -211,32 +248,134 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         UpdateScrollInfo(availableSize, extent);
 
         // ---- visible window of items -----------------------------------------
-        var viewportHeight = double.IsInfinity(availableSize.Height) ? extent.Height : availableSize.Height;
-        var firstRow = Math.Max(0, (int)Math.Floor(_offset.Y / stepY));
-        var visibleRows = (int)Math.Ceiling(viewportHeight / stepY) + 1;
+        // If measured inside a plain ScrollViewer (CanContentScroll=False), availableSize.Height
+        // is PositiveInfinity. Resolve the enclosing ScrollViewer viewport height and vertical offset
+        // so we still only realize the visible rows plus a 2-row buffer instead of all items.
+        var effectiveOffsetY = _offset.Y;
+        var viewportHeight = availableSize.Height;
+        if (double.IsInfinity(viewportHeight) || viewportHeight <= 0)
+        {
+            if (ancestorScroller is not null)
+            {
+                if (ancestorScroller.ViewportHeight > 0)
+                {
+                    viewportHeight = ancestorScroller.ViewportHeight;
+                    effectiveOffsetY = ancestorScroller.VerticalOffset;
+                    _lastMeasuredScrollOffset = effectiveOffsetY;
+                    _lastMeasuredViewportHeight = viewportHeight;
+                    _lastMeasuredViewportWidth = ancestorScroller.ViewportWidth;
+                }
+                else if (ancestorScroller.ActualHeight > 0)
+                {
+                    viewportHeight = ancestorScroller.ActualHeight;
+                    effectiveOffsetY = ancestorScroller.VerticalOffset;
+                }
+                else
+                {
+                    viewportHeight = 800;
+                }
+            }
+            else
+            {
+                viewportHeight = 800;
+            }
+        }
+
+        var firstRow = Math.Max(0, (int)Math.Floor(effectiveOffsetY / stepY));
+        var visibleRows = (int)Math.Ceiling(viewportHeight / stepY) + 2;
         var startIndex = Math.Min(itemCount - 1, firstRow * columns);
         var endIndex = Math.Min(itemCount - 1, (firstRow + visibleRows) * columns - 1);
 
-        RealizeRange(generator, startIndex, endIndex);
-        _arrangePlan = new ArrangePlan(columns, stepX, stepY, startIndex);
+        RealizeRange(generator, children, startIndex, endIndex);
+        _arrangePlan = new ArrangePlan(columns, stepX, stepY, startIndex, double.IsInfinity(availableSize.Height));
 
         var desiredWidth = viewportWidth <= 0 ? extent.Width : Math.Min(viewportWidth, extent.Width);
-        var desiredHeight = double.IsInfinity(availableSize.Height) ? extent.Height : availableSize.Height;
+        // When CanContentScroll=True (IScrollInfo mode), DesiredSize.Height must be bounded by
+        // the smaller of extent.Height and availableSize.Height so we never force a parent
+        // Auto-sized container to expand to infinity or trigger layout oscillation.
+        var desiredHeight = double.IsInfinity(availableSize.Height)
+            ? extent.Height
+            : Math.Min(availableSize.Height, extent.Height);
 
-        // Layout contract: DesiredSize must be finite no matter what constraint
-        // came in. Clamp defensively so a degenerate constraint (or a malformed
-        // NaN binding on Spacing/Item*) can never propagate upward.
         return new Size(
             double.IsFinite(desiredWidth) && desiredWidth > 0 ? desiredWidth : 0,
             double.IsFinite(desiredHeight) && desiredHeight > 0 ? desiredHeight : 0);
     }
 
-    private readonly struct ArrangePlan(int columns, double stepX, double stepY, int startIndex)
+    private ScrollViewer? _hookedScroller;
+
+    private static ScrollViewer? FindParentScrollViewer(DependencyObject start)
+    {
+        var current = VisualTreeHelper.GetParent(start);
+        while (current is not null)
+        {
+            if (current is ScrollViewer sv)
+            {
+                return sv;
+            }
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private void EnsureHookedToAncestorScrollViewer(ScrollViewer sv)
+    {
+        if (ReferenceEquals(_hookedScroller, sv))
+        {
+            return;
+        }
+        if (_hookedScroller is not null)
+        {
+            _hookedScroller.ScrollChanged -= OnAncestorScrollChanged;
+            _hookedScroller.SizeChanged -= OnAncestorSizeChanged;
+        }
+        _hookedScroller = sv;
+        _hookedScroller.ScrollChanged += OnAncestorScrollChanged;
+        _hookedScroller.SizeChanged += OnAncestorSizeChanged;
+    }
+
+    private double _lastMeasuredScrollOffset = -1;
+    private double _lastMeasuredViewportHeight = -1;
+    private double _lastMeasuredViewportWidth = -1;
+
+    private void OnAncestorSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged || e.HeightChanged)
+        {
+            InvalidateMeasure();
+        }
+    }
+
+    private void OnAncestorScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer sv)
+        {
+            return;
+        }
+
+        // Only invalidate measure when the user actually scrolls to a new vertical offset
+        // or resizes the viewport window — never on ExtentHeightChange, which would cause
+        // an infinite Measure <-> ScrollChanged layout loop that freezes the WPF UI thread.
+        var offsetDiff = Math.Abs(sv.VerticalOffset - _lastMeasuredScrollOffset);
+        var vpHeightDiff = Math.Abs(sv.ViewportHeight - _lastMeasuredViewportHeight);
+        var vpWidthDiff = Math.Abs(sv.ViewportWidth - _lastMeasuredViewportWidth);
+
+        if (offsetDiff > 8.0 || vpHeightDiff > 2.0 || vpWidthDiff > 2.0)
+        {
+            _lastMeasuredScrollOffset = sv.VerticalOffset;
+            _lastMeasuredViewportHeight = sv.ViewportHeight;
+            _lastMeasuredViewportWidth = sv.ViewportWidth;
+            InvalidateMeasure();
+        }
+    }
+
+    private readonly struct ArrangePlan(int columns, double stepX, double stepY, int startIndex, bool useLogicalOffset)
     {
         public int Columns { get; } = columns;
         public double StepX { get; } = stepX;
         public double StepY { get; } = stepY;
         public int StartIndex { get; } = startIndex;
+        public bool UseLogicalOffset { get; } = useLogicalOffset;
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -253,7 +392,9 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
             var row = relative / _arrangePlan.Columns;
             var column = relative % _arrangePlan.Columns;
             var x = column * _arrangePlan.StepX - _offset.X;
-            var y = row * _arrangePlan.StepY - _offset.Y;
+            var y = _arrangePlan.UseLogicalOffset
+                ? (itemIndex / _arrangePlan.Columns) * _arrangePlan.StepY
+                : row * _arrangePlan.StepY - _offset.Y;
 
             InternalChildren[i].Arrange(new Rect(x, y, _cellWidth, _cellHeight));
         }
@@ -291,24 +432,42 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         return 300;
     }
 
-    private void RealizeRange(IItemContainerGenerator generator, int startIndex, int endIndex)
+    private void RealizeRange(IItemContainerGenerator generator, UIElementCollection children, int startIndex, int endIndex)
     {
+        if (_realized.Count != children.Count)
+        {
+            RemoveAllRealized();
+        }
+
         // Drop everything outside the window first (from the end so indexes stay valid).
         for (var i = _realized.Count - 1; i >= 0; i--)
         {
             var index = _realized[i];
             if (index < startIndex || index > endIndex)
             {
-                generator.Remove(new GeneratorPosition(i, 0), 1);
+                try
+                {
+                    generator.Remove(new GeneratorPosition(i, 0), 1);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+
                 RemoveInternalChildRange(i, 1);
                 _realized.RemoveAt(i);
             }
         }
 
+        var cellConstraint = new Size(_cellWidth, _cellHeight);
+
         for (var index = startIndex; index <= endIndex; index++)
         {
-            if (_realized.Contains(index))
+            var existingOrdinal = _realized.IndexOf(index);
+            if (existingOrdinal >= 0 && existingOrdinal < children.Count)
             {
+                // Always measure already-realized containers so layout invalidations
+                // (e.g. async poster image loads or binding updates) propagate properly.
+                children[existingOrdinal].Measure(cellConstraint);
                 continue;
             }
 
@@ -329,10 +488,25 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
                         generator.PrepareItemContainer(uiElement);
                         _realized.Insert(ordinal, index);
                     }
+                    else
+                    {
+                        var childIdx = children.IndexOf(uiElement);
+                        if (childIdx < 0)
+                        {
+                            var ordinal = CountRealizedBefore(index);
+                            InsertInternalChild(ordinal, uiElement);
+                            generator.PrepareItemContainer(uiElement);
+                            _realized.Insert(ordinal, index);
+                        }
+                        else if (!_realized.Contains(index))
+                        {
+                            _realized.Insert(CountRealizedBefore(index), index);
+                        }
+                    }
                 }
             }
 
-            child?.Measure(new Size(_cellWidth, _cellHeight));
+            child?.Measure(cellConstraint);
         }
     }
 
@@ -361,7 +535,17 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         {
             for (var i = _realized.Count - 1; i >= 0; i--)
             {
-                generator.Remove(new GeneratorPosition(i, 0), 1);
+                try
+                {
+                    generator.Remove(new GeneratorPosition(i, 0), 1);
+                }
+                catch (InvalidOperationException)
+                {
+                    // The generator was reset concurrently (collection change,
+                    // template re-application); its realized set is already
+                    // gone, so there is nothing left to remove.
+                    break;
+                }
             }
         }
 

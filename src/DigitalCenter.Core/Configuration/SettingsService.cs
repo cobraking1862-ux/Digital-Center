@@ -61,24 +61,12 @@ public sealed class SettingsService
             settings.MoviesRoot = Path.Combine(settings.LibraryRoot, "Movies");
             settings.SeriesRoot = Path.Combine(settings.LibraryRoot, "Series");
         }
-    }
 
-    /// <summary>
-    /// Loads the current settings, applies <paramref name="change"/> and saves
-    /// them again in one step. Every screen that owns only part of the
-    /// configuration (Settings owns the library roots and preferences,
-    /// Management owns the Watch Folder) must go through this method: building
-    /// a fresh <see cref="AppSettings"/> and saving it would silently drop the
-    /// values owned by the other screen.
-    /// </summary>
-    public AppSettings Update(Action<AppSettings> change)
-    {
-        ArgumentNullException.ThrowIfNull(change);
-
-        var settings = Load();
-        change(settings);
-        Save(settings);
-        return settings;
+        if (string.IsNullOrWhiteSpace(settings.CollectionsRoot) &&
+            !string.IsNullOrWhiteSpace(settings.MoviesRoot))
+        {
+            settings.CollectionsRoot = Path.Combine(settings.MoviesRoot, "Collections");
+        }
     }
 
     public void Save(AppSettings settings)
@@ -104,9 +92,15 @@ public sealed class SettingsService
         var issues = new List<string>();
 
         ValidateRoot(settings.MoviesRoot, "Movies library root", issues);
-        ValidateRoot(settings.SeriesRoot, "Series library root", issues);
+        ValidateRoot(settings.CollectionsRoot, "Collections library root", issues, allowNonExistentIfParentExists: true);
+        ValidateRoot(settings.SeriesRoot, "Series library root", issues, allowNonExistentIfParentExists: true);
 
-        issues.AddRange(ValidateWatchFolder(settings));
+        issues.AddRange(ValidateWatchFolderPath(settings));
+
+        if (settings.StabilityDelaySeconds is < 2 or > 600)
+        {
+            issues.Add("The file-stability delay must be between 2 and 600 seconds.");
+        }
 
         if (settings.MinimumMatchConfidence is < 0.30 or > 0.95)
         {
@@ -126,48 +120,46 @@ public sealed class SettingsService
         return issues;
     }
 
-    /// <summary>
-    /// Validates only the Watch Folder rules. The Watch Folder is configured in
-    /// the Management workspace, so that screen validates its own input without
-    /// being blocked by unrelated settings (an unset library root, for example).
-    /// </summary>
-    public static IReadOnlyList<string> ValidateWatchFolder(AppSettings settings)
+    /// <summary>Validates the Watch Folder path and prevents recursive library rediscovery.</summary>
+    public static IReadOnlyList<string> ValidateWatchFolderPath(AppSettings settings)
     {
         var issues = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(settings.WatchFolderPath))
+        var watchFolder = settings.WatchFolderPath;
+        if (string.IsNullOrWhiteSpace(watchFolder))
         {
-            if (!Path.IsPathRooted(settings.WatchFolderPath))
-            {
-                issues.Add("The Watch Folder must be an absolute path.");
-            }
-            else if (!Directory.Exists(settings.WatchFolderPath))
-            {
-                issues.Add($"The Watch Folder does not exist: '{settings.WatchFolderPath}'.");
-            }
-
-            foreach (var (root, label) in new[]
-                     {
-                         (settings.MoviesRoot, "movies library root"),
-                         (settings.SeriesRoot, "series library root")
-                     })
-            {
-                if (IsInside(root, settings.WatchFolderPath))
-                {
-                    issues.Add($"The Watch Folder must be outside the {label}.");
-                }
-            }
+            return issues;
         }
 
-        if (settings.StabilityDelaySeconds is < 2 or > 600)
+        if (!Path.IsPathRooted(watchFolder))
         {
-            issues.Add("The file-stability delay must be between 2 and 600 seconds.");
+            issues.Add("The Watch Folder must be an absolute path.");
+            return issues;
+        }
+
+        if (!Directory.Exists(watchFolder))
+        {
+            issues.Add($"The Watch Folder does not exist: '{watchFolder}'.");
+        }
+
+        foreach (var (root, label) in new[]
+                 {
+                     (settings.MoviesRoot, "movies library root"),
+                     (settings.SeriesRoot, "series library root")
+                 })
+        {
+            // Reject nesting in either direction. A Watch Folder inside a
+            // library is confusing; a library inside the Watch Folder can
+            // cause imported files to be rediscovered recursively.
+            if (IsInside(root, watchFolder) || IsInside(watchFolder, root))
+            {
+                issues.Add($"The Watch Folder must be outside and must not overlap with the {label}; choose a separate folder tree.");
+            }
         }
 
         return issues;
     }
 
-    private static void ValidateRoot(string? root, string label, List<string> issues)
+    private static void ValidateRoot(string? root, string label, List<string> issues, bool allowNonExistentIfParentExists = false)
     {
         if (string.IsNullOrWhiteSpace(root))
         {
@@ -180,6 +172,12 @@ public sealed class SettingsService
         }
         else if (!Directory.Exists(root))
         {
+            var parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)));
+            if (allowNonExistentIfParentExists && !string.IsNullOrWhiteSpace(parent) && Directory.Exists(parent))
+            {
+                return;
+            }
+
             issues.Add($"{label} does not exist: '{root}'.");
         }
     }
@@ -193,9 +191,16 @@ public sealed class SettingsService
 
         try
         {
-            var p = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parent)) + Path.DirectorySeparatorChar;
-            var c = Path.TrimEndingDirectorySeparator(Path.GetFullPath(child)) + Path.DirectorySeparatorChar;
-            return c.StartsWith(p, StringComparison.OrdinalIgnoreCase);
+            var p = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parent));
+            var c = Path.TrimEndingDirectorySeparator(Path.GetFullPath(child));
+            if (string.Equals(p, c, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var parentPrefix = Path.EndsInDirectorySeparator(p) ? p : p + Path.DirectorySeparatorChar;
+            var childPath = Path.EndsInDirectorySeparator(c) ? c : c + Path.DirectorySeparatorChar;
+            return childPath.StartsWith(parentPrefix, StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception)
         {

@@ -1,7 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using DigitalCenter.ViewModels;
-using DigitalCenter.ViewModels.Services;
 
 namespace DigitalCenter.App.Views;
 
@@ -10,48 +11,50 @@ public partial class LibraryPage : UserControl
     public LibraryPage()
     {
         InitializeComponent();
-        Loaded += OnLoaded;
+        Loaded += OnLibraryPageLoaded;
+    }
+
+    private async void OnLibraryPageLoaded(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } vm)
+        {
+            if (vm.Items.Count == 0 && !vm.IsLoading)
+            {
+                await vm.RefreshSafeAsync();
+            }
+
+            // Ensure layout re-measures once the visual tree and ScrollViewer viewport are realized.
+            _ = Dispatcher.InvokeAsync(InvalidateMeasure, DispatcherPriority.Loaded);
+        }
     }
 
     private LibraryViewModel? ViewModel => DataContext as LibraryViewModel;
 
-    /// <summary>
-    /// Safety net for "the grid is empty until I touch a filter": a freshly
-    /// created page (first start, returning from the details screen, navigating
-    /// back to Home) asks for a load when the collection is still empty. A page
-    /// that already has items is left alone, so this never causes a reload.
-    /// </summary>
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    private void OnCardClick(object sender, MouseButtonEventArgs e)
     {
-        // "Nothing loaded yet" differs per tab: the Home dashboard keeps its
-        // rows in HomeMovies/HomeSeries, the category tabs in Items.
-        if (ViewModel is { IsLoading: false } vm
-            && (vm.IsHomeTab ? !vm.HasHomeItems : vm.Items.Count == 0))
+        if (ViewModel is not { } vm || (sender as FrameworkElement)?.DataContext is not LibraryItemViewModel item)
         {
-            _ = vm.RefreshSafeAsync();
+            return;
         }
+
+        var toggle = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        foreach (var other in vm.Items)
+        {
+            other.IsSelected = toggle
+                ? (ReferenceEquals(other, item) ? !other.IsSelected : other.IsSelected)
+                : ReferenceEquals(other, item);
+        }
+
+        e.Handled = true;
     }
 
-    /// <summary>Collections tab shortcut to the genre browser.</summary>
-
-    /// <summary>Home dashboard shortcut: every movie in its own category.</summary>
-    private void OnShowAllMoviesClick(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.ShowAllMovies();
-    }
-
-    /// <summary>Home dashboard shortcut: every series in its own category.</summary>
-    private void OnShowAllSeriesClick(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.ShowAllSeries();
-    }
-
-    /// <summary>Clears the search box (the ✕ affordance inside the field).</summary>
     private void OnClearSearchClick(object sender, RoutedEventArgs e)
     {
         if (ViewModel is { } vm)
         {
             vm.SearchText = string.Empty;
         }
+
+        LibrarySearchBox.Focus();
     }
 }

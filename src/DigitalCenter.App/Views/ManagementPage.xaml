@@ -5,32 +5,21 @@
 
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisInverted" Invert="True"/>
-        <conv:NullToVisibilityConverter x:Key="NullToVis"/>
         <conv:InverseBoolConverter x:Key="InverseBool"/>
         <conv:StatusKeyToBrushConverter x:Key="StatusBrush"/>
 
-        <!-- Row status chip tinted by the row's status key (Ok/Bad/Active/Pending/
-             Neutral). Based on the shared StatusChip so long statuses such as
-             "Awaiting destination" keep a rectangular background instead of the
-             oval a 999 px radius produced. -->
-        <!-- One metric inside the consolidated Import Summary card: a hairline
-             separates the columns without turning them into six separate cards. -->
-        <Style x:Key="SummaryMetric" TargetType="Border">
-            <Setter Property="Padding" Value="16,0,0,0"/>
-            <Setter Property="BorderThickness" Value="1,0,0,0"/>
-            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
-        </Style>
-
-        <Style x:Key="RowStatusChip" TargetType="Border" BasedOn="{StaticResource StatusChip}">
-            <Setter Property="Background" Value="{StaticResource ControlBrush}"/>
-            <Setter Property="Padding" Value="10,3"/>
+        <Style x:Key="RowStatusPill" TargetType="Border">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLowBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,2.5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="{StaticResource PageMargin}">
+    <Grid Margin="26,20,26,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -38,395 +27,297 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ============ Header: identity + monitoring controls ============ -->
+        <!-- ============ Header ============ -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Management" Style="{StaticResource EyebrowText}"/>
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <Border Style="{StaticResource IconTile}">
-                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphMedium}"
-                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel VerticalAlignment="Center" Margin="16,0,0,0">
-                        <TextBlock Text="Watch Folder" Style="{StaticResource PageTitle}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}"
-                                       Foreground="{StaticResource FaintTextBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding WatchPathDisplay}" Style="{StaticResource SubText}" Margin="7,0,0,0"
-                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="640"
-                                       ToolTip="{Binding WatchPathDisplay}"/>
-                        </StackPanel>
-                    </StackPanel>
+                <TextBlock Text="Watch Folder" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="Track Movie and Drama watch folder imports side by side. Configure folder locations in Settings."
+                           Style="{StaticResource SubText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Center"
+                    Style="{StaticResource SecondaryButton}"
+                    Command="{Binding OpenMaintenanceIssuesCommand}"
+                    Visibility="{Binding HasUnresolvedIssues, Converter={StaticResource BoolToVis}}"
+                    ToolTip="Open Watch Folder Issues in Maintenance">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="{StaticResource WarnBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding UnresolvedIssuesBadgeText}" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}"/>
                 </StackPanel>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <Border Style="{StaticResource StatusChip}" Margin="0,0,12,0" VerticalAlignment="Center"
-                        Background="{StaticResource PrimaryDimBrush}">
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="{StaticResource FaintTextBrush}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
-                                            <Setter Property="Fill" Value="{StaticResource OkBrush}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                        <TextBlock Text="{Binding MonitorStatusText}" FontSize="12" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Border>
-                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
-                        Command="{Binding OpenWatchFolderCommand}"
-                        AutomationProperties.Name="Open Folder"
-                        ToolTip="Open the saved Watch Folder in Windows Explorer">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                        <TextBlock Text="Open Folder"/>
-                    </StackPanel>
-                </Button>
-                <Button x:Name="StartStopButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
-                        Click="OnToggleMonitoringClick" ToolTip="Start or stop Watch Folder monitoring">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="StartStopGlyph" FontSize="12" Margin="0,0,8,0"
-                                   VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource GlyphSmall}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
-                                            <Setter Property="Text" Value="{StaticResource Icon.Stop}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <TextBlock>
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                    <Setter Property="Text" Value="Start Monitoring"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMonitoring}" Value="True">
-                                            <Setter Property="Text" Value="Stop Monitoring"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
-                        Command="{Binding RescanNowCommand}"
-                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{StaticResource Icon.Refresh}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                        <TextBlock Text="Rescan Now"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            </Button>
         </Grid>
 
-        <!-- ======= Watch Folder configuration: the ONE place it is managed =======
-             Deliberately small: the path, Browse…, Save Watch Folder and the
-             file-stability delay. The three monitoring switches are not
-             surfaced any more (their saved values keep working and are written
-             back unchanged), and the folder is opened from the single
-             "Open Folder" button in the header above. Saving a new path never
-             moves media and never erases catalog or import records. -->
-        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,16,0,0">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphSmall}"
-                               Foreground="{StaticResource PrimaryBrush}" Margin="0,0,9,0"/>
-                    <TextBlock Text="Watch Folder" Style="{StaticResource SectionTitle}"/>
-                    <Border Style="{StaticResource StatusChip}" Margin="12,0,0,0" VerticalAlignment="Center"
-                            Background="{StaticResource PrimaryDimBrush}"
-                            Visibility="{Binding HasWatchFolderChanges, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Unsaved changes" FontSize="11.5" FontWeight="SemiBold"/>
-                    </Border>
-                </StackPanel>
-                <TextBlock Text="DigitalCenter monitors exactly one Watch Folder, and this workspace is the only place it is configured. It must be an existing folder outside both library roots."
-                           Style="{StaticResource CaptionText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+        <!-- ============ Separate Status Section (Movies & Dramas — No Awaiting Info) ============ -->
+        <Grid Grid.Row="1" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <Grid Margin="0,12,0,0">
+            <!-- Movies Watch Status Card -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="16,12">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Movies Watch Status" FontWeight="SemiBold" FontSize="13.5"/>
+                            <Border Style="{StaticResource StatusPill}" Background="{StaticResource PrimaryDimBrush}" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding MovieWatchStateText}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryDarkBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding MovieWatchPathSummary}" Style="{StaticResource CaptionText}"
+                                   Margin="0,5,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding MovieWatchPathSummary}"/>
+                        <TextBlock Text="{Binding MovieLastScanText}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="Imported" Style="{StaticResource CaptionText}" HorizontalAlignment="Right"/>
+                        <TextBlock Text="{Binding MovieImportedCount}" Style="{StaticResource StatValue}"
+                                   Foreground="{StaticResource OkBrush}" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Drama Watch Status Card -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox Text="{Binding WatchFolderPath, UpdateSourceTrigger=PropertyChanged}"
-                             AutomationProperties.Name="Watch Folder path"
-                             ToolTip="Absolute path of the single default Watch Folder"/>
-                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                            Command="{Binding BrowseWatchFolderCommand}" ToolTip="Browse for the Watch Folder">
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.Folder}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                            <TextBlock Text="Browse…"/>
+                            <TextBlock Text="Drama Watch Status" FontWeight="SemiBold" FontSize="13.5"/>
+                            <Border Style="{StaticResource StatusPill}" Background="{StaticResource PrimaryDimBrush}" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding DramaWatchStateText}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryDarkBrush}"/>
+                            </Border>
                         </StackPanel>
-                    </Button>
-                    <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding SaveWatchFolderCommand}"
-                            IsEnabled="{Binding HasWatchFolderChanges}"
-                            AutomationProperties.Name="Save Watch Folder"
-                            ToolTip="Save the Watch Folder path. Nothing is moved and no record is deleted.">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.Save}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"/>
-                            <TextBlock Text="Save Watch Folder"/>
-                        </StackPanel>
-                    </Button>
+                        <TextBlock Text="{Binding DramaWatchPathSummary}" Style="{StaticResource CaptionText}"
+                                   Margin="0,5,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding DramaWatchPathSummary}"/>
+                        <TextBlock Text="{Binding DramaLastScanText}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="Imported" Style="{StaticResource CaptionText}" HorizontalAlignment="Right"/>
+                        <TextBlock Text="{Binding DramaImportedCount}" Style="{StaticResource StatValue}"
+                                   Foreground="{StaticResource OkBrush}" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                    </StackPanel>
                 </Grid>
+            </Border>
+        </Grid>
 
-                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                    <TextBlock Text="File-stability delay (seconds)" Style="{StaticResource CaptionText}"
-                               VerticalAlignment="Center" Margin="0,0,9,0"/>
-                    <TextBox Text="{Binding StabilityDelaySeconds, UpdateSourceTrigger=PropertyChanged}" Width="72"
-                             VerticalContentAlignment="Center"
-                             AutomationProperties.Name="File-stability delay in seconds"
-                             ToolTip="A file must keep its size for this many seconds before it is picked up"/>
-                    <TextBlock Text="A new file is only picked up once its size stops changing, so files still being copied are never imported half-finished."
-                               Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="16,0,0,0"
-                               Foreground="{StaticResource FaintTextBrush}"/>
-                </StackPanel>
-            </StackPanel>
-        </Border>
+        <!-- ============ Busy / Feedback Strip ============ -->
+        <StackPanel Grid.Row="2" Margin="0,10,0,4">
+            <ProgressBar IsIndeterminate="True" Height="4"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding StatusText}" Style="{StaticResource StatusBarText}" Margin="2,4,0,0"
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding HasStatusText, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
 
-        <!-- ====== Import summary: ONE consolidated card (six metrics) ====== -->
-        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="{StaticResource CardPaddingCompact}" Margin="0,16,0,0">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{StaticResource Icon.Diagnostic}" Style="{StaticResource GlyphSmall}"
-                               Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                    <TextBlock Text="Import Summary" Style="{StaticResource SectionTitle}" Margin="9,0,0,0"
-                               VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding ImportSummary}" Style="{StaticResource CaptionText}" Margin="14,0,0,0"
-                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
-                <UniformGrid Rows="1" Columns="6" Margin="0,14,0,0">
-                    <Border Style="{StaticResource SummaryMetric}" BorderThickness="0" Padding="0">
-                        <StackPanel>
-                            <TextBlock Text="{Binding TotalCount}" Style="{StaticResource StatValue}"/>
-                            <TextBlock Text="Total Detected" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SummaryMetric}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding ImportedCount}" Style="{StaticResource StatValue}"
-                                       Foreground="{StaticResource OkBrush}"/>
-                            <TextBlock Text="Imported" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SummaryMetric}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding AwaitingCount}" Style="{StaticResource StatValue}"
-                                       Foreground="{StaticResource PrimaryBrush}"/>
-                            <TextBlock Text="Awaiting Destination" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SummaryMetric}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding NoMatchCount}" Style="{StaticResource StatValue}"
-                                       Foreground="{StaticResource WarnBrush}"/>
-                            <TextBlock Text="No Match" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SummaryMetric}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding SkippedCount}" Style="{StaticResource StatValue}"
-                                       Foreground="{StaticResource SubTextBrush}"/>
-                            <TextBlock Text="Skipped" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource SummaryMetric}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding FailedCount}" Style="{StaticResource StatValue}"
-                                       Foreground="{StaticResource DangerBrush}"/>
-                            <TextBlock Text="Failed" Style="{StaticResource CaptionText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
-            </StackPanel>
-        </Border>
-
-        <!-- ============ Activity list + file preview ============ -->
-        <Grid Grid.Row="3" Margin="0,8,0,0">
+        <!-- ============ Two-Panel Import Logs (Movies | Dramas) ============ -->
+        <Grid Grid.Row="3" Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="7*"/>
+                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="5*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Recent activity -->
+            <!-- LEFT PANEL: Movie Imports -->
             <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Padding="{StaticResource CardHeaderPadding}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{StaticResource Icon.History}" Style="{StaticResource GlyphIcon}"
-                                       Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
-                            <TextBlock Text="Recent Activity" Style="{StaticResource SectionTitle}" Margin="10,0,0,0"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                    <ListBox Grid.Row="1"
-                             ItemsSource="{Binding Activity}"
-                             SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             VirtualizingPanel.IsVirtualizing="True">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Chrome" Background="Transparent" Padding="16,10" BorderThickness="0,0,0,1"
-                                                    BorderBrush="{StaticResource DividerBrush}">
-                                                <ContentPresenter/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardBackgroundHover}"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Chrome" Property="Background" Value="{StaticResource NavActiveBrush}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Width="150">
-                                        <Ellipse Fill="{Binding StatusKey, Converter={StaticResource StatusBrush}}"
-                                                 Width="9" Height="9" VerticalAlignment="Top" Margin="0,5,0,0"/>
-                                        <StackPanel Margin="9,0,0,0">
-                                            <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionText}"/>
-                                            <TextBlock Text="{Binding DetectedType}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,0,10,0">
-                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding SourcePath}"/>
-                                        <TextBlock Text="{Binding MatchSummary}" Style="{StaticResource SubText}" FontSize="11.5"
-                                                   Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <Border Grid.Column="2" Style="{StaticResource RowStatusChip}">
-                                        <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{Binding StatusKey, Converter={StaticResource StatusBrush}}"/>
-                                    </Border>
 
-                                    <!-- Per-file "Browse / Move": opens the folder picker and
-                                         relocates THIS file. The tooltip sits on the wrapper so it
-                                         is still readable while the button is disabled. -->
-                                    <Border Grid.Column="3" Margin="10,0,0,0" VerticalAlignment="Top"
-                                            ToolTip="{Binding MoveHint}">
-                                        <Button Style="{StaticResource SecondaryButton}"
-                                                Padding="10,5" MinHeight="30"
-                                                Command="{Binding DataContext.MoveFileCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                                CommandParameter="{Binding}"
-                                                IsEnabled="{Binding CanConfirm}"
-                                                AutomationProperties.Name="Browse and move this file">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{StaticResource Icon.FolderOpen}" Style="{StaticResource GlyphXs}"
-                                                           Margin="0,0,7,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="Browse / Move" FontSize="11.5" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                    </Border>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <!-- Movie Panel Header + Movie Buttons Above Movie Imports -->
+                    <Border Grid.Row="0" Padding="14,10" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Movie Imports" Style="{StaticResource SectionTitle}"/>
+                            <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                                <Button Margin="0,0,8,0" Padding="12,5"
+                                        Command="{Binding ScanMoviesCommand}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                        Content="Scan Movies"/>
+                                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Padding="10,5"
+                                        Command="{Binding OpenMoviesWatchFolderCommand}"
+                                        Content="Open Movies"/>
+                                <Button Style="{StaticResource DangerButton}" Padding="10,5"
+                                        Command="{Binding ClearMovieHistoryCommand}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                        Content="Clear Movie History"/>
+                            </WrapPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Movie Imports List -->
+                    <Grid Grid.Row="1">
+                        <TextBlock Text="No movie imports logged yet. Drop movie files in your Movies Watch Folder or click Scan Movies."
+                                   Style="{StaticResource SubText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextAlignment="Center" TextWrapping="Wrap" Margin="24"
+                                   Visibility="{Binding HasNoMovieActivity, Converter={StaticResource BoolToVis}}"/>
+
+                        <ListBox ItemsSource="{Binding Activity}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.IsVirtualizing="True">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Chrome" Background="Transparent" Padding="14,10" BorderThickness="0,0,0,1"
+                                                        BorderBrush="{StaticResource DividerBrush}">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                            <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding SourcePath}"/>
+                                            <TextBlock Text="{Binding MatchSummary}" Style="{StaticResource SubText}" FontSize="11.5"
+                                                       Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding MatchSummary}"/>
+                                            <TextBlock Text="{Binding TimestampText}" Style="{StaticResource CaptionText}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource RowStatusPill}">
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{Binding StatusKey, Converter={StaticResource StatusBrush}}"/>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
                 </Grid>
             </Border>
 
-            <!-- File preview -->
-            <Border Grid.Column="2" Style="{StaticResource CardBorder}">
+            <!-- RIGHT PANEL: Drama Imports -->
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="0">
                 <Grid>
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="260"
-                                Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisInverted}}">
-                        <Border Style="{StaticResource EmptyMedallion}">
-                            <TextBlock Text="{StaticResource Icon.OpenFile}" Style="{StaticResource GlyphLarge}"
-                                       Foreground="{StaticResource SubTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Select an activity row to preview the file."
-                                   Style="{StaticResource SubText}" HorizontalAlignment="Center" Margin="0,14,0,0"
-                                   TextWrapping="Wrap" TextAlignment="Center"/>
-                    </StackPanel>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  Visibility="{Binding HasPreview, Converter={StaticResource BoolToVis}}">
-                        <StackPanel>
-                            <TextBlock Text="File preview" Style="{StaticResource EyebrowText}"/>
-                            <TextBlock Text="{Binding PreviewFileName}" FontSize="15" FontWeight="SemiBold" Margin="0,6,0,0"
-                                       TextWrapping="Wrap"/>
-                            <TextBlock Text="{Binding PreviewSourcePath}" Style="{StaticResource CaptionText}" Margin="0,4,0,0"
-                                       TextWrapping="Wrap"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <Border Style="{StaticResource StatusChip}" Padding="9,3">
-                                    <TextBlock Text="{Binding PreviewSizeText}" FontSize="11" FontWeight="SemiBold"/>
-                                </Border>
-                                <Border Style="{StaticResource StatusChip}" Padding="9,3" Margin="7,0,0,0">
-                                    <TextBlock Text="{Binding PreviewTypeText}" FontSize="11" FontWeight="SemiBold"/>
-                                </Border>
-                            </StackPanel>
+                    <!-- Drama Panel Header + Drama Buttons Above Drama Imports -->
+                    <Border Grid.Row="0" Padding="14,10" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Drama Imports" Style="{StaticResource SectionTitle}"/>
+                            <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                                <Button Margin="0,0,8,0" Padding="12,5"
+                                        Command="{Binding ScanDramasCommand}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                        Content="Scan Dramas"/>
+                                <Button Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Padding="10,5"
+                                        Command="{Binding OpenDramaWatchFolderCommand}"
+                                        Content="Open Drama"/>
+                                <Button Style="{StaticResource DangerButton}" Padding="10,5"
+                                        Command="{Binding ClearDramaHistoryCommand}"
+                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                        Content="Clear Drama History"/>
+                            </WrapPanel>
+                        </Grid>
+                    </Border>
 
-                            <Separator Style="{StaticResource Divider}"/>
+                    <!-- Drama Imports List -->
+                    <Grid Grid.Row="1">
+                        <TextBlock Text="No drama imports logged yet. Drop drama subfolders or episodes in your Drama Watch Folder or click Scan Dramas."
+                                   Style="{StaticResource SubText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextAlignment="Center" TextWrapping="Wrap" Margin="24"
+                                   Visibility="{Binding HasNoDramaActivity, Converter={StaticResource BoolToVis}}"/>
 
-                            <TextBlock Text="Match" Style="{StaticResource FieldLabel}" Margin="0,2,0,4"/>
-                            <TextBlock Text="{Binding PreviewMatchText}" TextWrapping="Wrap"/>
-                            <TextBlock Text="{Binding PreviewDetailText}" Style="{StaticResource SubText}" Margin="0,6,0,0"
-                                       TextWrapping="Wrap"
-                                       Visibility="{Binding PreviewDetailText, Converter={StaticResource NullToVis}}"/>
-
-                            <TextBlock Text="Destination" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Text="{Binding DestinationPreviewText, Mode=OneWay}" IsReadOnly="True"
-                                     Visibility="{Binding PreviewIsMedia, Converter={StaticResource BoolToVis}}"/>
-                            <TextBlock Text="{Binding PreviewTargetText}" Style="{StaticResource CaptionText}" Margin="0,7,0,0"
-                                       TextWrapping="Wrap"
-                                       Visibility="{Binding PreviewHasTarget, Converter={StaticResource BoolToVis}}"/>
-
-                            <StackPanel Margin="0,18,0,0"
-                                        Visibility="{Binding PreviewIsMedia, Converter={StaticResource BoolToVis}}">
-                                <Button Command="{Binding ConfirmMoveCommand}" HorizontalAlignment="Stretch"
-                                        IsEnabled="{Binding CanConfirmSelected}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{StaticResource Icon.Download}" Style="{StaticResource GlyphSmall}" Margin="0,0,9,0"/>
-                                        <TextBlock Text="Move to Library"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button Style="{StaticResource DangerButton}" HorizontalAlignment="Stretch" Margin="0,9,0,0"
-                                        Command="{Binding SkipFileCommand}"
-                                        IsEnabled="{Binding CanSkipSelected}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{StaticResource Icon.Stop}" Style="{StaticResource GlyphXs}" Margin="0,0,8,0"
-                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                        <TextBlock Text="Skip File"/>
-                                    </StackPanel>
-                                </Button>
-                                <TextBlock Text="Files without a reliable match stay in the Watch Folder untouched."
-                                           Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </ScrollViewer>
+                        <ListBox ItemsSource="{Binding DramaActivity}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.IsVirtualizing="True">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Chrome" Background="Transparent" Padding="14,10" BorderThickness="0,0,0,1"
+                                                        BorderBrush="{StaticResource DividerBrush}">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding DramaTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <Border Style="{StaticResource StatusPill}" Background="{StaticResource PrimaryDimBrush}" Margin="8,0,0,0">
+                                                    <TextBlock Text="{Binding EpisodeBadge}" FontSize="10.5" FontWeight="Bold"
+                                                               Foreground="{StaticResource PrimaryDarkBrush}"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding SourceFileName}" Style="{StaticResource SubText}" FontSize="11.5"
+                                                       Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding TargetPath}"/>
+                                            <TextBlock Style="{StaticResource CaptionText}" Margin="0,2,0,0">
+                                                <Run Text="{Binding TimestampText, Mode=OneWay}"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="{Binding SizeText, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource RowStatusPill}" Background="#DCFCE7" BorderBrush="#86EFAC">
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource OkBrush}"/>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

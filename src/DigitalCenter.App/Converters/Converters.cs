@@ -99,7 +99,7 @@ public sealed class CountToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>True → false, false → true (RadioButton binding against a bool).</summary>
+/// <summary>True → false, false → true.</summary>
 public sealed class InverseBoolConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
@@ -132,13 +132,16 @@ public sealed class IndexToBoolConverter : IValueConverter
 }
 
 /// <summary>
-/// Loads a cached poster file (MediaTitle.PosterPath, resolved against the
-/// application poster cache) as a frozen, downscaled BitmapImage. Images are
-/// cached per path so scrolling the poster grid never re-decodes files.
+/// Loads a cached poster or backdrop file as a frozen BitmapImage.
+/// Uses 1280px decode width for Hero Backdrops and 320px for grid poster cards.
 /// </summary>
 public sealed class PosterPathToImageConverter : IValueConverter
 {
     private static readonly ConcurrentDictionary<string, BitmapImage?> Cache = new(StringComparer.OrdinalIgnoreCase);
+    private static string? _cachedPostersDirectory;
+
+    private static string PostersDirectory =>
+        _cachedPostersDirectory ??= AppPaths.CreateDefault().PostersDirectory;
 
     public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -147,34 +150,34 @@ public sealed class PosterPathToImageConverter : IValueConverter
             return null;
         }
 
-        return Cache.GetOrAdd(posterPath, LoadPoster);
+        var isBackdrop = string.Equals(parameter as string, "Backdrop", StringComparison.OrdinalIgnoreCase) ||
+                         posterPath.EndsWith("-backdrop.jpg", StringComparison.OrdinalIgnoreCase);
+        var decodeWidth = isBackdrop ? 1280 : 320;
+        var cacheKey = $"{posterPath}:{decodeWidth}";
+
+        return Cache.GetOrAdd(cacheKey, _ => LoadImage(posterPath, decodeWidth));
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 
-    private static BitmapImage? LoadPoster(string posterPath)
+    private static BitmapImage? LoadImage(string posterPath, int decodeWidth)
     {
         try
         {
-            var app = Application.Current as App;
-            var paths = app?.Services?.GetService<AppPaths>();
-            if (paths is null)
-            {
-                return null;
-            }
-
-            var absolute = Path.Combine(paths.PostersDirectory, posterPath);
+            var absolute = Path.Combine(PostersDirectory, posterPath);
             if (!File.Exists(absolute))
             {
                 return null;
             }
 
+            using var stream = new FileStream(absolute, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan);
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
-            image.DecodePixelWidth = 320; // Cards render up to ~200 DIP wide; keeps memory small and art crisp.
-            image.UriSource = new Uri(absolute, UriKind.Absolute);
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            image.DecodePixelWidth = decodeWidth;
+            image.StreamSource = stream;
             image.EndInit();
             image.Freeze();
             return image;

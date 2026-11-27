@@ -77,9 +77,16 @@ public static class MetadataMerge
             title.Synopsis = metadata.Synopsis;
         }
 
-        if (!IsOverridden(title, MetadataFieldNames.OriginalLanguage) && !string.IsNullOrWhiteSpace(metadata.OriginalLanguage))
+        if (!IsOverridden(title, MetadataFieldNames.OriginalLanguage))
         {
-            title.OriginalLanguage = metadata.OriginalLanguage;
+            var resolvedLanguage = LanguageResolver.FromLanguageCodeOrName(metadata.OriginalLanguage)
+                                   ?? (!string.IsNullOrWhiteSpace(metadata.OriginalLanguage)
+                                       ? metadata.OriginalLanguage
+                                       : null);
+            if (!string.IsNullOrWhiteSpace(resolvedLanguage))
+            {
+                title.OriginalLanguage = resolvedLanguage;
+            }
         }
 
         if (metadata.ImdbId is not null && !IsOverridden(title, MetadataFieldNames.ImdbId))
@@ -92,7 +99,6 @@ public static class MetadataMerge
             title.VoteAverage = metadata.VoteAverage;
         }
 
-        // Artwork: only fill what is missing; manual artwork choices survive.
         if (!IsOverridden(title, MetadataFieldNames.Poster))
         {
             title.TmdbPosterPath ??= metadata.PosterPath;
@@ -115,7 +121,36 @@ public static class MetadataMerge
         ApplyGenres(db, title, metadata);
         ApplyCountries(db, title, metadata);
         ApplyPeople(db, title, metadata);
+        ApplyCollection(db, title, metadata);
         ApplySeries(db, title, metadata);
+    }
+
+    private static void ApplyCollection(DigitalCenterDbContext db, MediaTitle title, TmdbTitleMetadata metadata)
+    {
+        if (metadata.IsSeries)
+        {
+            return;
+        }
+
+        var collectionName = CollectionResolver.Resolve(metadata.CollectionName, metadata.Title ?? title.Title);
+        if (string.IsNullOrWhiteSpace(collectionName))
+        {
+            return;
+        }
+
+        var catName = $"Collection: {collectionName}";
+        var category = db.Categories.Local.FirstOrDefault(c => c.Type == MediaKind.Movie && string.Equals(c.Name, catName, StringComparison.OrdinalIgnoreCase))
+                       ?? db.Categories.FirstOrDefault(c => c.Type == MediaKind.Movie && c.Name == catName);
+        if (category is null)
+        {
+            category = new Category { Type = MediaKind.Movie, Name = catName };
+            db.Categories.Add(category);
+        }
+
+        if (!title.Categories.Any(tc => string.Equals(tc.Category?.Name, catName, StringComparison.OrdinalIgnoreCase) || (category.Id != 0 && tc.CategoryId == category.Id)))
+        {
+            title.Categories.Add(new TitleCategory { MediaTitleId = title.Id, Category = category, CategoryId = category.Id });
+        }
     }
 
     private static void ApplyGenres(DigitalCenterDbContext db, MediaTitle title, TmdbTitleMetadata metadata)
@@ -179,8 +214,6 @@ public static class MetadataMerge
                 {
                     Name = credit.Name,
                     TmdbPersonId = credit.TmdbPersonId,
-                    // Store the intended cache file name now; the artwork step
-                    // downloads the image into it.
                     ProfilePath = credit.TmdbPersonId is not null ? $"p{credit.TmdbPersonId}.jpg" : null
                 };
                 db.People.Add(person);
@@ -240,12 +273,9 @@ public static class MetadataMerge
             details.AiringStatus = metadata.AiringStatus;
         }
 
-        // The season count comes from the catalogue entry itself; a partial
-        // fetch (one season, for one imported episode) must never lower it.
-        var seasonCount = metadata.SeasonCount ?? (metadata.Seasons.Count > 0 ? metadata.Seasons.Count : null);
-        if (seasonCount is > 0 && (details.TotalSeasons is null || details.TotalSeasons < seasonCount.Value))
+        if (metadata.Seasons.Count > 0)
         {
-            details.TotalSeasons = seasonCount;
+            details.TotalSeasons = metadata.Seasons.Count;
         }
 
         foreach (var seasonMeta in metadata.Seasons)
@@ -269,18 +299,13 @@ public static class MetadataMerge
                         EpisodeNumber = episodeMeta.EpisodeNumber,
                         Title = string.IsNullOrWhiteSpace(episodeMeta.Title)
                             ? $"Episode {episodeMeta.EpisodeNumber}"
-                            : episodeMeta.Title,
-                        TmdbId = episodeMeta.TmdbId
+                            : episodeMeta.Title
                     });
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(episodeMeta.Title) &&
+                         (string.IsNullOrWhiteSpace(episode.Title) || episode.Title.StartsWith("Episode ", StringComparison.Ordinal)))
                 {
-                    episode.TmdbId ??= episodeMeta.TmdbId;
-                    if (!string.IsNullOrWhiteSpace(episodeMeta.Title) &&
-                        (string.IsNullOrWhiteSpace(episode.Title) || episode.Title.StartsWith("Episode ", StringComparison.Ordinal)))
-                    {
-                        episode.Title = episodeMeta.Title;
-                    }
+                    episode.Title = episodeMeta.Title;
                 }
             }
         }

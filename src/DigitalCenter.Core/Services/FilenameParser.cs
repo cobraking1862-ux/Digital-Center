@@ -43,46 +43,22 @@ public sealed class FilenameParser
     private const string YearPattern = @"\b(19|20)\d{2}\b";
     private const string ParenYearPattern = @"\((19|20)\d{2}\)";
 
-    /// <summary>
-    /// Separators that commonly sit between season/episode tokens: "S01E01",
-    /// "S01.E01", "S01_E01", "S01-E01", "S01 E01". Treating them all the same
-    /// is what makes "Reacher.S01.E01" parse as an episode instead of a movie
-    /// called "Reacher S01 E01".
-    /// </summary>
-    private const string TokenSeparators = @"[\s._\-]*";
-
-    /// <summary>
-    /// Word-boundary replacement for season/episode markers. '_' is a word
-    /// character, so "\bS01" never matches inside "Show_S01E01"; an explicit
-    /// "not preceded by a letter or digit" lookbehind does (and still keeps
-    /// resolutions such as "1920x1080" out of the NxNN pattern).
-    /// </summary>
-    private const string MarkerStart = @"(?<![A-Za-z0-9])";
-    private const string WordStart = @"(?<![A-Za-z])";
-
     private static readonly Regex ParenYear = new(ParenYearPattern, RegexOptions.Compiled);
     private static readonly Regex YearToken = new(@"^(19|20)\d{2}$", RegexOptions.Compiled);
     private static readonly Regex Resolution = new(@"^\d{3,4}x\d{3,4}$", RegexOptions.Compiled);
-    private static readonly Regex SeasonEpisode = new(
-        $@"{MarkerStart}s(\d{{1,2}}){TokenSeparators}e(?:p)?\.?(\d{{1,3}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex SeasonEpisodeAlt = new(
-        $@"{MarkerStart}(\d{{1,2}})x(\d{{1,3}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    /// <summary>"Season 1 Episode 1", "Season.01.Episode.05", "Season 1 - Episode 1".</summary>
-    private static readonly Regex SeasonWordEpisode = new(
-        $@"{WordStart}season{TokenSeparators}(\d{{1,2}}){TokenSeparators}(?:,|and|&)?{TokenSeparators}episode{TokenSeparators}(\d{{1,3}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    /// <summary>A lone "Season 2" token in the file name (episode number comes from another marker).</summary>
-    private static readonly Regex SeasonWord = new(
-        $@"{WordStart}season{TokenSeparators}(\d{{1,2}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex EpisodeOnly = new(
-        $@"{WordStart}e(?:p)?{TokenSeparators}(\d{{1,3}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex EpisodeWord = new(
-        $@"{WordStart}episode{TokenSeparators}(\d{{1,3}})(?!\d)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // "S01E02", "S01.E02", "S01_E02", "S01-E02", "S01 E02", "S01EP02" — the
+    // separator between the season and the episode part is optional and may be
+    // a space, dot, underscore or dash (watch-folder names use every variant).
+    // The marker must not sit inside a word or number, so an explicit
+    // lookbehind is used instead of \b ("_" is a word character, which would
+    // otherwise make "Reacher_S01_E01" unmatchable).
+    private static readonly Regex SeasonEpisode = new(@"(?<![a-zA-Z])s(\d{1,2})[\s._-]?ep?\.?(\d{1,3})(?!\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // "Season 1 Episode 2", "Season.1.Episode.2", "Season 1 Ep 2" written in
+    // the file name itself (no folder hint required).
+    private static readonly Regex SeasonEpisodeWords = new(@"(?<![a-zA-Z])season[\s._-]*(\d{1,2})\b[\s._-]*(?:episodes?|eps?|e)[\s._-]*(\d{1,3})(?!\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SeasonEpisodeAlt = new(@"(?<![a-zA-Z0-9])(\d{1,2})x(\d{1,3})(?!\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EpisodeOnly = new(@"(?<![a-zA-Z0-9])e(?:p)?\.?\s?(\d{1,3})(?!\d)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EpisodeWord = new(@"\bepisode\s+(\d{1,3})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TrailingNumber = new(@"(?:^|\s)-\s*(\d{1,3})\s*$", RegexOptions.Compiled);
     private static readonly Regex BareTrailingNumber = new(@"^(.+?)\s+(\d{1,3})$", RegexOptions.Compiled);
     private static readonly Regex SeasonFolder = new(@"\bseason\s*(\d{1,2})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -237,82 +213,57 @@ public sealed class FilenameParser
     {
         result = null!;
 
-        // Ordered attempts, most specific first:
-        //   1. S01E02 (any separator between the tokens), 2. 1x02,
-        //   3. "Season 1 Episode 1",
-        //   4. episode-only forms that need a season number — taken from the
-        //      enclosing folder ("Season 02") or from a "Season 2" token in
-        //      the file name itself.
+        // Ordered attempts: "Season 1 Episode 2", S01E02 (all separators),
+        // 1x02, then episode-only forms that need a season hint.
         Match? marker = null;
         int? season = null, episode = null;
         var bareNumberForm = false;
-        var explicitMarker = false;   // the name carried both numbers
-        var seasonFromName = false;   // "Season 2" token inside the file name
-        var titleEnd = -1;            // cut the title here when it precedes the marker
 
-        var m = SeasonEpisode.Match(name);
+        var m = SeasonEpisodeWords.Match(name);
         if (m.Success)
         {
             marker = m;
-            explicitMarker = true;
+            season = int.Parse(m.Groups[1].Value);
+            episode = int.Parse(m.Groups[2].Value);
+        }
+        else if ((m = SeasonEpisode.Match(name)).Success)
+        {
+            marker = m;
             season = int.Parse(m.Groups[1].Value);
             episode = int.Parse(m.Groups[2].Value);
         }
         else if ((m = SeasonEpisodeAlt.Match(name)).Success)
         {
             marker = m;
-            explicitMarker = true;
             season = int.Parse(m.Groups[1].Value);
             episode = int.Parse(m.Groups[2].Value);
         }
-        else if ((m = SeasonWordEpisode.Match(name)).Success)
+        else if (seasonHint.HasValue)
         {
-            marker = m;
-            explicitMarker = true;
-            season = int.Parse(m.Groups[1].Value);
-            episode = int.Parse(m.Groups[2].Value);
-        }
-        else
-        {
-            var wordSeason = SeasonWord.Match(name);
-            int? nameSeason = null;
-            if (wordSeason.Success && int.TryParse(wordSeason.Groups[1].Value, out var parsedNameSeason)
-                && parsedNameSeason is >= 0 and <= 99)
+            if ((m = EpisodeOnly.Match(name)).Success)
             {
-                nameSeason = parsedNameSeason;
+                marker = m;
+                season = seasonHint.Value;
+                episode = int.Parse(m.Groups[1].Value);
             }
-
-            var effectiveHint = seasonHint ?? nameSeason;
-            if (effectiveHint.HasValue)
+            else if ((m = EpisodeWord.Match(name)).Success)
             {
-                seasonFromName = !seasonHint.HasValue && nameSeason.HasValue;
-                titleEnd = seasonFromName ? wordSeason.Index : -1;
-
-                if ((m = EpisodeOnly.Match(name)).Success)
-                {
-                    marker = m;
-                    season = effectiveHint.Value;
-                    episode = int.Parse(m.Groups[1].Value);
-                }
-                else if ((m = EpisodeWord.Match(name)).Success)
-                {
-                    marker = m;
-                    season = effectiveHint.Value;
-                    episode = int.Parse(m.Groups[1].Value);
-                }
-                else if ((m = TrailingNumber.Match(name)).Success)
-                {
-                    marker = m;
-                    season = effectiveHint.Value;
-                    episode = int.Parse(m.Groups[1].Value);
-                }
-                else if ((m = BareTrailingNumber.Match(name)).Success)
-                {
-                    marker = m;
-                    season = effectiveHint.Value;
-                    episode = int.Parse(m.Groups[2].Value);
-                    bareNumberForm = true;
-                }
+                marker = m;
+                season = seasonHint.Value;
+                episode = int.Parse(m.Groups[1].Value);
+            }
+            else if ((m = TrailingNumber.Match(name)).Success)
+            {
+                marker = m;
+                season = seasonHint.Value;
+                episode = int.Parse(m.Groups[1].Value);
+            }
+            else if ((m = BareTrailingNumber.Match(name)).Success)
+            {
+                marker = m;
+                season = seasonHint.Value;
+                episode = int.Parse(m.Groups[2].Value);
+                bareNumberForm = true;
             }
         }
 
@@ -321,19 +272,12 @@ public sealed class FilenameParser
             return false;
         }
 
-        // The bare-trailing-number form carries the title inside the match;
-        // every other form keeps it in front of the marker (and in front of a
-        // "Season NN" token when that supplied the season number).
-        var cut = bareNumberForm ? -1 : titleEnd >= 0 ? Math.Min(titleEnd, marker.Index) : marker.Index;
-        var rawTitle = bareNumberForm ? marker.Groups[1].Value : name[..Math.Max(0, cut)];
+        // The bare-trailing-number form carries the title inside the match.
+        var rawTitle = bareNumberForm ? marker.Groups[1].Value : name[..marker.Index];
 
-        var title = CleanTitle(rawTitle, out _);
-        int? year = null;
-        if (title.Length > 0)
-        {
-            (title, year) = SplitTrailingYear(title);
-        }
-
+        // Release years belong to the year field, not the search title
+        // ("Show.2022.S01E01" must search for "Show").
+        var (title, year) = SplitTitleYear(rawTitle);
         if (title.Length == 0)
         {
             // Keep the series flag so callers know this was series-like.
@@ -342,6 +286,7 @@ public sealed class FilenameParser
             return true;
         }
 
+        var wordForm = SeasonEpisodeWords.IsMatch(name);
         result = new ParsedFileName(
             IsSeries: true,
             Title: title,
@@ -349,34 +294,36 @@ public sealed class FilenameParser
             Season: season,
             Episode: episode,
             Confident: title.Any(char.IsLetter),
-            Note: explicitMarker
-                ? null
-                : seasonFromName
-                    ? "Season taken from the file name."
-                    : seasonHint.HasValue
-                        ? "Season taken from folder name."
-                        : null);
+            Note: seasonHint.HasValue && !wordForm && !SeasonEpisode.IsMatch(name) && !SeasonEpisodeAlt.IsMatch(name)
+                ? "Season taken from folder name."
+                : null);
         return true;
     }
 
     /// <summary>
-    /// Splits a trailing release year off a series title ("Reacher 2022" →
-    /// "Reacher" + 2022). The year is metadata for the search query, never
-    /// part of it: TMDb has no series called "Reacher 2022". Titles whose last
-    /// word is not a 19xx/20xx year are returned unchanged ("Blade Runner 2049").
+    /// Splits a raw pre-marker title into a clean title and an optional
+    /// release year. A parenthesised year wins; otherwise the last bare year
+    /// token is treated as the year (the same rule the movie parser uses, so
+    /// "Blade Runner 2049" style names stay intact when a real year follows).
     /// </summary>
-    private static (string Title, int? Year) SplitTrailingYear(string title)
+    private static (string Title, int? Year) SplitTitleYear(string rawTitle)
     {
-        var index = title.LastIndexOf(' ');
-        if (index <= 0 || index == title.Length - 1)
+        var parenMatch = ParenYear.Match(rawTitle);
+        if (parenMatch.Success)
         {
-            return (title, null);
+            var parenYear = int.Parse(parenMatch.Value.Trim('(', ')'));
+            return (CleanTitle(rawTitle[..parenMatch.Index], out _), parenYear);
         }
 
-        var last = title[(index + 1)..];
-        return YearToken.IsMatch(last) && int.TryParse(last, out var year)
-            ? (title[..index].TrimEnd(), year)
-            : (title, null);
+        var tokens = Tokenize(rawTitle);
+        var yearIndex = FindYearTokenIndex(tokens);
+        if (yearIndex >= 0)
+        {
+            var year = int.Parse(tokens[yearIndex]);
+            return (CleanTitle(string.Join(' ', tokens.Take(yearIndex)), out _), year);
+        }
+
+        return (CleanTitle(rawTitle, out _), null);
     }
 
     private ParsedFileName ParseMovie(string name)
