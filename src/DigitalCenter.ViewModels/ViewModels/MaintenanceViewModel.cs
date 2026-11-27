@@ -208,7 +208,7 @@ public partial class MaintenanceViewModel : ObservableObject
     {
         _paths = paths;
         _settingsService = settingsService;
-        _downloadSettings = new DownloadSettingsService(paths);
+        _downloadSettings = new DownloadSettingsService(paths, logger);
         _scanner = scanner;
         _dramaLibrary = dramaLibrary;
         _ticketService = ticketService;
