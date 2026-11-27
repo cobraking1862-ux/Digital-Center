@@ -45,6 +45,7 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
         Status = LookupCheckStatus.Pending;
         Detail = "Ready to check";
         CheckedUrl = string.Empty;
+        BrowserFallbackUrl = string.Empty;
         DownloadStatusText = string.Empty;
     }
 
