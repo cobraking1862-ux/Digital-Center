@@ -280,8 +280,11 @@ public partial class App : Application
         services.AddSingleton<DramaLibraryService>();
         services.AddSingleton<DramaWatchFolderService>();
         services.AddSingleton<DramaCopyService>();
-        // BigOne must inspect every redirect itself; never share a redirect-following client.
-        services.AddSingleton<HttpClient>(_ =>
+        // Keep BigOne's redirect-disabled transport private to this workflow. Other
+        // services (notably IMDb lookup) retain their own redirect-following clients.
+        services.AddSingleton(new BigOneOptions(
+            configuration["Download:BigOneCloudOrigin"] ?? "https://new10.gdflix.io/"));
+        services.AddSingleton<BigOneDownloadWorkflow>(sp =>
         {
             var handler = new HttpClientHandler
             {
@@ -293,11 +296,8 @@ public partial class App : Application
             var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("DigitalCenter/14.0");
             client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml;q=0.9,*/*;q=0.8");
-            return client;
+            return new BigOneDownloadWorkflow(client, sp.GetRequiredService<BigOneOptions>());
         });
-        services.AddSingleton(new BigOneOptions(
-            configuration["Download:BigOneCloudOrigin"] ?? "https://new10.gdflix.io/"));
-        services.AddSingleton<BigOneDownloadWorkflow>();
         services.AddSingleton<DownloadWorkflowDispatcher>();
 
         services.AddSingleton<ImdbLookupService>();
