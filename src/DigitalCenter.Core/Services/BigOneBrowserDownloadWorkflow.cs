@@ -17,6 +17,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     private const string BollyFlixHost = DownloadWorkflowIds.BigOneSiteHost;
     private const string FastDlHost = "dl.fastdlserver.site";
     private const string GdFlixHost = "new10.gdflix.io";
+    private const string GdFlixRedirectHost = "gdflix.dev";
     private const int NavigationTimeoutMs = 45_000;
     private const int ElementTimeoutMs = 20_000;
     private const int HumanVerificationTimeoutMs = 180_000;
@@ -25,7 +26,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     {
         BollyFlixHost,
         FastDlHost,
-        GdFlixHost
+        GdFlixHost,
+        GdFlixRedirectHost
     };
 
     private static readonly HashSet<string> AllowedFinalHosts = new(StringComparer.OrdinalIgnoreCase)
@@ -451,13 +453,35 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             return _page;
         }
 
+        // The customer may close the visible Edge window while a workflow is running.
+        // Reuse an open tab if the context survived; otherwise discard the dead context
+        // and launch a fresh one rather than repeatedly using a disconnected Playwright handle.
+        if (_context is not null)
+        {
+            try
+            {
+                _page = _context.Pages.FirstOrDefault(candidate => !candidate.IsClosed) ??
+                        await _context.NewPageAsync().ConfigureAwait(false);
+                await InstrumentPageAsync(_page).ConfigureAwait(false);
+                Report(progress, "Reused the existing BigOne browser session.");
+                return _page;
+            }
+            catch (PlaywrightException ex)
+            {
+                _logger?.Warn($"Previous BigOne browser session is closed; starting a new one ({ex.GetType().Name}).");
+                _context = null;
+                _page = null;
+                _instrumentedPages.Clear();
+            }
+        }
+
         _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
         var profileDirectory = Path.Combine(_paths.DataRoot, "BrowserProfiles", "BigOne");
         Directory.CreateDirectory(profileDirectory);
 
         try
         {
-            _context ??= await _playwright.Chromium.LaunchPersistentContextAsync(
+            _context = await _playwright.Chromium.LaunchPersistentContextAsync(
                 profileDirectory,
                 new BrowserTypeLaunchPersistentContextOptions
                 {
@@ -465,10 +489,10 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     Channel = "msedge",
                     SlowMo = 120,
                     AcceptDownloads = true,
-                    Args = ["--start-maximized"]
+                    Args = ["--start-maximized", "--disable-quic"]
                 }).ConfigureAwait(false);
 
-            Report(progress, "Opened a visible Microsoft Edge window with a persistent BigOne browser profile.");
+            Report(progress, "Opened a visible Microsoft Edge window with a persistent BigOne browser profile (QUIC disabled for compatibility).");
         }
         catch (PlaywrightException edgeException)
         {
@@ -477,17 +501,17 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
             try
             {
-                _context ??= await _playwright.Chromium.LaunchPersistentContextAsync(
+                _context = await _playwright.Chromium.LaunchPersistentContextAsync(
                     profileDirectory,
                     new BrowserTypeLaunchPersistentContextOptions
                     {
                         Headless = false,
                         SlowMo = 120,
                         AcceptDownloads = true,
-                        Args = ["--start-maximized"]
+                        Args = ["--start-maximized", "--disable-quic"]
                     }).ConfigureAwait(false);
 
-                Report(progress, "Opened a visible Playwright Chromium window.");
+                Report(progress, "Opened a visible Playwright Chromium window (QUIC disabled for compatibility).");
             }
             catch (PlaywrightException chromiumException)
             {
@@ -865,17 +889,21 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         string.IsNullOrEmpty(uri.UserInfo) &&
         (AllowedPageHosts.Contains(uri.IdnHost) || AllowedFinalHosts.Contains(uri.IdnHost));
 
+    private static bool IsGdFlixHost(string host) =>
+        host.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase) ||
+        host.Equals(GdFlixRedirectHost, StringComparison.OrdinalIgnoreCase);
+
     private static bool IsFileHostUri(Uri uri) =>
         uri.IsAbsoluteUri &&
         uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) &&
         (uri.IdnHost.Equals(FastDlHost, StringComparison.OrdinalIgnoreCase) ||
-         uri.IdnHost.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase));
+         IsGdFlixHost(uri.IdnHost));
 
     private static bool IsGdFlixCloudPageUri(Uri uri) =>
         IsFileHostUri(uri) &&
-        uri.IdnHost.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase) &&
+        IsGdFlixHost(uri.IdnHost) &&
         uri.AbsolutePath.StartsWith("/cloud/", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFastDlRoute(Uri uri) =>
