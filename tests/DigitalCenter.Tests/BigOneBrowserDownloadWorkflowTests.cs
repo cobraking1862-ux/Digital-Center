@@ -1,3 +1,4 @@
+using DigitalCenter.Core.Configuration;
 using DigitalCenter.Core.Services;
 using Xunit;
 
