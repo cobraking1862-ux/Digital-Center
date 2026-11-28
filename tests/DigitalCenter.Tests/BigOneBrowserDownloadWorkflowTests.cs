@@ -1,5 +1,6 @@
 using DigitalCenter.Core.Configuration;
 using DigitalCenter.Core.Services;
+using DigitalCenter.Core.Models;
 using Xunit;
 
 namespace DigitalCenter.Tests;
@@ -8,6 +9,54 @@ public sealed class BigOneBrowserDownloadWorkflowTests
 {
     private static readonly Uri ListingUri = new("https://new1.bollyflix.tours/?s=tt0241527");
     private static readonly Uri MovieUri = new("https://new1.bollyflix.tours/harry-potter-2001/");
+
+    [Fact]
+    public void DefaultLookupSites_IncludeBollyFlixVisibleBrowserTarget()
+    {
+        var site = ImdbLookupService.GetDefaultSites()
+            .Single(candidate => candidate.Id == "builtin-bollyflix");
+
+        Assert.True(site.IsEnabled);
+        Assert.True(site.IsBuiltIn);
+        Assert.Equal("BollyFlix", site.Name);
+        Assert.Equal("https://new1.bollyflix.tours/?s={imdb_id}", site.UrlTemplate);
+    }
+
+    [Fact]
+    public void SettingsMigration_AddsBollyFlixWithoutRemovingCustomLookupSites()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DigitalCenterTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = new SettingsService(new AppPaths { DataRoot = root });
+            service.Save(new AppSettings
+            {
+                Version = 10,
+                LookupSites =
+                [
+                    new LookupSiteEntry
+                    {
+                        Id = "custom-katmovie",
+                        Name = "KatMovie",
+                        UrlTemplate = "https://katmovie.example/?s={imdb_id}",
+                        IsEnabled = true
+                    }
+                ]
+            });
+
+            var migrated = service.Load();
+
+            Assert.Equal(11, migrated.Version);
+            Assert.Contains(migrated.LookupSites, site => site.Id == "custom-katmovie");
+            Assert.Contains(migrated.LookupSites, site => site.Id == "builtin-bollyflix");
+            Assert.Equal(2, migrated.LookupSites.Count);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 
     [Fact]
     public void DownloadSettings_MigratesOnlyLegacyBollyFlixBindingToVisibleBrowser()
