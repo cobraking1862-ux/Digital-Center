@@ -499,7 +499,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             var request = route.Request;
             if (IsMainFrameNavigation(request, page) &&
                 Uri.TryCreate(request.Url, UriKind.Absolute, out var destination) &&
-                !IsAllowedPageHost(destination.IdnHost))
+                !IsAllowedPageUri(destination))
             {
                 _logger?.Warn($"[BigOne Browser] BLOCKED unexpected top-level navigation to {SafeUrl(request.Url)}");
                 await route.AbortAsync().ConfigureAwait(false);
@@ -518,7 +518,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (!IsAllowedPageHost(target.IdnHost))
+        if (!IsAllowedPageUri(target))
         {
             throw new InvalidOperationException($"The {stage} URL is outside the approved browser-navigation hosts.");
         }
@@ -540,7 +540,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
 
         if (!Uri.TryCreate(page.Url, UriKind.Absolute, out var currentUri) ||
-            !IsAllowedPageHost(currentUri.IdnHost))
+            !IsAllowedPageUri(currentUri))
         {
             throw new InvalidOperationException(
                 $"The {stage} navigation ended at an unapproved host: {SafeUrl(page.Url)}.");
@@ -618,7 +618,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         for (var request = response.Request; request is not null; request = request.RedirectedFrom)
         {
             if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var requestedUri) ||
-                !IsAllowedPageHost(requestedUri.IdnHost))
+                !IsAllowedPageUri(requestedUri))
             {
                 throw new InvalidOperationException(
                     $"The {stage} redirect chain included an unapproved host: {SafeUrl(request.Url)}.");
@@ -707,7 +707,12 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         uri.AbsolutePath.Equals("/", StringComparison.Ordinal) &&
         uri.Query.Contains("s=", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsAllowedPageHost(string host) => AllowedPageHosts.Contains(host);
+    private static bool IsAllowedPageUri(Uri uri) =>
+        uri.IsAbsoluteUri &&
+        uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+        uri.IsDefaultPort &&
+        string.IsNullOrEmpty(uri.UserInfo) &&
+        AllowedPageHosts.Contains(uri.IdnHost);
 
     private static bool IsFileHostUri(Uri uri) =>
         uri.IsAbsoluteUri &&
