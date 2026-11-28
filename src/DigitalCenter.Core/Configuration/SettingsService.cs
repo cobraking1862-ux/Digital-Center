@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalCenter.Core.Services;
 
 namespace DigitalCenter.Core.Configuration;
 
