@@ -104,7 +104,7 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
     public bool IsBuiltIn => Entry.IsBuiltIn;
 
     private static bool IsBollyFlixEntry(LookupSiteEntry entry) =>
-        string.Equals(entry.Name, "BollyFlix", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(entry.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
         (!string.IsNullOrWhiteSpace(entry.UrlTemplate) &&
          entry.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase));
 
