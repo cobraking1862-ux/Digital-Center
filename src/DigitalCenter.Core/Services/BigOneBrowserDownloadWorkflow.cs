@@ -450,9 +450,22 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
     private async Task<IPage> GetOrCreateVisiblePageAsync(IProgress<string>? progress)
     {
-        if (_page is { IsClosed: false })
+        if (_page is { IsClosed: false } existingPage)
         {
-            return _page;
+            try
+            {
+                // IsClosed can briefly lag a browser-process disconnect. A live protocol
+                // round-trip confirms that the page is still usable before reusing it.
+                _ = await existingPage.TitleAsync().ConfigureAwait(false);
+                return existingPage;
+            }
+            catch (PlaywrightException ex)
+            {
+                _logger?.Warn($"The previous BigOne tab is no longer connected ({ex.GetType().Name}); recreating the browser session.");
+                _context = null;
+                _page = null;
+                _instrumentedPages.Clear();
+            }
         }
 
         // The customer may close the visible Edge window while a workflow is running.
