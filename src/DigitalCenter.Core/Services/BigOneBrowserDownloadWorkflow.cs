@@ -498,8 +498,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         await page.RouteAsync("**/*", async route =>
         {
             var request = route.Request;
-            if (request.IsNavigationRequest &&
-                request.Frame == page.MainFrame &&
+            if (IsMainFrameNavigation(request, page) &&
                 Uri.TryCreate(request.Url, UriKind.Absolute, out var destination) &&
                 !IsAllowedPageHost(destination.IdnHost))
             {
@@ -610,6 +609,25 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
         catch (TimeoutException)
         {
+            return false;
+        }
+    }
+
+    private static bool IsMainFrameNavigation(IRequest request, IPage page)
+    {
+        if (!request.IsNavigationRequest)
+        {
+            return false;
+        }
+
+        try
+        {
+            return request.Frame == page.MainFrame;
+        }
+        catch
+        {
+            // Playwright documents that a navigation request can be emitted before
+            // its frame exists. The final page URL is validated again after navigation.
             return false;
         }
     }
@@ -775,28 +793,21 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             return;
         }
 
-        _runGate.Wait();
+        _disposed = true;
         try
         {
-            _disposed = true;
-            try
-            {
-                _context?.CloseAsync().GetAwaiter().GetResult();
-            }
-            catch
-            {
-                // Application shutdown must not be blocked by an already-closed browser.
-            }
-
-            _context = null;
-            _page = null;
-            _playwright?.Dispose();
-            _playwright = null;
+            // Closing the persistent context also interrupts any in-flight browser
+            // operation so application shutdown does not wait on a manual challenge.
+            _context?.CloseAsync().GetAwaiter().GetResult();
         }
-        finally
+        catch
         {
-            _runGate.Release();
-            _runGate.Dispose();
+            // Application shutdown must not be blocked by an already-closed browser.
         }
+
+        _context = null;
+        _page = null;
+        _playwright?.Dispose();
+        _playwright = null;
     }
 }
