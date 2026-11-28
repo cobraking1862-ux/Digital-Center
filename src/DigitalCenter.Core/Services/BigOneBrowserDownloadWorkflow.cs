@@ -84,10 +84,10 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
 
         await _runGate.WaitAsync(ct).ConfigureAwait(false);
+        var activeStage = "Browser startup";
         try
         {
             ThrowIfDisposed();
-            var activeStage = "Browser startup";
             Report(progress, "Playwright proxy: no explicit proxy is configured; the browser is using its default OS/browser network configuration.");
             var page = await GetOrCreateVisiblePageAsync(progress).ConfigureAwait(false);
             var titlePageUri = sourceUri;
