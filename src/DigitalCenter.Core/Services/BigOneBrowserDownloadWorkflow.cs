@@ -87,13 +87,16 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         try
         {
             ThrowIfDisposed();
+            var activeStage = "Browser startup";
+            Report(progress, "Playwright proxy: no explicit proxy is configured; the browser is using its default OS/browser network configuration.");
             var page = await GetOrCreateVisiblePageAsync(progress).ConfigureAwait(false);
             var titlePageUri = sourceUri;
 
             if (IsSearchListingUri(sourceUri))
             {
+                activeStage = "BollyFlix search";
                 Report(progress, "Opening the BollyFlix IMDb search result in the visible browser.");
-                await NavigateAsync(page, sourceUri, "BollyFlix search results", progress, ct).ConfigureAwait(false);
+                await NavigateAsync(page, sourceUri, activeStage, progress, ct).ConfigureAwait(false);
                 if (!await WaitForStageElementAsync(
                         page,
                         ".post-cards article.latestPost.excerpt",
@@ -115,8 +118,9 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                 return BrowserFallback("The source URL is not a supported BollyFlix search or movie page.", sourceUri, progress);
             }
 
+            activeStage = "BollyFlix movie post";
             Report(progress, "Opening the movie post and reading its quality sections.");
-            await NavigateAsync(page, titlePageUri, "BollyFlix movie post", progress, ct).ConfigureAwait(false);
+            await NavigateAsync(page, titlePageUri, activeStage, progress, ct).ConfigureAwait(false);
             if (!await WaitForStageElementAsync(
                     page,
                     ".post-single-content .thecontent h5",
@@ -139,8 +143,9 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             }
 
             Report(progress, $"Selected {selected.QualityLabel} (preferred: {request.PreferredQuality}).");
+            activeStage = "FastDLServer redirect";
             Report(progress, $"Opening the FastDLServer route: {SafeUrl(selected.TargetUrl)}");
-            await NavigateAsync(page, selected.TargetUrl, "FastDLServer file-host redirect", progress, ct).ConfigureAwait(false);
+            await NavigateAsync(page, selected.TargetUrl, activeStage, progress, ct).ConfigureAwait(false);
 
             if (!TryGetCurrentUri(page, out var fileHostUri) || !IsFileHostUri(fileHostUri))
             {
@@ -173,6 +178,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     progress);
             }
 
+            activeStage = "GDFlix FAST CLOUD popup";
             Report(progress, $"Clicking FAST CLOUD / ZIPDISK to open the GDFlix cloud tab: {SafeUrl(cloudUri)}");
             var cloudPage = await page.RunAndWaitForPopupAsync(
                 async () => await page.Locator("a[href*='/cloud/']").Filter(
@@ -185,6 +191,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
             // A popup event can arrive before the new tab finishes its initial navigation.
             // Wait for the expected GDFlix cloud URL instead of validating about:blank.
+            activeStage = "GDFlix cloud navigation";
             await cloudPage.WaitForURLAsync(
                 openedUrl =>
                     Uri.TryCreate(openedUrl, UriKind.Absolute, out var candidateUri) &&
@@ -236,6 +243,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                 downloadLink = cloudPage.Locator("a:has-text('Quick Download (Ready)')").First;
             }
 
+            activeStage = "GDFlix download event";
             Report(progress, $"Clicking {await downloadLink.InnerTextAsync().ConfigureAwait(false)} and waiting for Edge's actual download event.");
             var capturedDownload = await ClickAndCaptureDownloadAsync(
                 cloudPage,
@@ -267,10 +275,11 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
         catch (PlaywrightException ex)
         {
-            var diagnostic = RedactDiagnosticUrls(ex.Message);
-            _logger?.Warn($"BigOne visible browser stopped: {ex.GetType().Name}: {diagnostic}");
+            var diagnostic = $"Stage '{activeStage}' failed: {DescribeBrowserFailure(ex.Message)}";
+            _logger?.Warn($"[BigOne Browser] {diagnostic} · {RedactDiagnosticUrls(ex.Message)}");
+            Report(progress, diagnostic);
             return BrowserFallback(
-                $"Visible browser automation stopped ({ex.GetType().Name}): {diagnostic}. The browser window has been left open for inspection.",
+                $"{diagnostic} The visible browser has been left open for inspection.",
                 sourceUri,
                 progress);
         }
@@ -569,7 +578,11 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
         page.RequestFailed += (_, request) =>
         {
-            _logger?.Warn($"[BigOne Browser] REQUEST FAILED {SafeUrl(request.Url)} · {request.Failure ?? "unknown network error"}");
+            var host = GetSafeHost(request.Url);
+            var requestKind = request.IsNavigationRequest ? "navigation" : request.ResourceType;
+            _logger?.Warn(
+                $"[BigOne Browser] REQUEST FAILED ({requestKind}) {request.Method} {host} · " +
+                $"{DescribeBrowserFailure(request.Failure ?? "unknown network error")}");
         };
 
         await page.RouteAsync("**/*", async route =>
@@ -602,13 +615,24 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
 
         Report(progress, $"{stage}: navigating to {SafeUrl(target)}");
-        var response = await page.GotoAsync(
-            target.AbsoluteUri,
-            new PageGotoOptions
-            {
-                WaitUntil = WaitUntilState.DOMContentLoaded,
-                Timeout = NavigationTimeoutMs
-            }).ConfigureAwait(false);
+        IResponse? response;
+        try
+        {
+            response = await page.GotoAsync(
+                target.AbsoluteUri,
+                new PageGotoOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = NavigationTimeoutMs
+                }).ConfigureAwait(false);
+        }
+        catch (PlaywrightException ex)
+        {
+            var diagnostic = $"Navigation stage '{stage}' failed for host '{target.IdnHost}': {DescribeBrowserFailure(ex.Message)}";
+            _logger?.Warn($"[BigOne Browser] {diagnostic} · {RedactDiagnosticUrls(ex.Message)}");
+            Report(progress, diagnostic);
+            throw new InvalidOperationException(diagnostic, ex);
+        }
 
         ct.ThrowIfCancellationRequested();
         if (response is not null)
@@ -962,6 +986,44 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         var fileName = Path.GetFileName(path);
         return string.IsNullOrWhiteSpace(fileName) ? "download" : fileName;
     }
+
+    /// <summary>
+    /// Classifies Chromium/Playwright navigation failures without exposing paths,
+    /// query strings, signed tokens, or credentials in user-visible diagnostics.
+    /// </summary>
+    public static string DescribeBrowserFailure(string? errorText)
+    {
+        var text = errorText ?? string.Empty;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"net::ERR_[A-Z0-9_]+",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var code = match.Success ? match.Value.ToUpperInvariant() : string.Empty;
+
+        var category = code switch
+        {
+            "ERR_CONNECTION_RESET" => "The connection was reset by a network endpoint or intermediary; this does not identify which one.",
+            "ERR_CONNECTION_REFUSED" => "The connection was refused by the destination or an intermediary.",
+            "ERR_CONNECTION_TIMED_OUT" => "The connection timed out before a response was received.",
+            "ERR_NAME_NOT_RESOLVED" => "DNS could not resolve the destination hostname.",
+            "ERR_PROXY_CONNECTION_FAILED" => "The browser could not connect to its configured proxy.",
+            "ERR_TUNNEL_CONNECTION_FAILED" => "The browser's proxy tunnel could not be established.",
+            "ERR_CERT_AUTHORITY_INVALID" or "ERR_CERT_COMMON_NAME_INVALID" or "ERR_CERT_DATE_INVALID" =>
+                "TLS certificate validation failed.",
+            "ERR_HTTP2_PROTOCOL_ERROR" => "The HTTP/2 connection or response was invalid.",
+            "ERR_QUIC_PROTOCOL_ERROR" => "The QUIC/HTTP/3 connection failed.",
+            "ERR_NETWORK_CHANGED" => "The network route changed while the request was active.",
+            _ when text.Contains("Timeout", StringComparison.OrdinalIgnoreCase) =>
+                "The browser navigation timed out.",
+            _ when !string.IsNullOrWhiteSpace(code) => "The browser reported a network navigation error.",
+            _ => "The browser navigation failed; inspect the accompanying Playwright diagnostic."
+        };
+
+        return string.IsNullOrEmpty(code) ? category : $"{category} ({code})";
+    }
+
+    private static string GetSafeHost(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.IdnHost : "<unknown-host>";
 
     private static string NormalizeText(string? text) =>
         string.Join(" ", (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
