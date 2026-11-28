@@ -20,13 +20,15 @@ public static class DownloadQualityTiers
     ];
 }
 
-/// <summary>Stable provider IDs for built-in authorized download workflows.</summary>
+/// <summary>
+/// Stable provider IDs for the built-in authorized download workflows.
+/// The legacy HTTP-only crawler workflows (direct-link, multi-step-link) and the
+/// pre-browser big-one workflow were removed; their IDs survive only as literals
+/// in DownloadSettingsService's legacy-binding migration.
+/// </summary>
 public static class DownloadWorkflowIds
 {
     public const string None = "";
-    public const string DirectLink = "direct-link";
-    public const string MultiStepLink = "multi-step-link";
-    public const string BigOne = "big-one";
     public const string BigOneBrowser = "big-one-browser";
     public const string BigOneSite = "builtin-bollyflix";
     public const string BigOneSiteHost = "new1.bollyflix.tours";
@@ -73,9 +75,24 @@ public sealed class DownloadSettingsService
 
     public string SettingsFilePath => _filePath;
 
+    // Provider IDs of the removed HTTP-only download workflows (direct-link,
+    // multi-step-link) and the pre-browser big-one workflow. Kept only so
+    // existing download-settings.json bindings on BollyFlix sites migrate
+    // cleanly to the BigOne visible browser workflow instead of silently
+    // losing their download assignment.
+    private static readonly string[] LegacyWorkflowProviderIds =
+    [
+        "direct-link",
+        "multi-step-link",
+        "big-one"
+    ];
+
     /// <summary>
-    /// Moves an existing BollyFlix assignment from the old HTTP-only workflow to
-    /// the visible browser workflow. Other sites and their assignments are untouched.
+    /// Moves an existing BollyFlix assignment from a removed legacy workflow
+    /// (direct-link, multi-step-link, or the pre-browser big-one HTTP workflow)
+    /// to the visible browser workflow. Other sites and their assignments are
+    /// untouched; their stale legacy bindings are ignored at runtime, which
+    /// leaves those sites Lookup-only until they are reassigned.
     /// </summary>
     public bool MigrateBollyFlixBrowserBinding(IEnumerable<LookupSiteEntry> sites)
     {
@@ -93,8 +110,8 @@ public sealed class DownloadSettingsService
                 continue;
             }
 
-            if (providerId.Equals(DownloadWorkflowIds.MultiStepLink, StringComparison.OrdinalIgnoreCase) ||
-                providerId.Equals(DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase))
+            if (LegacyWorkflowProviderIds.Any(legacy =>
+                    providerId.Equals(legacy, StringComparison.OrdinalIgnoreCase)))
             {
                 settings.SiteWorkflowBindings[site.Id] = DownloadWorkflowIds.BigOneBrowser;
                 changed = true;
