@@ -773,8 +773,6 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
     private static string SafeUrl(Uri uri) => SafeUrl(uri.AbsoluteUri);
 
-    private static string SafeUrl(Uri uri) => SafeUrl(uri.AbsoluteUri);
-
     private static string SafeUrl(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
