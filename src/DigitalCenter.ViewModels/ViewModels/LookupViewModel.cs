@@ -131,7 +131,7 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
 /// launch one-click workflow downloads to IDM (using the default quality configured
 /// in Maintenance → Lookup Sites → Download Manager), or file Tickets.
 /// </summary>
-public partial class LookupViewModel : ObservableObject
+public partial class LookupViewModel : ObservableObject, IDisposable
 {
     private readonly ImdbLookupService _lookupService;
     private readonly TicketService _ticketService;
@@ -164,7 +164,7 @@ public partial class LookupViewModel : ObservableObject
         _ticketService = ticketService;
         _settingsService = settingsService;
         _downloadSettings = new DownloadSettingsService(paths);
-        _providerRegistry = DownloadProviderRegistry.CreateDefault(logger: logger);
+        _providerRegistry = DownloadProviderRegistry.CreateDefault(logger: logger, paths: paths);
         _idmLauncher = new IdmLauncherService(logger);
         _dialogs = dialogs;
         _uiDispatcher = uiDispatcher;
@@ -500,6 +500,8 @@ public partial class LookupViewModel : ObservableObject
             row.IsResolvingDownload = false;
         }
     }
+
+    public void Dispose() => _providerRegistry.Dispose();
 
     private bool CanFileTicket() => SelectedResult is not null;
 
