@@ -771,6 +771,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     private static string NormalizeText(string? text) =>
         string.Join(" ", (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
+    private static string SafeUrl(Uri uri) => SafeUrl(uri.AbsoluteUri);
+
     private static string SafeUrl(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
