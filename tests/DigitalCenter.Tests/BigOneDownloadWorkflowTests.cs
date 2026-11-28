@@ -148,7 +148,7 @@ public sealed class BigOneDownloadWorkflowTests
     }
 
     [Fact]
-    public async Task Workflow_ValidatesEveryStageAndOnlyHandsVerifiedDestinationToIdm()
+    public async Task Workflow_UsesCloudResumeAnchorWithoutQuickReadyOrFalseCaptchaChallenge()
     {
         var handler = CreateCompleteChain();
         using var http = new HttpClient(handler);
@@ -173,6 +173,24 @@ public sealed class BigOneDownloadWorkflowTests
         Assert.DoesNotContain(handler.RequestedUris, uri => uri.Host == "busycdn.instadl.rest");
         Assert.DoesNotContain(handler.RequestedUris, uri => uri.Host == "filesgram.example.test");
         Assert.DoesNotContain(handler.RequestedUris, uri => uri.Host == "goflix.example.test");
+    }
+
+    [Fact]
+    public async Task Workflow_RejectsUnapprovedWorkersDevCloudResumeHost()
+    {
+        var untrustedCloudPage = Fixture("page4.html").Replace(
+            "cloud-dl.px6xkyh05ea.workers.dev",
+            "cloud-dl.attacker.workers.dev",
+            StringComparison.OrdinalIgnoreCase);
+        var handler = CreateCompleteChain()
+            .Map(CloudUrl, new MockHttpMessageHandler.Response(200, untrustedCloudPage));
+        using var http = new HttpClient(handler);
+        var workflow = new BigOneDownloadWorkflow(http);
+
+        var outcome = await workflow.ResolveAsync(MovieRequest(SearchUrl, "720p"));
+
+        Assert.Equal(DownloadResolveStatus.NeedsBrowser, outcome.Status);
+        Assert.DoesNotContain(handler.RequestedUris, uri => uri.Host == "cloud-dl.attacker.workers.dev");
     }
 
     [Fact]
