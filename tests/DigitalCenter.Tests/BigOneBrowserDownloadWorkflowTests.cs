@@ -9,6 +9,51 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     private static readonly Uri MovieUri = new("https://new1.bollyflix.tours/harry-potter-2001/");
 
     [Fact]
+    public void DownloadSettings_MigratesOnlyLegacyBollyFlixBindingToVisibleBrowser()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DigitalCenterTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = new DownloadSettingsService(new AppPaths { DataRoot = root });
+            service.SetProviderIdForSite("custom-bollyflix", DownloadWorkflowIds.MultiStepLink);
+            service.SetProviderIdForSite("custom-katmovie", DownloadWorkflowIds.MultiStepLink);
+            service.SetProviderIdForSite("custom-old-bollyflix", "big-one");
+
+            var migrated = service.MigrateBollyFlixBrowserBinding(
+            [
+                new LookupSiteEntry
+                {
+                    Id = "custom-bollyflix",
+                    Name = "BollyFlix",
+                    UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}"
+                },
+                new LookupSiteEntry
+                {
+                    Id = "custom-katmovie",
+                    Name = "KatMovie",
+                    UrlTemplate = "https://katmovie.example/?s={imdb_id}"
+                },
+                new LookupSiteEntry
+                {
+                    Id = "custom-old-bollyflix",
+                    Name = "BollyFlix mirror",
+                    UrlTemplate = "https://mirror.bollyflix.example/?s={imdb_id}"
+                }
+            ]);
+
+            Assert.True(migrated);
+            Assert.Equal(DownloadWorkflowIds.BigOneBrowser, service.GetProviderIdForSite("custom-bollyflix"));
+            Assert.Equal(DownloadWorkflowIds.MultiStepLink, service.GetProviderIdForSite("custom-katmovie"));
+            Assert.Equal(DownloadWorkflowIds.BigOneBrowser, service.GetProviderIdForSite("custom-old-bollyflix"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ParseTitlePageUri_ExtractsMoviePermalinkFromCapturedListingShape()
     {
         const string html = """
