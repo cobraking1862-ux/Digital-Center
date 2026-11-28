@@ -13,7 +13,7 @@ namespace DigitalCenter.Core.Services;
 /// Each workflow is isolated by its stable ProviderId; failures in one provider
 /// never affect Lookup, IDM, or other providers.
 /// </summary>
-public sealed class DownloadProviderRegistry
+public sealed class DownloadProviderRegistry : IDisposable
 {
     private readonly Dictionary<string, IDownloadWorkflowProvider> _providers = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAppLogger? _logger;
@@ -30,14 +30,27 @@ public sealed class DownloadProviderRegistry
         }
     }
 
-    public static DownloadProviderRegistry CreateDefault(HttpClient? httpClient = null, IAppLogger? logger = null)
+    public static DownloadProviderRegistry CreateDefault(
+        HttpClient? httpClient = null,
+        IAppLogger? logger = null,
+        AppPaths? paths = null)
     {
         var client = httpClient ?? CreateDefaultHttpClient();
+        var appPaths = paths ?? AppPaths.CreateDefault();
         return new DownloadProviderRegistry(
         [
             new DirectLinkDownloadWorkflow(client),
-            new MultiStepLinkDownloadWorkflow(client)
+            new MultiStepLinkDownloadWorkflow(client),
+            new BigOneBrowserDownloadWorkflow(appPaths, logger)
         ], logger);
+    }
+
+    public void Dispose()
+    {
+        foreach (var provider in _providers.Values.OfType<IDisposable>().Distinct())
+        {
+            provider.Dispose();
+        }
     }
 
     public bool HasProvider(string? providerId) =>
