@@ -14,7 +14,7 @@ namespace DigitalCenter.Core.Services;
 /// </summary>
 public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, IDisposable
 {
-    private const string BollyFlixHost = "new1.bollyflix.tours";
+    private const string BollyFlixHost = DownloadWorkflowIds.BigOneSiteHost;
     private const string FastDlHost = "dl.fastdlserver.site";
     private const string GdFlixHost = "new10.gdflix.io";
     private const int NavigationTimeoutMs = 45_000;
