@@ -1050,7 +1050,7 @@ public partial class MaintenanceViewModel : ObservableObject
             var sb = new StringBuilder();
             sb.AppendLine($"Database Optimization Complete ({res.Duration.TotalMilliseconds:0} ms)");
             sb.AppendLine($"  • WAL pages checkpointed: {res.WalPagesCheckpointed}");
-            sb.AppendLine($"  • Size before:  {UiFormat.FormatBytes(res.SizeBeforeBytes)}");
+            sb.AppendLine($"  • Size before: {UiFormat.FormatBytes(res.SizeBeforeBytes)}");
             sb.AppendLine($"  • Size after:  {UiFormat.FormatBytes(res.SizeAfterBytes)}");
             sb.AppendLine($"  • Reclaimed:   {UiFormat.FormatBytes(res.BytesReclaimed)}");
             sb.AppendLine("  • SQLite query planner statistics updated (ANALYZE).");
