@@ -26,6 +26,7 @@ public static class DownloadWorkflowIds
     public const string None = "";
     public const string DirectLink = "direct-link";
     public const string MultiStepLink = "multi-step-link";
+    public const string BigOneBrowser = "big-one-browser";
 }
 
 /// <summary>
