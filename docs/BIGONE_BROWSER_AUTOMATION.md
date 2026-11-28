@@ -19,18 +19,19 @@ Build the application and install the fallback Chromium binary:
 
 The workflow first attempts installed Microsoft Edge. It launches Playwright Chromium visibly if Edge cannot be controlled and the Chromium binary is installed.
 
-## Automated route
+## Assisted GDFlix interaction and download route
 
 1. Open the configured BollyFlix IMDb search URL in the visible browser.
 2. Locate the matching movie post and open it.
 3. Parse each quality heading and only its own Google Drive-labelled FastDLServer link.
 4. Choose the preferred quality, using the existing downward quality fallback.
-5. Navigate through the FastDLServer redirect in the browser.
-6. Open the GDFlix FAST CLOUD page.
-7. Read the static Cloud Resume Download URL (or the legacy Quick Download (Ready) link when present).
-8. Validate the final host and send the URL to the existing IDM launcher.
+5. Navigate through the FastDLServer redirect to the GDFlix file-information page.
+6. **Manual action:** click **FAST CLOUD / ZIPDISK** in the visible GDFlix file-information page. DigitalCenter waits for the newly opened tab and verifies that it has finished navigating to the expected GDFlix `/cloud/` page.
+7. Wait until **Cloud Resume Download** is visible. The page may also show **Direct**; DigitalCenter does not choose Direct.
+8. **Manual action:** click **Cloud Resume Download**. DigitalCenter monitors the browser context, including the short-lived tab opened by the button, and waits for the actual browser download event.
+9. Validate the actual download event URL against the exact approved HTTPS final hosts, cancel the browser's duplicate transfer, and send the captured URL and suggested filename to the existing IDM launcher.
 
-Linksmod, Login To DL, Instant DL, Telegram, GoFile and the JavaScript-only Generate Quick Link action are not selected by this route.
+A static `href` for Cloud Resume Download is optional. Some page versions use JavaScript-driven buttons; the actual browser download event is authoritative. Linksmod, Login To DL, Instant DL, Telegram, GoFile and the Direct button are not selected.
 
 ## Human verification
 
