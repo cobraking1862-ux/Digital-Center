@@ -1,6 +1,5 @@
 using DigitalCenter.Core.Configuration;
 using DigitalCenter.Core.Services;
-using DigitalCenter.Core.Models;
 using Xunit;
 
 namespace DigitalCenter.Tests;
