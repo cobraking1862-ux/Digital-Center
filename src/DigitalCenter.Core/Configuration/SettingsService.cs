@@ -68,7 +68,6 @@ public sealed class SettingsService
             if (settings.LookupSites.Count > 0 &&
                 !settings.LookupSites.Any(site =>
                     string.Equals(site.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(site.Name, "BollyFlix", StringComparison.OrdinalIgnoreCase) ||
                     (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
                      site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase))))
             {
