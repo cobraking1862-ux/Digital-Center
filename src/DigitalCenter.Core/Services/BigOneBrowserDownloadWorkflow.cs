@@ -500,13 +500,17 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
 
         _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
-        var profileDirectory = Path.Combine(_paths.DataRoot, "BrowserProfiles", "BigOne");
-        Directory.CreateDirectory(profileDirectory);
+        var profilesRoot = Path.Combine(_paths.DataRoot, "BrowserProfiles");
+        var edgeProfileDirectory = Path.Combine(profilesRoot, "BigOne");
+        var chromeProfileDirectory = Path.Combine(profilesRoot, "BigOne-Chrome");
+        var chromiumProfileDirectory = Path.Combine(profilesRoot, "BigOne-Chromium");
+        Directory.CreateDirectory(profilesRoot);
 
         try
         {
+            Directory.CreateDirectory(edgeProfileDirectory);
             _context = await _playwright.Chromium.LaunchPersistentContextAsync(
-                profileDirectory,
+                edgeProfileDirectory,
                 new BrowserTypeLaunchPersistentContextOptions
                 {
                     Headless = false,
@@ -516,34 +520,57 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     Args = ["--start-maximized", "--disable-quic"]
                 }).ConfigureAwait(false);
 
-            Report(progress, "Opened a visible Microsoft Edge window with a persistent BigOne browser profile (QUIC disabled for compatibility).");
+            Report(progress, "Opened installed Microsoft Edge through Playwright (dedicated BigOne profile; QUIC disabled).");
         }
         catch (PlaywrightException edgeException)
         {
-            _logger?.Warn($"Microsoft Edge could not be launched by Playwright: {edgeException.GetType().Name}.");
-            Report(progress, "Microsoft Edge automation is unavailable. Trying the Playwright Chromium browser.");
+            _logger?.Warn($"Installed Microsoft Edge could not be launched by Playwright: {edgeException.GetType().Name}.");
+            Report(progress, "Installed Microsoft Edge is unavailable. Trying the installed Google Chrome browser.");
 
             try
             {
+                Directory.CreateDirectory(chromeProfileDirectory);
                 _context = await _playwright.Chromium.LaunchPersistentContextAsync(
-                    profileDirectory,
+                    chromeProfileDirectory,
                     new BrowserTypeLaunchPersistentContextOptions
                     {
                         Headless = false,
+                        Channel = "chrome",
                         SlowMo = 120,
                         AcceptDownloads = true,
                         Args = ["--start-maximized", "--disable-quic"]
                     }).ConfigureAwait(false);
 
-                Report(progress, "Opened a visible Playwright Chromium window (QUIC disabled for compatibility).");
+                Report(progress, "Opened installed Google Chrome through Playwright (dedicated BigOne-Chrome profile; QUIC disabled).");
             }
-            catch (PlaywrightException chromiumException)
+            catch (PlaywrightException chromeException)
             {
-                _playwright.Dispose();
-                _playwright = null;
-                throw new InvalidOperationException(
-                    "No supported visible browser could be started. Install Microsoft Edge or run scripts/Install-PlaywrightBrowsers.ps1 to install the Playwright Chromium browser.",
-                    chromiumException);
+                _logger?.Warn($"Installed Google Chrome could not be launched by Playwright: {chromeException.GetType().Name}.");
+                Report(progress, "Installed Google Chrome is unavailable. Trying Playwright-managed Chromium.");
+
+                try
+                {
+                    Directory.CreateDirectory(chromiumProfileDirectory);
+                    _context = await _playwright.Chromium.LaunchPersistentContextAsync(
+                        chromiumProfileDirectory,
+                        new BrowserTypeLaunchPersistentContextOptions
+                        {
+                            Headless = false,
+                            SlowMo = 120,
+                            AcceptDownloads = true,
+                            Args = ["--start-maximized", "--disable-quic"]
+                        }).ConfigureAwait(false);
+
+                    Report(progress, "Opened Playwright-managed Chromium (dedicated BigOne-Chromium profile; QUIC disabled).");
+                }
+                catch (PlaywrightException chromiumException)
+                {
+                    _playwright.Dispose();
+                    _playwright = null;
+                    throw new InvalidOperationException(
+                        "No supported visible browser could be started. Install Microsoft Edge or Google Chrome, or run scripts/Install-PlaywrightBrowsers.ps1 to install Playwright Chromium.",
+                        chromiumException);
+                }
             }
         }
 
