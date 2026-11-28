@@ -26,7 +26,11 @@ public static class DownloadWorkflowIds
     public const string None = "";
     public const string DirectLink = "direct-link";
     public const string MultiStepLink = "multi-step-link";
+    public const string BigOne = "big-one";
     public const string BigOneBrowser = "big-one-browser";
+    public const string BigOneSite = "builtin-bollyflix";
+    public const string BigOneSiteHost = "new1.bollyflix.tours";
+    public const string BigOneLookupUrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}";
 }
 
 /// <summary>
@@ -79,9 +83,9 @@ public sealed class DownloadSettingsService
         var changed = false;
         foreach (var site in sites)
         {
-            var isBollyFlix = string.Equals(site.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
+            var isBollyFlix = string.Equals(site.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) ||
                               (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
-                               site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase));
+                               site.UrlTemplate.Contains(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase));
             if (!isBollyFlix ||
                 !settings.SiteWorkflowBindings.TryGetValue(site.Id, out var providerId) ||
                 string.IsNullOrWhiteSpace(providerId))
@@ -90,7 +94,7 @@ public sealed class DownloadSettingsService
             }
 
             if (providerId.Equals(DownloadWorkflowIds.MultiStepLink, StringComparison.OrdinalIgnoreCase) ||
-                providerId.Equals("big-one", StringComparison.OrdinalIgnoreCase))
+                providerId.Equals(DownloadWorkflowIds.BigOne, StringComparison.OrdinalIgnoreCase))
             {
                 settings.SiteWorkflowBindings[site.Id] = DownloadWorkflowIds.BigOneBrowser;
                 changed = true;
