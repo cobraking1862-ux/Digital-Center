@@ -998,7 +998,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             text,
             @"net::ERR_[A-Z0-9_]+",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var code = match.Success ? match.Value.ToUpperInvariant() : string.Empty;
+        var code = match.Success ? match.Value["net::".Length..].ToUpperInvariant() : string.Empty;
 
         var category = code switch
         {
