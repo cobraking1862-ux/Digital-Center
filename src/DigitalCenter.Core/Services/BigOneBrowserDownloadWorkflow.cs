@@ -169,43 +169,60 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     progress);
             }
 
-            Report(progress, $"Opening the GDFlix cloud page: {SafeUrl(cloudUri)}");
-            await NavigateAsync(page, cloudUri, "GDFlix cloud landing page", progress, ct).ConfigureAwait(false);
+            Report(progress, $"Clicking FAST CLOUD / ZIPDISK to open the GDFlix cloud tab: {SafeUrl(cloudUri)}");
+            var cloudPage = await page.RunAndWaitForPopupAsync(
+                async () => await page.Locator("a[href*='/cloud/']").First.ClickAsync(
+                    new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false),
+                new PageRunAndWaitForPopupOptions { Timeout = NavigationTimeoutMs }).ConfigureAwait(false);
 
-            if (!TryGetCurrentUri(page, out var cloudPageUri) || !IsGdFlixCloudPageUri(cloudPageUri))
+            await InstrumentPageAsync(cloudPage).ConfigureAwait(false);
+            _page = cloudPage;
+
+            if (!TryGetCurrentUri(cloudPage, out var cloudPageUri) || !IsGdFlixCloudPageUri(cloudPageUri) ||
+                !string.Equals(cloudPageUri.AbsolutePath, cloudUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
             {
                 return BrowserFallback(
-                    $"The FAST CLOUD link ended on an unsupported page: {SafeUrl(page.Url)}",
+                    $"FAST CLOUD opened an unexpected tab: {SafeUrl(cloudPage.Url)}",
                     titlePageUri,
                     progress);
             }
 
             if (!await WaitForStageElementAsync(
-                    page,
+                    cloudPage,
                     "a:has-text('Cloud Resume Download'), a:has-text('Quick Download (Ready)')",
                     "Cloud Resume Download action",
                     progress,
                     ct).ConfigureAwait(false))
             {
                 return BrowserFallback(
-                    "The GDFlix cloud page did not expose a static Cloud Resume Download or Quick Download (Ready) link.",
+                    "The GDFlix cloud tab did not expose the Cloud Resume Download action.",
                     titlePageUri,
                     progress);
             }
 
-            var cloudHtml = await page.ContentAsync().ConfigureAwait(false);
-            var finalUri = ParseCloudResumeUri(cloudHtml, cloudPageUri);
-            if (finalUri is null || !IsApprovedFinalDestination(finalUri))
+            var cloudHtml = await cloudPage.ContentAsync().ConfigureAwait(false);
+            var expectedFinalUri = ParseCloudResumeUri(cloudHtml, cloudPageUri);
+            if (expectedFinalUri is null || !IsApprovedFinalDestination(expectedFinalUri))
             {
                 return BrowserFallback(
-                    "The GDFlix cloud page did not expose a final download URL on an approved host.",
+                    "The GDFlix cloud page did not expose a download action on an approved host.",
                     titlePageUri,
                     progress);
             }
 
-            var fileName = GetFileName(finalUri);
-            Report(progress, $"Found the {selected.QualityLabel} Cloud Resume Download URL.");
-            Report(progress, $"Handing the verified-host URL to IDM: {SafeUrl(finalUri)}");
+            var downloadLink = cloudPage.Locator("a:has-text('Cloud Resume Download')").First;
+            Report(progress, "Clicking Cloud Resume Download and waiting for Edge's actual download event.");
+            var capturedDownload = await ClickAndCaptureDownloadAsync(
+                cloudPage,
+                downloadLink,
+                expectedFinalUri,
+                progress,
+                ct).ConfigureAwait(false);
+
+            var finalUri = capturedDownload.Url;
+            var fileName = capturedDownload.FileName;
+            Report(progress, $"Captured the {selected.QualityLabel} browser download: {SafeUrl(finalUri)}");
+            Report(progress, "Cancelled Edge's duplicate transfer; handing the captured URL to IDM.");
 
             return DownloadResolveOutcome.Success(
                 new ResolvedDownload
@@ -225,9 +242,10 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         }
         catch (PlaywrightException ex)
         {
-            _logger?.Warn($"BigOne visible browser stopped: {ex.GetType().Name}.");
+            var diagnostic = RedactDiagnosticUrls(ex.Message);
+            _logger?.Warn($"BigOne visible browser stopped: {ex.GetType().Name}: {diagnostic}");
             return BrowserFallback(
-                $"Visible browser automation stopped ({ex.GetType().Name}). The browser window has been left open for inspection.",
+                $"Visible browser automation stopped ({ex.GetType().Name}): {diagnostic}. The browser window has been left open for inspection.",
                 sourceUri,
                 progress);
         }
@@ -549,6 +567,118 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         Report(progress, $"{stage}: current page is {SafeUrl(currentUri)}");
     }
 
+    private async Task<(Uri Url, string FileName)> ClickAndCaptureDownloadAsync(
+        IPage sourcePage,
+        ILocator downloadLink,
+        Uri expectedFinalUri,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
+        var context = _context ?? throw new InvalidOperationException("The visible browser context is not available.");
+        var completion = new TaskCompletionSource<IDownload>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attachedPages = new HashSet<IPage>();
+
+        void AttachDownloadHandler(IPage observedPage)
+        {
+            if (attachedPages.Add(observedPage))
+            {
+                observedPage.Download += OnDownload;
+            }
+        }
+
+        void OnDownload(object? sender, IDownload download)
+        {
+            if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var downloadUri) ||
+                !IsApprovedFinalDestination(downloadUri))
+            {
+                _logger?.Warn($"[BigOne Browser] Ignored a download event from an unapproved destination: {SafeUrl(download.Url)}");
+                _ = CancelUnexpectedDownloadAsync(download);
+                return;
+            }
+
+            completion.TrySetResult(download);
+        }
+
+        async Task InstrumentPopupAsync(IPage popup)
+        {
+            try
+            {
+                await InstrumentPageAsync(popup).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger?.Warn($"[BigOne Browser] Could not instrument a temporary download tab ({ex.GetType().Name}).");
+            }
+        }
+
+        EventHandler<IPage> onContextPage = (_, newPage) =>
+        {
+            AttachDownloadHandler(newPage);
+            _ = InstrumentPopupAsync(newPage);
+        };
+
+        context.Page += onContextPage;
+        AttachDownloadHandler(sourcePage);
+
+        try
+        {
+            await downloadLink.ClickAsync(
+                new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false);
+
+            var download = await completion.Task
+                .WaitAsync(TimeSpan.FromMilliseconds(NavigationTimeoutMs), ct)
+                .ConfigureAwait(false);
+
+            if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var finalUri) ||
+                !IsApprovedFinalDestination(finalUri))
+            {
+                await CancelUnexpectedDownloadAsync(download).ConfigureAwait(false);
+                throw new InvalidOperationException("Cloud Resume Download produced a URL outside the approved final-host policy.");
+            }
+
+            if (!finalUri.IdnHost.Equals(expectedFinalUri.IdnHost, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger?.Warn(
+                    $"[BigOne Browser] Download host differs from the static button href. " +
+                    $"Button={SafeUrl(expectedFinalUri)}; event={SafeUrl(finalUri)}.");
+            }
+
+            var suggestedName = download.SuggestedFilename;
+            var fileName = string.IsNullOrWhiteSpace(suggestedName)
+                ? GetFileName(finalUri)
+                : Path.GetFileName(suggestedName);
+
+            await download.CancelAsync().ConfigureAwait(false);
+            Report(progress, $"Edge download event captured ({fileName}); the browser's copy was cancelled.");
+            return (finalUri, fileName);
+        }
+        catch (TimeoutException)
+        {
+            throw new TimeoutException(
+                "Cloud Resume Download was clicked, but Edge did not emit a download event within the expected time.");
+        }
+        finally
+        {
+            context.Page -= onContextPage;
+            foreach (var observedPage in attachedPages)
+            {
+                observedPage.Download -= OnDownload;
+            }
+        }
+    }
+
+    private static async Task CancelUnexpectedDownloadAsync(IDownload download)
+    {
+        try
+        {
+            await download.CancelAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // An unwanted popup download must not interrupt the intended workflow.
+        }
+    }
+
     private async Task<bool> WaitForStageElementAsync(
         IPage page,
         string selector,
@@ -712,7 +842,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) &&
-        AllowedPageHosts.Contains(uri.IdnHost);
+        (AllowedPageHosts.Contains(uri.IdnHost) || AllowedFinalHosts.Contains(uri.IdnHost));
 
     private static bool IsFileHostUri(Uri uri) =>
         uri.IsAbsoluteUri &&
@@ -770,6 +900,16 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
     private static string NormalizeText(string? text) =>
         string.Join(" ", (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+    private static readonly System.Text.RegularExpressions.Regex UrlInDiagnosticRegex = new(
+        @"https?://[^\s\""'< >]+",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static string RedactDiagnosticUrls(string message) =>
+        UrlInDiagnosticRegex.Replace(message ?? string.Empty, match =>
+            Uri.TryCreate(match.Value.TrimEnd('.', ',', ')', ']', '}'), UriKind.Absolute, out var uri)
+                ? SafeUrl(uri)
+                : "<URL redacted>");
 
     private static string SafeUrl(Uri uri) => SafeUrl(uri.AbsoluteUri);
 
