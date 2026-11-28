@@ -238,10 +238,9 @@ public partial class App : Application
                 disposableServices.Dispose();
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Browser and service shutdown must not prevent the application from exiting.
-            Services?.GetService<IAppLogger>()?.Warn($"Service shutdown warning: {ex.GetType().Name}");
         }
 
         base.OnExit(e);
