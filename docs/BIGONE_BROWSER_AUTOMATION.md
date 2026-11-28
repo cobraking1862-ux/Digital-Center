@@ -25,12 +25,13 @@ The workflow first attempts installed Microsoft Edge. It launches Playwright Chr
 2. Locate the matching movie post and open it.
 3. Parse each quality heading and only its own Google Drive-labelled FastDLServer link.
 4. Choose the preferred quality, using the existing downward quality fallback.
-5. Navigate through the FastDLServer redirect in the browser.
-6. Open the GDFlix FAST CLOUD page.
-7. Read the static Cloud Resume Download URL (or the legacy Quick Download (Ready) link when present).
-8. Validate the final host and send the URL to the existing IDM launcher.
+5. Navigate through the FastDLServer redirect in the visible Edge browser.
+6. Click the validated FAST CLOUD / ZIPDISK link and capture the new GDFlix tab. The workflow no longer navigates directly to the extracted cloud URL.
+7. Wait for the Cloud Resume Download anchor (the legacy Quick Download (Ready) link is only recognized as an alternative).
+8. Click Cloud Resume Download and capture the browser's actual download event. The event supplies the final URL and browser-suggested filename.
+9. Validate the captured HTTPS host, cancel Edge's temporary copy to avoid downloading the same file twice, and return the captured URL to the existing IDM confirmation-dialog launcher.
 
-Linksmod, Login To DL, Instant DL, Telegram, GoFile and the JavaScript-only Generate Quick Link action are not selected by this route.
+The workflow observes download events from both the cloud page and any short-lived tab opened by the download click. Unapproved download URLs are cancelled and ignored. Linksmod, Login To DL, Instant DL, Telegram, GoFile and the JavaScript-only Generate Quick Link action are not selected by this route.
 
 ## Human verification
 
