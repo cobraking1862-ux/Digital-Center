@@ -48,6 +48,20 @@ dotnet run --project src/DigitalCenter.App/DigitalCenter.App.csproj
 
 Local runtime data (SQLite database, cached posters, logs, backups, and `settings.json`) is stored under `%APPDATA%\DigitalCenter` so the app never writes inside your media folders or next to the executable.
 
+## BigOne Visible Browser Workflow
+
+The BollyFlix BigOne provider opens a visible Microsoft Edge window (Playwright Chromium is the fallback), uses AngleSharp to parse the live DOM, and hands the final static Cloud Resume URL to IDM. The browser uses its own persistent profile and pauses for manual human verification when a site requires it.
+
+Install the fallback browser once after building:
+
+```powershell
+.\scripts\Install-PlaywrightBrowsers.ps1
+```
+
+Assign **BigOne — Visible Browser (BollyFlix)** to the BollyFlix site in Maintenance → Lookup Sites. The browser stage trace is shown in Lookup and written to `%APPDATA%\DigitalCenter\Logs`.
+
+See [BigOne Browser Automation](docs/BIGONE_BROWSER_AUTOMATION.md) for the route and diagnostics.
+
 ## Configuring the TMDb API Token Securely
 
 `DigitalCenter.App` reads the TMDb v4 Read Access Token from configuration key `Tmdb:ReadAccessToken` in the following precedence order (later sources override earlier ones):
@@ -90,5 +104,6 @@ $env:Tmdb__ReadAccessToken = "<YOUR_TMDB_READ_ACCESS_TOKEN>"
 ## Documentation
 
 - [Architecture Overview](docs/ARCHITECTURE.md)
+- [BigOne Browser Automation](docs/BIGONE_BROWSER_AUTOMATION.md)
 - [Changelog](CHANGELOG.md)
 - [AI Agent Guidelines](GEMINI.md)
