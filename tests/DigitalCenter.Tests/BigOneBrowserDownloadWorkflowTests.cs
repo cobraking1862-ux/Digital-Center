@@ -274,8 +274,8 @@ public sealed class BigOneBrowserDownloadWorkflowTests
             <button id="direct">Direct</button>
             """;
 
-        // A dynamic action has no safe static href. The live workflow must wait for
-        // the user's Cloud Resume click and validate the actual browser Download event.
+        // A dynamic action has no static href. The live workflow still clicks the
+        // Cloud Resume button automatically and validates the actual browser Download event.
         Assert.Null(BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage));
     }
 
