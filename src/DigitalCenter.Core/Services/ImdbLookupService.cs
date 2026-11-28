@@ -155,6 +155,7 @@ public sealed class ImdbLookupService
         new() { Id = "builtin-imdb", Name = "IMDb", UrlTemplate = "https://www.imdb.com/title/{imdb_id}/", IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-tmdb", Name = "TMDb", UrlTemplate = "https://www.themoviedb.org/search?query={query}", IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-justwatch", Name = "JustWatch", UrlTemplate = "https://www.justwatch.com/us/search?q={title}", IsEnabled = true, IsBuiltIn = true },
+        new() { Id = DownloadWorkflowIds.BigOneSite, Name = "BollyFlix", UrlTemplate = DownloadWorkflowIds.BigOneLookupUrlTemplate, IsEnabled = true, IsBuiltIn = true },
         new() { Id = "builtin-rt", Name = "Rotten Tomatoes", UrlTemplate = "https://www.rottentomatoes.com/search?search={title}", IsEnabled = false, IsBuiltIn = true },
         new() { Id = "builtin-letterboxd", Name = "Letterboxd", UrlTemplate = "https://letterboxd.com/imdb/{imdb_id}/", IsEnabled = false, IsBuiltIn = true },
         new() { Id = "builtin-youtube", Name = "YouTube Trailer", UrlTemplate = "https://www.youtube.com/results?search_query={title}+{year}+official+trailer", IsEnabled = false, IsBuiltIn = true }

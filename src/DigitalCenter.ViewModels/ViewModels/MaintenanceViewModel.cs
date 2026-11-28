@@ -83,7 +83,9 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
         Action<string, string?> onWorkflowChanged)
     {
         Entry = entry;
-        AvailableWorkflows = availableWorkflows;
+        AvailableWorkflows = availableWorkflows
+            .Where(option => option.ProviderId != DownloadWorkflowIds.BigOneBrowser || IsBollyFlixEntry(entry))
+            .ToList();
         _onToggled = onToggled;
         _onWorkflowChanged = onWorkflowChanged;
         IsEnabled = entry.IsEnabled;
@@ -100,6 +102,11 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
     public string NoResultsMarker => Entry.NoResultsMarker ?? string.Empty;
     public bool HasNoResultsMarker => !string.IsNullOrWhiteSpace(Entry.NoResultsMarker);
     public bool IsBuiltIn => Entry.IsBuiltIn;
+
+    private static bool IsBollyFlixEntry(LookupSiteEntry entry) =>
+        string.Equals(entry.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) ||
+        (!string.IsNullOrWhiteSpace(entry.UrlTemplate) &&
+         entry.UrlTemplate.Contains(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase));
 
     [ObservableProperty] public partial bool IsEnabled { get; set; }
     [ObservableProperty] public partial string SelectedProviderId { get; set; }
@@ -218,8 +225,7 @@ public partial class MaintenanceViewModel : ObservableObject
         AvailableWorkflows =
         [
             new WorkflowOptionItem(DownloadWorkflowIds.None, "None (Lookup-only)"),
-            new WorkflowOptionItem(DownloadWorkflowIds.DirectLink, "Direct Link Workflow"),
-            new WorkflowOptionItem(DownloadWorkflowIds.MultiStepLink, "Multi-Step Host Workflow")
+            new WorkflowOptionItem(DownloadWorkflowIds.BigOneBrowser, "BigOne — Visible Browser (BollyFlix)")
         ];
 
         ProgressText = string.Empty;
@@ -1213,10 +1219,12 @@ public partial class MaintenanceViewModel : ObservableObject
     private void ReloadLookupSites()
     {
         var settings = _settingsService.Load();
-        var dl = _downloadSettings.Load();
         var entries = settings.LookupSites is { Count: > 0 }
             ? settings.LookupSites
             : ImdbLookupService.GetDefaultSites().ToList();
+
+        _downloadSettings.MigrateBollyFlixBrowserBinding(entries);
+        var dl = _downloadSettings.Load();
 
         LookupSites.Clear();
         foreach (var entry in entries)

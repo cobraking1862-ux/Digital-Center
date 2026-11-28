@@ -231,6 +231,18 @@ public partial class App : Application
         }
         catch (Exception) { }
 
+        try
+        {
+            if (Services is IDisposable disposableServices)
+            {
+                disposableServices.Dispose();
+            }
+        }
+        catch (Exception)
+        {
+            // Browser and service shutdown must not prevent the application from exiting.
+        }
+
         base.OnExit(e);
     }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalCenter.Core.Services;
 
 namespace DigitalCenter.Core.Configuration;
 
@@ -25,7 +26,13 @@ public sealed class SettingsService
     public AppSettings Load()
     {
         var settings = LoadRaw();
+        var previousVersion = settings.Version;
         MigrateLegacy(settings);
+        if (settings.Version != previousVersion && File.Exists(_settingsFile))
+        {
+            Save(settings);
+        }
+
         return settings;
     }
 
@@ -54,6 +61,24 @@ public sealed class SettingsService
     /// </summary>
     public static void MigrateLegacy(AppSettings settings)
     {
+        settings.LookupSites ??= [];
+
+        if (settings.Version < 11)
+        {
+            if (settings.LookupSites.Count > 0 &&
+                !settings.LookupSites.Any(site =>
+                    string.Equals(site.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
+                     site.UrlTemplate.Contains(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase))))
+            {
+                var bollyFlix = ImdbLookupService.GetDefaultSites().First(site =>
+                    site.Id.Equals("builtin-bollyflix", StringComparison.OrdinalIgnoreCase));
+                settings.LookupSites.Add(bollyFlix);
+            }
+
+            settings.Version = 11;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.MoviesRoot) &&
             string.IsNullOrWhiteSpace(settings.SeriesRoot) &&
             !string.IsNullOrWhiteSpace(settings.LibraryRoot))

@@ -131,7 +131,7 @@ public sealed partial class LookupCheckRowViewModel : ObservableObject
 /// launch one-click workflow downloads to IDM (using the default quality configured
 /// in Maintenance → Lookup Sites → Download Manager), or file Tickets.
 /// </summary>
-public partial class LookupViewModel : ObservableObject
+public partial class LookupViewModel : ObservableObject, IDisposable
 {
     private readonly ImdbLookupService _lookupService;
     private readonly TicketService _ticketService;
@@ -164,7 +164,7 @@ public partial class LookupViewModel : ObservableObject
         _ticketService = ticketService;
         _settingsService = settingsService;
         _downloadSettings = new DownloadSettingsService(paths);
-        _providerRegistry = DownloadProviderRegistry.CreateDefault(logger: logger);
+        _providerRegistry = DownloadProviderRegistry.CreateDefault(logger: logger, paths: paths);
         _idmLauncher = new IdmLauncherService(logger);
         _dialogs = dialogs;
         _uiDispatcher = uiDispatcher;
@@ -232,6 +232,7 @@ public partial class LookupViewModel : ObservableObject
             ? settings.LookupSites
             : ImdbLookupService.GetDefaultSites().ToList();
 
+        _downloadSettings.MigrateBollyFlixBrowserBinding(all);
         _enabledSites = all.Where(s => s.IsEnabled).ToList();
         OnPropertyChanged(nameof(HasNoEnabledSites));
         CheckAvailabilityCommand.NotifyCanExecuteChanged();
@@ -414,7 +415,8 @@ public partial class LookupViewModel : ObservableObject
         }
     }
 
-    private bool CanCancelCheck() => IsCheckingAvailability;
+    private bool CanCancelCheck() =>
+        IsCheckingAvailability || AvailabilityChecks.Any(row => row.IsResolvingDownload);
 
     [RelayCommand(CanExecute = nameof(CanCancelCheck))]
     private void CancelCheck()
@@ -456,6 +458,7 @@ public partial class LookupViewModel : ObservableObject
             PreferredQuality: dlSettings.PreferredQuality);
 
         row.IsResolvingDownload = true;
+        CancelCheckCommand.NotifyCanExecuteChanged();
         row.NeedsBrowserAttention = false;
         row.DownloadStatusText = $"Resolving {dlSettings.PreferredQuality} (auto-fallback enabled)…";
 
@@ -498,8 +501,11 @@ public partial class LookupViewModel : ObservableObject
         finally
         {
             row.IsResolvingDownload = false;
+            CancelCheckCommand.NotifyCanExecuteChanged();
         }
     }
+
+    public void Dispose() => _providerRegistry.Dispose();
 
     private bool CanFileTicket() => SelectedResult is not null;
 

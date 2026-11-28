@@ -1,0 +1,37 @@
+name: .NET CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dotnet-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore DigitalCenter.slnx
+
+      - name: Build Release
+        run: dotnet build DigitalCenter.slnx --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test DigitalCenter.slnx --configuration Release --no-build --no-restore
