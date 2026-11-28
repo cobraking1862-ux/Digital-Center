@@ -178,6 +178,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
             await InstrumentPageAsync(cloudPage).ConfigureAwait(false);
             _page = cloudPage;
+            Report(progress, $"FAST CLOUD popup opened: {SafeUrl(cloudPage.Url)}");
 
             if (!TryGetCurrentUri(cloudPage, out var cloudPageUri) || !IsGdFlixCloudPageUri(cloudPageUri) ||
                 !string.Equals(cloudPageUri.AbsolutePath, cloudUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
@@ -212,7 +213,12 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             }
 
             var downloadLink = cloudPage.Locator("a:has-text('Cloud Resume Download')").First;
-            Report(progress, "Clicking Cloud Resume Download and waiting for Edge's actual download event.");
+            if (await downloadLink.CountAsync().ConfigureAwait(false) == 0)
+            {
+                downloadLink = cloudPage.Locator("a:has-text('Quick Download (Ready)')").First;
+            }
+
+            Report(progress, $"Clicking {await downloadLink.InnerTextAsync().ConfigureAwait(false)} and waiting for Edge's actual download event.");
             var capturedDownload = await ClickAndCaptureDownloadAsync(
                 cloudPage,
                 downloadLink,
