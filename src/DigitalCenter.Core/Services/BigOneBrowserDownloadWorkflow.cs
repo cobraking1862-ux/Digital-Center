@@ -17,6 +17,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     private const string BollyFlixHost = DownloadWorkflowIds.BigOneSiteHost;
     private const string FastDlHost = "dl.fastdlserver.site";
     private const string GdFlixHost = "new10.gdflix.io";
+    private const string GdFlixCurrentHost = "new1.gdflix.io";
+    private const string GdFlixRedirectHost = "gdflix.dev";
     private const int NavigationTimeoutMs = 45_000;
     private const int ElementTimeoutMs = 20_000;
     private const int HumanVerificationTimeoutMs = 180_000;
@@ -25,7 +27,9 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     {
         BollyFlixHost,
         FastDlHost,
-        GdFlixHost
+        GdFlixHost,
+        GdFlixCurrentHost,
+        GdFlixRedirectHost
     };
 
     private static readonly HashSet<string> AllowedFinalHosts = new(StringComparer.OrdinalIgnoreCase)
@@ -169,28 +173,17 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     progress);
             }
 
-            Report(progress, $"Clicking FAST CLOUD / ZIPDISK to open the GDFlix cloud tab: {SafeUrl(cloudUri)}");
-            var cloudPage = await page.RunAndWaitForPopupAsync(
-                async () => await page.Locator("a[href*='/cloud/']").Filter(
-                    new LocatorFilterOptions { HasText = "FAST CLOUD" }).First.ClickAsync(
-                    new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false),
-                new PageRunAndWaitForPopupOptions { Timeout = NavigationTimeoutMs }).ConfigureAwait(false);
-
-            await InstrumentPageAsync(cloudPage).ConfigureAwait(false);
+            var cloudPage = await WaitForManualCloudPopupAsync(
+                page,
+                cloudUri,
+                progress,
+                ct).ConfigureAwait(false);
             _page = cloudPage;
-
-            if (!TryGetCurrentUri(cloudPage, out var cloudPageUri) || !IsGdFlixCloudPageUri(cloudPageUri) ||
-                !string.Equals(cloudPageUri.AbsolutePath, cloudUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
-            {
-                return BrowserFallback(
-                    $"FAST CLOUD opened an unexpected tab: {SafeUrl(cloudPage.Url)}",
-                    titlePageUri,
-                    progress);
-            }
+            var cloudPageUri = new Uri(cloudPage.Url);
 
             if (!await WaitForStageElementAsync(
                     cloudPage,
-                    "a:has-text('Cloud Resume Download'), a:has-text('Quick Download (Ready)')",
+                    "a:has-text('Cloud Resume Download'), button:has-text('Cloud Resume Download'), [role='button']:has-text('Cloud Resume Download'), a:has-text('Quick Download (Ready)'), button:has-text('Quick Download (Ready)')",
                     "Cloud Resume Download action",
                     progress,
                     ct).ConfigureAwait(false))
@@ -202,20 +195,17 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             }
 
             var cloudHtml = await cloudPage.ContentAsync().ConfigureAwait(false);
+            // Some GDFlix versions use a JavaScript button rather than a static href.
+            // The final browser download event is authoritative; a parsed href is optional.
             var expectedFinalUri = ParseCloudResumeUri(cloudHtml, cloudPageUri);
-            if (expectedFinalUri is null || !IsApprovedFinalDestination(expectedFinalUri))
+            if (expectedFinalUri is null)
             {
-                return BrowserFallback(
-                    "The GDFlix cloud page did not expose a download action on an approved host.",
-                    titlePageUri,
-                    progress);
+                Report(progress, "Cloud Resume has no usable static download URL; the actual browser download event will be validated instead.");
             }
 
-            var downloadLink = cloudPage.Locator("a:has-text('Cloud Resume Download')").First;
-            Report(progress, "Clicking Cloud Resume Download and waiting for Edge's actual download event.");
-            var capturedDownload = await ClickAndCaptureDownloadAsync(
+            Report(progress, "Action required: click Cloud Resume Download in the GDFlix cloud tab (do not click Direct). Waiting for the short-lived download tab.");
+            var capturedDownload = await WaitForManualDownloadAsync(
                 cloudPage,
-                downloadLink,
                 expectedFinalUri,
                 progress,
                 ct).ConfigureAwait(false);
@@ -223,7 +213,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             var finalUri = capturedDownload.Url;
             var fileName = capturedDownload.FileName;
             Report(progress, $"Captured the {selected.QualityLabel} browser download: {SafeUrl(finalUri)}");
-            Report(progress, "Cancelled Edge's duplicate transfer; handing the captured URL to IDM.");
+            Report(progress, "Cancelled the browser's duplicate transfer; handing the captured URL to IDM.");
 
             return DownloadResolveOutcome.Success(
                 new ResolvedDownload
@@ -568,10 +558,103 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         Report(progress, $"{stage}: current page is {SafeUrl(currentUri)}");
     }
 
-    private async Task<(Uri Url, string FileName)> ClickAndCaptureDownloadAsync(
-        IPage sourcePage,
-        ILocator downloadLink,
-        Uri expectedFinalUri,
+    /// <summary>
+    /// Waits for the user to click FAST CLOUD / ZIPDISK on the visible GDFlix
+    /// file-information page. The click opens a new tab; Playwright observes that
+    /// tab and waits for its actual cloud-page navigation before continuing.
+    /// </summary>
+    private async Task<IPage> WaitForManualCloudPopupAsync(
+        IPage fileInformationPage,
+        Uri expectedCloudUri,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
+        var context = _context ?? throw new InvalidOperationException("The visible browser context is not available.");
+        var popupCompletion = new TaskCompletionSource<IPage>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task RegisterPopupAsync(IPage popup)
+        {
+            try
+            {
+                await InstrumentPageAsync(popup).ConfigureAwait(false);
+                popupCompletion.TrySetResult(popup);
+            }
+            catch (Exception ex)
+            {
+                popupCompletion.TrySetException(ex);
+            }
+        }
+
+        EventHandler<IPage> onContextPage = (_, newPage) =>
+        {
+            if (!ReferenceEquals(newPage, fileInformationPage))
+            {
+                _ = RegisterPopupAsync(newPage);
+            }
+        };
+
+        context.Page += onContextPage;
+        try
+        {
+            Report(progress,
+                "Action required: click FAST CLOUD / ZIPDISK on the GDFlix file-information page. " +
+                "DigitalCenter is waiting for the new cloud tab.");
+
+            IPage popup;
+            try
+            {
+                popup = await popupCompletion.Task
+                    .WaitAsync(TimeSpan.FromMilliseconds(HumanVerificationTimeoutMs), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(
+                    "Timed out waiting for the manual FAST CLOUD / ZIPDISK click on the GDFlix file-information page.");
+            }
+
+            await popup.WaitForURLAsync(
+                openedUrl =>
+                    Uri.TryCreate(openedUrl, UriKind.Absolute, out var candidateUri) &&
+                    IsGdFlixCloudPageUri(candidateUri) &&
+                    string.Equals(
+                        candidateUri.AbsolutePath,
+                        expectedCloudUri.AbsolutePath,
+                        StringComparison.OrdinalIgnoreCase),
+                new PageWaitForURLOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = NavigationTimeoutMs
+                }).ConfigureAwait(false);
+
+            if (!TryGetCurrentUri(popup, out var cloudPageUri) ||
+                !IsGdFlixCloudPageUri(cloudPageUri) ||
+                !string.Equals(
+                    cloudPageUri.AbsolutePath,
+                    expectedCloudUri.AbsolutePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The manual FAST CLOUD click opened an unexpected destination: {SafeUrl(popup.Url)}");
+            }
+
+            Report(progress, $"GDFlix cloud tab is ready: {SafeUrl(cloudPageUri)}");
+            return popup;
+        }
+        finally
+        {
+            context.Page -= onContextPage;
+        }
+    }
+
+    /// <summary>
+    /// Waits for the user to click Cloud Resume Download. The download may originate
+    /// from a short-lived popup tab, so listeners are attached to the current cloud
+    /// page and every new page in the browser context before asking for the click.
+    /// </summary>
+    private async Task<(Uri Url, string FileName)> WaitForManualDownloadAsync(
+        IPage cloudPage,
+        Uri? expectedFinalUri,
         IProgress<string>? progress,
         CancellationToken ct)
     {
@@ -592,7 +675,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var downloadUri) ||
                 !IsApprovedFinalDestination(downloadUri))
             {
-                _logger?.Warn($"[BigOne Browser] Ignored a download event from an unapproved destination: {SafeUrl(download.Url)}");
+                _logger?.Warn(
+                    $"[BigOne Browser] Ignored a download event from an unapproved destination: {SafeUrl(download.Url)}");
                 _ = CancelUnexpectedDownloadAsync(download);
                 return;
             }
@@ -600,47 +684,42 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             completion.TrySetResult(download);
         }
 
-        async Task InstrumentPopupAsync(IPage popup)
-        {
-            try
-            {
-                await InstrumentPageAsync(popup).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger?.Warn($"[BigOne Browser] Could not instrument a temporary download tab ({ex.GetType().Name}).");
-            }
-        }
-
-        EventHandler<IPage> onContextPage = (_, newPage) =>
-        {
-            AttachDownloadHandler(newPage);
-            _ = InstrumentPopupAsync(newPage);
-        };
-
+        EventHandler<IPage> onContextPage = (_, newPage) => AttachDownloadHandler(newPage);
         context.Page += onContextPage;
-        AttachDownloadHandler(sourcePage);
+        AttachDownloadHandler(cloudPage);
 
         try
         {
-            await downloadLink.ClickAsync(
-                new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false);
+            Report(progress,
+                "Waiting for the manual Cloud Resume Download click. " +
+                "Choose Cloud Resume Download, not Direct; the browser's short-lived download tab is being monitored.");
 
-            var download = await completion.Task
-                .WaitAsync(TimeSpan.FromMilliseconds(NavigationTimeoutMs), ct)
-                .ConfigureAwait(false);
+            IDownload download;
+            try
+            {
+                download = await completion.Task
+                    .WaitAsync(TimeSpan.FromMilliseconds(HumanVerificationTimeoutMs), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException(
+                    "Timed out waiting for the manual Cloud Resume Download click or its browser download event. Direct was not selected.");
+            }
 
             if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var finalUri) ||
                 !IsApprovedFinalDestination(finalUri))
             {
                 await CancelUnexpectedDownloadAsync(download).ConfigureAwait(false);
-                throw new InvalidOperationException("Cloud Resume Download produced a URL outside the approved final-host policy.");
+                throw new InvalidOperationException(
+                    "Cloud Resume Download produced a URL outside the approved final-host policy.");
             }
 
-            if (!finalUri.IdnHost.Equals(expectedFinalUri.IdnHost, StringComparison.OrdinalIgnoreCase))
+            if (expectedFinalUri is not null &&
+                !finalUri.IdnHost.Equals(expectedFinalUri.IdnHost, StringComparison.OrdinalIgnoreCase))
             {
                 _logger?.Warn(
-                    $"[BigOne Browser] Download host differs from the static button href. " +
+                    "[BigOne Browser] Download host differs from the static Cloud Resume href. " +
                     $"Button={SafeUrl(expectedFinalUri)}; event={SafeUrl(finalUri)}.");
             }
 
@@ -650,13 +729,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                 : Path.GetFileName(suggestedName);
 
             await download.CancelAsync().ConfigureAwait(false);
-            Report(progress, $"Edge download event captured ({fileName}); the browser's copy was cancelled.");
+            Report(progress, $"Captured the actual Cloud Resume browser download ({fileName}); browser transfer cancelled for IDM.");
             return (finalUri, fileName);
-        }
-        catch (TimeoutException)
-        {
-            throw new TimeoutException(
-                "Cloud Resume Download was clicked, but Edge did not emit a download event within the expected time.");
         }
         finally
         {
@@ -845,17 +919,22 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         string.IsNullOrEmpty(uri.UserInfo) &&
         (AllowedPageHosts.Contains(uri.IdnHost) || AllowedFinalHosts.Contains(uri.IdnHost));
 
+    private static bool IsGdFlixHost(string host) =>
+        host.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase) ||
+        host.Equals(GdFlixCurrentHost, StringComparison.OrdinalIgnoreCase) ||
+        host.Equals(GdFlixRedirectHost, StringComparison.OrdinalIgnoreCase);
+
     private static bool IsFileHostUri(Uri uri) =>
         uri.IsAbsoluteUri &&
         uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
         uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) &&
         (uri.IdnHost.Equals(FastDlHost, StringComparison.OrdinalIgnoreCase) ||
-         uri.IdnHost.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase));
+         IsGdFlixHost(uri.IdnHost));
 
     private static bool IsGdFlixCloudPageUri(Uri uri) =>
         IsFileHostUri(uri) &&
-        uri.IdnHost.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase) &&
+        IsGdFlixHost(uri.IdnHost) &&
         uri.AbsolutePath.StartsWith("/cloud/", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFastDlRoute(Uri uri) =>
