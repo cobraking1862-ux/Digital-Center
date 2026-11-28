@@ -4,9 +4,9 @@ DigitalCenter uses Microsoft Playwright for .NET to run the BigOne workflow in a
 
 ## Components
 
-- **Microsoft.Playwright** controls visible Microsoft Edge. A bundled Playwright Chromium browser is the fallback when Edge is unavailable.
+- **Microsoft.Playwright** controls visible installed Microsoft Edge first, installed Google Chrome second, and Playwright-managed Chromium last. Each engine uses its own persistent profile.
 - **AngleSharp** parses the live browser DOM using CSS selectors. It is the C# HTML-DOM equivalent for projects that would otherwise use BeautifulSoup.
-- The browser uses a dedicated persistent profile at `%APPDATA%\\DigitalCenter\\BrowserProfiles\\BigOne`. It does not attach to or overwrite the user's normal Brave/Edge profile.
+- Browser profiles are isolated by engine: `%APPDATA%\\DigitalCenter\\BrowserProfiles\\BigOne` (Edge), `BigOne-Chrome` (installed Chrome), and `BigOne-Chromium` (Playwright-managed Chromium). The workflow does not attach to or overwrite the user's normal daily browser profile.
 - The Edge session starts with QUIC disabled so navigation falls back to TCP-based HTTP/2 where a network/tunnel mishandles HTTP/3.
 - GDFlix navigation accepts the exact hosts `new10.gdflix.io`, `new1.gdflix.io`, and its documented redirect host `gdflix.dev`; it does not allow arbitrary GDFlix-looking domains.
 - The existing IDM launcher still opens the final download URL with its confirmation dialog.
@@ -19,7 +19,7 @@ Build the application and install the fallback Chromium binary:
 .scripts\Install-PlaywrightBrowsers.ps1
 ```
 
-The workflow first attempts installed Microsoft Edge. It launches Playwright Chromium visibly if Edge cannot be controlled and the Chromium binary is installed.
+The workflow tries installed Microsoft Edge, then installed Google Chrome, then Playwright-managed Chromium. Every option remains visible and is controlled by Playwright. Chrome is used only when Edge cannot be launched; the bundled Chromium is the final fallback.
 
 ## Automated route
 
@@ -27,11 +27,11 @@ The workflow first attempts installed Microsoft Edge. It launches Playwright Chr
 2. Locate the matching movie post and open it.
 3. Parse each quality heading and only its own Google Drive-labelled FastDLServer link.
 4. Choose the preferred quality, using the existing downward quality fallback.
-5. Navigate through the FastDLServer redirect in the visible Edge browser. If the redirect uses GDFlix's official `gdflix.dev` alias, the exact host is accepted alongside the numbered GDFlix hosts.
+5. Navigate through the FastDLServer redirect in the visible Playwright-controlled browser. If the redirect uses GDFlix's official `gdflix.dev` alias, the exact host is accepted alongside the numbered GDFlix hosts.
 6. Click the validated FAST CLOUD / ZIPDISK link and capture the new GDFlix tab. The workflow no longer navigates directly to the extracted cloud URL.
 7. Wait for the Cloud Resume Download anchor (the legacy Quick Download (Ready) link is only recognized as an alternative).
 8. Click Cloud Resume Download and capture the browser's actual download event. The event supplies the final URL and browser-suggested filename.
-9. Validate the captured HTTPS host, cancel Edge's temporary copy to avoid downloading the same file twice, and return the captured URL to the existing IDM confirmation-dialog launcher.
+9. Validate the captured HTTPS host, cancel browser's temporary copy to avoid downloading the same file twice, and return the captured URL to the existing IDM confirmation-dialog launcher.
 
 The workflow observes download events from both the cloud page and any short-lived tab opened by the download click. Unapproved download URLs are cancelled and ignored. Linksmod, Login To DL, Instant DL, Telegram, GoFile and the JavaScript-only Generate Quick Link action are not selected by this route.
 
