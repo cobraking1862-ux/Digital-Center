@@ -232,6 +232,7 @@ public partial class LookupViewModel : ObservableObject, IDisposable
             ? settings.LookupSites
             : ImdbLookupService.GetDefaultSites().ToList();
 
+        _downloadSettings.MigrateBollyFlixBrowserBinding(all);
         _enabledSites = all.Where(s => s.IsEnabled).ToList();
         OnPropertyChanged(nameof(HasNoEnabledSites));
         CheckAvailabilityCommand.NotifyCanExecuteChanged();
