@@ -219,7 +219,8 @@ public partial class MaintenanceViewModel : ObservableObject
         [
             new WorkflowOptionItem(DownloadWorkflowIds.None, "None (Lookup-only)"),
             new WorkflowOptionItem(DownloadWorkflowIds.DirectLink, "Direct Link Workflow"),
-            new WorkflowOptionItem(DownloadWorkflowIds.MultiStepLink, "Multi-Step Host Workflow")
+            new WorkflowOptionItem(DownloadWorkflowIds.MultiStepLink, "Multi-Step Host Workflow"),
+            new WorkflowOptionItem(DownloadWorkflowIds.BigOneBrowser, "BigOne — Visible Browser (BollyFlix)")
         ];
 
         ProgressText = string.Empty;
