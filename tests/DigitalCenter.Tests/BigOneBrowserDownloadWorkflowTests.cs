@@ -65,8 +65,11 @@ public sealed class BigOneBrowserDownloadWorkflowTests
         try
         {
             var service = new DownloadSettingsService(new AppPaths { DataRoot = root });
-            service.SetProviderIdForSite("custom-bollyflix", DownloadWorkflowIds.MultiStepLink);
-            service.SetProviderIdForSite("custom-katmovie", DownloadWorkflowIds.MultiStepLink);
+            // Legacy provider IDs of the removed HTTP-only workflows, as persisted
+            // by older DigitalCenter versions in download-settings.json.
+            service.SetProviderIdForSite("custom-bollyflix", "multi-step-link");
+            service.SetProviderIdForSite("custom-bollyflix-direct", "direct-link");
+            service.SetProviderIdForSite("custom-katmovie", "multi-step-link");
             service.SetProviderIdForSite("custom-old-bollyflix", "big-one");
 
             var migrated = service.MigrateBollyFlixBrowserBinding(
@@ -74,6 +77,12 @@ public sealed class BigOneBrowserDownloadWorkflowTests
                 new LookupSiteEntry
                 {
                     Id = "custom-bollyflix",
+                    Name = "BollyFlix",
+                    UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}"
+                },
+                new LookupSiteEntry
+                {
+                    Id = "custom-bollyflix-direct",
                     Name = "BollyFlix",
                     UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}"
                 },
@@ -93,7 +102,9 @@ public sealed class BigOneBrowserDownloadWorkflowTests
 
             Assert.True(migrated);
             Assert.Equal(DownloadWorkflowIds.BigOneBrowser, service.GetProviderIdForSite("custom-bollyflix"));
-            Assert.Equal(DownloadWorkflowIds.MultiStepLink, service.GetProviderIdForSite("custom-katmovie"));
+            Assert.Equal(DownloadWorkflowIds.BigOneBrowser, service.GetProviderIdForSite("custom-bollyflix-direct"));
+            // Non-BollyFlix sites keep their (now stale) assignment; it is ignored at runtime.
+            Assert.Equal("multi-step-link", service.GetProviderIdForSite("custom-katmovie"));
             Assert.Equal(DownloadWorkflowIds.BigOneBrowser, service.GetProviderIdForSite("custom-old-bollyflix"));
         }
         finally
