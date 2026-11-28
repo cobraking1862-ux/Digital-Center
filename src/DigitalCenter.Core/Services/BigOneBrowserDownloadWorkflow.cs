@@ -173,7 +173,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     progress);
             }
 
-            var cloudPage = await WaitForManualCloudPopupAsync(
+            Report(progress, $"Automatically clicking FAST CLOUD / ZIPDISK: {SafeUrl(cloudUri)}");
+            var cloudPage = await ClickAndWaitForCloudPopupAsync(
                 page,
                 cloudUri,
                 progress,
@@ -563,60 +564,30 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     }
 
     /// <summary>
-    /// Waits for the user to click FAST CLOUD / ZIPDISK on the visible GDFlix
-    /// file-information page. The click opens a new tab; Playwright observes that
-    /// tab and waits for its actual cloud-page navigation before continuing.
+    /// Automatically clicks FAST CLOUD / ZIPDISK, captures its new tab, and waits
+    /// for the popup to finish navigating to the expected GDFlix cloud page.
     /// </summary>
-    private async Task<IPage> WaitForManualCloudPopupAsync(
+    private async Task<IPage> ClickAndWaitForCloudPopupAsync(
         IPage fileInformationPage,
         Uri expectedCloudUri,
         IProgress<string>? progress,
         CancellationToken ct)
     {
-        var context = _context ?? throw new InvalidOperationException("The visible browser context is not available.");
-        var popupCompletion = new TaskCompletionSource<IPage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ct.ThrowIfCancellationRequested();
 
-        async Task RegisterPopupAsync(IPage popup)
-        {
-            try
-            {
-                await InstrumentPageAsync(popup).ConfigureAwait(false);
-                popupCompletion.TrySetResult(popup);
-            }
-            catch (Exception ex)
-            {
-                popupCompletion.TrySetException(ex);
-            }
-        }
+        var popup = await fileInformationPage.RunAndWaitForPopupAsync(
+            async () => await fileInformationPage.Locator("a[href*='/cloud/']").Filter(
+                new LocatorFilterOptions { HasText = "FAST CLOUD" }).First.ClickAsync(
+                new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false),
+            new PageRunAndWaitForPopupOptions { Timeout = NavigationTimeoutMs }).ConfigureAwait(false);
 
-        EventHandler<IPage> onContextPage = (_, newPage) =>
-        {
-            if (!ReferenceEquals(newPage, fileInformationPage))
-            {
-                _ = RegisterPopupAsync(newPage);
-            }
-        };
+        await InstrumentPageAsync(popup).ConfigureAwait(false);
+        _page = popup;
 
-        context.Page += onContextPage;
+        // The popup event can fire while the new tab is still at about:blank.
+        // Wait for the real cloud URL instead of validating the initial URL.
         try
         {
-            Report(progress,
-                "Action required: click FAST CLOUD / ZIPDISK on the GDFlix file-information page. " +
-                "DigitalCenter is waiting for the new cloud tab.");
-
-            IPage popup;
-            try
-            {
-                popup = await popupCompletion.Task
-                    .WaitAsync(TimeSpan.FromMilliseconds(HumanVerificationTimeoutMs), ct)
-                    .ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                throw new TimeoutException(
-                    "Timed out waiting for the manual FAST CLOUD / ZIPDISK click on the GDFlix file-information page.");
-            }
-
             await popup.WaitForURLAsync(
                 openedUrl =>
                     Uri.TryCreate(openedUrl, UriKind.Absolute, out var candidateUri) &&
@@ -630,25 +601,28 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                     WaitUntil = WaitUntilState.DOMContentLoaded,
                     Timeout = NavigationTimeoutMs
                 }).ConfigureAwait(false);
-
-            if (!TryGetCurrentUri(popup, out var cloudPageUri) ||
-                !IsGdFlixCloudPageUri(cloudPageUri) ||
-                !string.Equals(
-                    cloudPageUri.AbsolutePath,
-                    expectedCloudUri.AbsolutePath,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    $"The manual FAST CLOUD click opened an unexpected destination: {SafeUrl(popup.Url)}");
-            }
-
-            Report(progress, $"GDFlix cloud tab is ready: {SafeUrl(cloudPageUri)}");
-            return popup;
         }
-        finally
+        catch (TimeoutException)
         {
-            context.Page -= onContextPage;
+            throw new TimeoutException(
+                $"FAST CLOUD / ZIPDISK opened a tab, but it did not reach the expected GDFlix cloud page. " +
+                $"Expected host: {expectedCloudUri.IdnHost}.");
         }
+
+        ct.ThrowIfCancellationRequested();
+        if (!TryGetCurrentUri(popup, out var cloudPageUri) ||
+            !IsGdFlixCloudPageUri(cloudPageUri) ||
+            !string.Equals(
+                cloudPageUri.AbsolutePath,
+                expectedCloudUri.AbsolutePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"FAST CLOUD / ZIPDISK opened an unexpected destination: {SafeUrl(popup.Url)}");
+        }
+
+        Report(progress, $"FAST CLOUD / ZIPDISK popup is ready: {SafeUrl(cloudPageUri)}");
+        return popup;
     }
 
     /// <summary>
