@@ -234,6 +234,20 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
+    public void ParseFastCloudUri_AcceptsCurrentNumberedGdFlixHost()
+    {
+        var fileHostPage = new Uri("https://new1.gdflix.io/file/SAFE_FILE");
+        const string html = """
+            <a href="/cloud/SAFE_FILE/SAFE_TOKEN"><b>FAST CLOUD / ZIPDISK</b></a>
+            """;
+
+        var result = BigOneBrowserDownloadWorkflow.ParseFastCloudUri(html, fileHostPage);
+
+        Assert.NotNull(result);
+        Assert.Equal("new1.gdflix.io", result!.Host);
+    }
+
+    [Fact]
     public void ParseFastCloudUri_RejectsExternalCloudHosts()
     {
         var fileHostPage = new Uri("https://new10.gdflix.io/file/SAFE");
