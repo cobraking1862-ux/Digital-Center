@@ -335,6 +335,30 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
+    public void BrowserFailureDiagnostics_ClassifyConnectionResetWithoutLeakingUrlTokens()
+    {
+        var diagnostic = BigOneBrowserDownloadWorkflow.DescribeBrowserFailure(
+            "Navigation failed at https://new1.bollyflix.tours/?s=tt0241527: net::ERR_CONNECTION_RESET");
+
+        Assert.Contains("connection was reset", diagnostic, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ERR_CONNECTION_RESET", diagnostic);
+        Assert.DoesNotContain("tt0241527", diagnostic);
+        Assert.DoesNotContain("https://", diagnostic);
+    }
+
+    [Theory]
+    [InlineData("net::ERR_NAME_NOT_RESOLVED", "DNS")]
+    [InlineData("net::ERR_PROXY_CONNECTION_FAILED", "proxy")]
+    [InlineData("net::ERR_CERT_AUTHORITY_INVALID", "TLS")]
+    [InlineData("net::ERR_QUIC_PROTOCOL_ERROR", "QUIC")]
+    public void BrowserFailureDiagnostics_DistinguishCommonNetworkFailureClasses(string error, string expected)
+    {
+        var diagnostic = BigOneBrowserDownloadWorkflow.DescribeBrowserFailure(error);
+
+        Assert.Contains(expected, diagnostic, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void FinalDestinationPolicy_UsesExactHttpsHosts()
     {
         Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
