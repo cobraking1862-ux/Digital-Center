@@ -215,6 +215,25 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
+    public void ParseFastCloudUri_AcceptsOfficialGdFlixRedirectDomain()
+    {
+        var fileHostPage = new Uri("https://gdflix.dev/file/iif5zjN7hPXqDaXdAxaq");
+        const string html = """
+            <div class="card">
+              <a href="/cloud/1795845182/iif5zjN7hPXqDaXdAxaq">
+                <b>FAST CLOUD / ZIPDISK</b>
+              </a>
+            </div>
+            """;
+
+        var result = BigOneBrowserDownloadWorkflow.ParseFastCloudUri(html, fileHostPage);
+
+        Assert.NotNull(result);
+        Assert.Equal("gdflix.dev", result!.Host);
+        Assert.Equal("/cloud/1795845182/iif5zjN7hPXqDaXdAxaq", result.AbsolutePath);
+    }
+
+    [Fact]
     public void ParseFastCloudUri_RejectsExternalCloudHosts()
     {
         var fileHostPage = new Uri("https://new10.gdflix.io/file/SAFE");
@@ -243,6 +262,22 @@ public sealed class BigOneBrowserDownloadWorkflowTests
         Assert.NotNull(result);
         Assert.Equal("cloud-dl.px6xkyh05ea.workers.dev", result!.Host);
         Assert.Contains("Sample%20720p.mkv.zip", result.AbsoluteUri);
+    }
+
+    [Fact]
+    public void ParseCloudResumeUri_AcceptsCloudPageOnGdFlixRedirectDomain()
+    {
+        var cloudPage = new Uri("https://gdflix.dev/cloud/1795845182/iif5zjN7hPXqDaXdAxaq");
+        const string html = """
+            <a href="https://cloud-dl.px6xkyh05ea.workers.dev/SAFE_SIGNED_FILE/Sample%20720p.mkv.zip?bytes=1000">
+              Cloud Resume Download
+            </a>
+            """;
+
+        var result = BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage);
+
+        Assert.NotNull(result);
+        Assert.Equal("cloud-dl.px6xkyh05ea.workers.dev", result!.Host);
     }
 
     [Fact]
