@@ -82,7 +82,8 @@ public sealed class DownloadSettingsService
             var isBollyFlix = site.Name.Equals("BollyFlix", StringComparison.OrdinalIgnoreCase) ||
                               site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase);
             if (!isBollyFlix ||
-                !settings.SiteWorkflowBindings.TryGetValue(site.Id, out var providerId))
+                !settings.SiteWorkflowBindings.TryGetValue(site.Id, out var providerId) ||
+                string.IsNullOrWhiteSpace(providerId))
             {
                 continue;
             }
