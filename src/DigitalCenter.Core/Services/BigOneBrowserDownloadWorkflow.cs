@@ -203,9 +203,13 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                 Report(progress, "Cloud Resume has no usable static download URL; the actual browser download event will be validated instead.");
             }
 
-            Report(progress, "Action required: click Cloud Resume Download in the GDFlix cloud tab (do not click Direct). Waiting for the short-lived download tab.");
-            var capturedDownload = await WaitForManualDownloadAsync(
+            var cloudResumeAction = cloudPage.Locator(
+                "a:has-text('Cloud Resume Download'), button:has-text('Cloud Resume Download'), [role='button']:has-text('Cloud Resume Download'), a:has-text('Quick Download (Ready)'), button:has-text('Quick Download (Ready)')")
+                .First;
+            Report(progress, "Clicking Cloud Resume Download (not Direct) and capturing the short-lived download tab.");
+            var capturedDownload = await ClickAndCaptureDownloadAsync(
                 cloudPage,
+                cloudResumeAction,
                 expectedFinalUri,
                 progress,
                 ct).ConfigureAwait(false);
@@ -648,12 +652,13 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     }
 
     /// <summary>
-    /// Waits for the user to click Cloud Resume Download. The download may originate
-    /// from a short-lived popup tab, so listeners are attached to the current cloud
-    /// page and every new page in the browser context before asking for the click.
+    /// Clicks Cloud Resume Download after attaching listeners to the cloud page and
+    /// every new context page. GDFlix opens a short-lived tab before starting the
+    /// actual browser download, so the Download event may arrive from that popup.
     /// </summary>
-    private async Task<(Uri Url, string FileName)> WaitForManualDownloadAsync(
+    private async Task<(Uri Url, string FileName)> ClickAndCaptureDownloadAsync(
         IPage cloudPage,
+        ILocator downloadLink,
         Uri? expectedFinalUri,
         IProgress<string>? progress,
         CancellationToken ct)
@@ -684,27 +689,30 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             completion.TrySetResult(download);
         }
 
+        // A short-lived target=_blank tab may own the Download event rather than
+        // the persistent Cloud Resume page. Attach synchronously on Page creation.
         EventHandler<IPage> onContextPage = (_, newPage) => AttachDownloadHandler(newPage);
         context.Page += onContextPage;
         AttachDownloadHandler(cloudPage);
 
         try
         {
-            Report(progress,
-                "Waiting for the manual Cloud Resume Download click. " +
-                "Choose Cloud Resume Download, not Direct; the browser's short-lived download tab is being monitored.");
+            await downloadLink.ClickAsync(
+                new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false);
+
+            Report(progress, "Cloud Resume Download was clicked; waiting for the actual browser download event.");
 
             IDownload download;
             try
             {
                 download = await completion.Task
-                    .WaitAsync(TimeSpan.FromMilliseconds(HumanVerificationTimeoutMs), ct)
+                    .WaitAsync(TimeSpan.FromMilliseconds(NavigationTimeoutMs), ct)
                     .ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
                 throw new TimeoutException(
-                    "Timed out waiting for the manual Cloud Resume Download click or its browser download event. Direct was not selected.");
+                    "Cloud Resume Download was clicked, but no approved browser download event arrived from the short-lived tab.");
             }
 
             if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var finalUri) ||
