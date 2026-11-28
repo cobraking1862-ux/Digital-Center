@@ -32,10 +32,15 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         GdFlixRedirectHost
     };
 
+    // GDFlix rotates the cloud-dl workers.dev subdomain that serves the Cloud Resume
+    // download. Hosts observed so far are listed here; a host that is not listed is
+    // still accepted for the current run when GDFlix itself presents it as the Cloud
+    // Resume Download link (see IsApprovedFinalDestination(uri, sessionPresentedFinalUri)).
     private static readonly HashSet<string> AllowedFinalHosts = new(StringComparer.OrdinalIgnoreCase)
     {
         "cloud-dl.px6xkyh05ea.workers.dev",
         "cloud-dl.bj1zcnlye7n.workers.dev",
+        "cloud-dl.8ntmtvmb42x.workers.dev",
         "quick.cloudpaglu.site"
     };
 
@@ -58,6 +63,11 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     private IBrowserContext? _context;
     private IPage? _page;
     private bool _disposed;
+
+    // The final download host that GDFlix itself presented on the approved cloud page
+    // during the current run. Read by the per-page route handler, which can fire on
+    // any Playwright message-loop thread, so it must stay volatile.
+    private volatile Uri? _sessionExpectedFinalUri;
 
     public BigOneBrowserDownloadWorkflow(AppPaths paths, IAppLogger? logger = null)
     {
@@ -87,6 +97,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         try
         {
             ThrowIfDisposed();
+            _sessionExpectedFinalUri = null;
             var page = await GetOrCreateVisiblePageAsync(progress).ConfigureAwait(false);
             var titlePageUri = sourceUri;
 
@@ -199,9 +210,14 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             // Some GDFlix versions use a JavaScript button rather than a static href.
             // The final browser download event is authoritative; a parsed href is optional.
             var expectedFinalUri = ParseCloudResumeUri(cloudHtml, cloudPageUri);
+            _sessionExpectedFinalUri = expectedFinalUri;
             if (expectedFinalUri is null)
             {
                 Report(progress, "Cloud Resume has no usable static download URL; the actual browser download event will be validated instead.");
+            }
+            else
+            {
+                Report(progress, $"GDFlix presented the Cloud Resume final host for this run: {expectedFinalUri.IdnHost}.");
             }
 
             var cloudResumeAction = cloudPage.Locator(
@@ -376,8 +392,12 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     }
 
     /// <summary>
-    /// Reads the static Cloud Resume Download href (preferred), or the legacy
-    /// Quick Download (Ready) href when that static anchor is present.
+    /// Reads the live Cloud Resume Download href (preferred), or the legacy
+    /// Quick Download (Ready) href when that static anchor is present. The href is
+    /// returned even when its host is outside AllowedFinalHosts, because GDFlix
+    /// rotates its cloud-dl workers.dev subdomains; whether that host may actually
+    /// receive the download is decided by the session-anchored overload of
+    /// IsApprovedFinalDestination instead.
     /// </summary>
     public static Uri? ParseCloudResumeUri(string html, Uri cloudPageUri)
     {
@@ -397,7 +417,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         var rawHref = selected?.GetAttribute("href");
         if (string.IsNullOrWhiteSpace(rawHref) ||
             !Uri.TryCreate(cloudPageUri, rawHref, out var finalUri) ||
-            !IsApprovedFinalDestination(finalUri))
+            !IsCandidateFinalDownloadUri(finalUri))
         {
             return null;
         }
@@ -413,11 +433,42 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         string.IsNullOrEmpty(uri.UserInfo) &&
         AllowedFinalHosts.Contains(uri.IdnHost);
 
+    /// <summary>
+    /// Returns true for the explicit final download hosts used by this BigOne route,
+    /// or for the exact HTTPS final host that GDFlix itself presented as the Cloud
+    /// Resume Download link on the approved cloud page during the current run.
+    /// GDFlix rotates its cloud-dl workers.dev subdomains, so the page itself is the
+    /// authoritative source for the current host; arbitrary other hosts stay rejected.
+    /// </summary>
+    public static bool IsApprovedFinalDestination(Uri uri, Uri? sessionPresentedFinalUri) =>
+        IsApprovedFinalDestination(uri) ||
+        (sessionPresentedFinalUri is not null &&
+         IsCandidateFinalDownloadUri(uri) &&
+         IsCandidateFinalDownloadUri(sessionPresentedFinalUri) &&
+         IsSessionPresentedFinalHost(sessionPresentedFinalUri.IdnHost) &&
+         uri.IdnHost.Equals(sessionPresentedFinalUri.IdnHost, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Challenge detection is based on visible page text, not IDs or script names.</summary>
     public static bool IsHumanVerificationText(string? visibleText) =>
         !string.IsNullOrWhiteSpace(visibleText) &&
         HumanVerificationMarkers.Any(marker =>
             visibleText.Contains(marker, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsCandidateFinalDownloadUri(Uri uri) =>
+        uri.IsAbsoluteUri &&
+        uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+        uri.IsDefaultPort &&
+        string.IsNullOrEmpty(uri.UserInfo);
+
+    /// <summary>
+    /// A host GDFlix presented on its own approved cloud page is trusted for the current
+    /// run only when it is either a known-approved host or a Cloud Resume delivery
+    /// worker of the observed cloud-dl.&lt;id&gt;.workers.dev shape.
+    /// </summary>
+    private static bool IsSessionPresentedFinalHost(string host) =>
+        AllowedFinalHosts.Contains(host) ||
+        (host.StartsWith("cloud-dl.", StringComparison.OrdinalIgnoreCase) &&
+         host.EndsWith(".workers.dev", StringComparison.OrdinalIgnoreCase));
 
     private async Task<IPage> GetOrCreateVisiblePageAsync(IProgress<string>? progress)
     {
@@ -513,7 +564,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             var request = route.Request;
             if (IsMainFrameNavigation(request, page) &&
                 Uri.TryCreate(request.Url, UriKind.Absolute, out var destination) &&
-                !IsAllowedPageUri(destination))
+                !IsAllowedPageUri(destination) &&
+                !IsApprovedFinalDestination(destination, _sessionExpectedFinalUri))
             {
                 _logger?.Warn($"[BigOne Browser] BLOCKED unexpected top-level navigation to {SafeUrl(request.Url)}");
                 await route.AbortAsync().ConfigureAwait(false);
@@ -640,6 +692,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         var context = _context ?? throw new InvalidOperationException("The visible browser context is not available.");
         var completion = new TaskCompletionSource<IDownload>(TaskCreationOptions.RunContinuationsAsynchronously);
         var attachedPages = new HashSet<IPage>();
+        string? lastIgnoredDestination = null;
 
         void AttachDownloadHandler(IPage observedPage)
         {
@@ -652,10 +705,11 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         void OnDownload(object? sender, IDownload download)
         {
             if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var downloadUri) ||
-                !IsApprovedFinalDestination(downloadUri))
+                !IsApprovedFinalDestination(downloadUri, expectedFinalUri))
             {
+                lastIgnoredDestination = SafeUrl(download.Url);
                 _logger?.Warn(
-                    $"[BigOne Browser] Ignored a download event from an unapproved destination: {SafeUrl(download.Url)}");
+                    $"[BigOne Browser] Ignored a download event from an unapproved destination: {lastIgnoredDestination}");
                 _ = CancelUnexpectedDownloadAsync(download);
                 return;
             }
@@ -685,12 +739,16 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
             }
             catch (TimeoutException)
             {
+                var ignored = lastIgnoredDestination is null
+                    ? "No download event was observed at all."
+                    : $"A download event was observed but rejected from: {lastIgnoredDestination}. If GDFlix rotated to a legitimate new final host, add it to AllowedFinalHosts in BigOneBrowserDownloadWorkflow.";
                 throw new TimeoutException(
-                    "Cloud Resume Download was clicked, but no approved browser download event arrived from the short-lived tab.");
+                    "Cloud Resume Download was clicked, but no approved browser download event arrived from the short-lived tab. " +
+                    ignored);
             }
 
             if (!Uri.TryCreate(download.Url, UriKind.Absolute, out var finalUri) ||
-                !IsApprovedFinalDestination(finalUri))
+                !IsApprovedFinalDestination(finalUri, expectedFinalUri))
             {
                 await CancelUnexpectedDownloadAsync(download).ConfigureAwait(false);
                 throw new InvalidOperationException(

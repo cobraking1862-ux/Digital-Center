@@ -246,6 +246,44 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
+    public void ParseCloudResumeUri_ReturnsTheLiveHrefForTheCurrentlyRotatedWorkerHost()
+    {
+        // GDFlix rotates its cloud-dl workers.dev subdomain. The captured cloud page
+        // on 2026-11-28 served Cloud Resume Download from this host, which is exactly
+        // the rotation that stalled the previous exact-host-only policy.
+        var cloudPage = new Uri("https://new10.gdflix.io/cloud/1795853572/iif5zjN7hPXqDaXdAxaq");
+        const string html = """
+            <div class="card" id="cf_captcha">
+              <a href="https://cloud-dl.newrotation.workers.dev/SAFE_SIGNED_FILE/Sample%20720p.mkv.zip?bytes=1390209917">
+                Cloud Resume Download
+              </a>
+              <button id="quick">Generate Quick Link</button>
+            </div>
+            """;
+
+        var result = BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage);
+
+        Assert.NotNull(result);
+        Assert.Equal("cloud-dl.newrotation.workers.dev", result!.Host);
+
+        // A freshly rotated host is not in the static allow-list by itself...
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(result));
+        // ...but it is approved for this run because GDFlix presented it on the cloud page.
+        Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(result, result));
+    }
+
+    [Fact]
+    public void ParseCloudResumeUri_RejectsNonHttpsFinalLinks()
+    {
+        var cloudPage = new Uri("https://new10.gdflix.io/cloud/SAFE");
+        const string html = """
+            <a href="http://cloud-dl.px6xkyh05ea.workers.dev/SAFE_FILE.zip">Cloud Resume Download</a>
+            """;
+
+        Assert.Null(BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage));
+    }
+
+    [Fact]
     public void ParseFastCloudUri_AcceptsCurrentAndRedirectGdFlixHosts()
     {
         const string html = """
@@ -280,14 +318,19 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
-    public void ParseCloudResumeUri_RejectsUnapprovedWorkerSubdomains()
+    public void ParseCloudResumeUri_StillParsesTheObservedCloudDl8Ntmtvmb42xHost()
     {
-        var cloudPage = new Uri("https://new10.gdflix.io/cloud/SAFE");
+        var cloudPage = new Uri("https://new10.gdflix.io/cloud/1795853572/iif5zjN7hPXqDaXdAxaq");
         const string html = """
-            <a href="https://cloud-dl.attacker.workers.dev/SAFE_FILE.zip">Cloud Resume Download</a>
+            <a href="https://cloud-dl.8ntmtvmb42x.workers.dev/SAFE_SIGNED_FILE/Harry%20Potter.mkv.zip?bytes=1390209917">Cloud Resume Download</a>
             """;
 
-        Assert.Null(BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage));
+        var result = BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage);
+
+        Assert.NotNull(result);
+        Assert.Equal("cloud-dl.8ntmtvmb42x.workers.dev", result!.Host);
+        // The newly observed host is also part of the static allow-list.
+        Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(result));
     }
 
     [Fact]
@@ -324,11 +367,40 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     {
         Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
             new Uri("https://cloud-dl.px6xkyh05ea.workers.dev/SIGNED_FILE.zip")));
+        Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
+            new Uri("https://cloud-dl.8ntmtvmb42x.workers.dev/SIGNED_FILE.zip")));
         Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
             new Uri("http://cloud-dl.px6xkyh05ea.workers.dev/SIGNED_FILE.zip")));
         Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
             new Uri("https://cloud-dl.px6xkyh05ea.workers.dev.attacker.test/SIGNED_FILE.zip")));
         Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(
             new Uri("https://attacker.example.test/SIGNED_FILE.zip")));
+    }
+
+    [Fact]
+    public void FinalDestinationPolicy_ApprovesOnlyTheHostTheCloudPageItselfPresented()
+    {
+        var presented = new Uri("https://cloud-dl.newrotation.workers.dev/SIGNED_FILE.zip");
+        var otherWorker = new Uri("https://cloud-dl.anotherhost.workers.dev/SIGNED_FILE.zip");
+        var nonWorker = new Uri("https://attacker.example.test/SIGNED_FILE.zip");
+
+        // Without a session-presented host, only the static allow-list applies.
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(presented, null));
+
+        // The exact host GDFlix presented on the approved cloud page is approved...
+        Assert.True(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(presented, presented));
+
+        // ...but any other host stays rejected, even during the same run.
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(otherWorker, presented));
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(nonWorker, presented));
+
+        // A session-presented host outside the cloud-dl workers.dev delivery shape
+        // never becomes approved, so the anchor cannot be abused for arbitrary hosts.
+        var offShapeAnchor = new Uri("https://attacker.example.test/SIGNED_FILE.zip");
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(offShapeAnchor, offShapeAnchor));
+
+        // Non-HTTPS candidates are never approved, even when host strings match.
+        var insecure = new Uri("http://cloud-dl.newrotation.workers.dev/SIGNED_FILE.zip");
+        Assert.False(BigOneBrowserDownloadWorkflow.IsApprovedFinalDestination(insecure, presented));
     }
 }
