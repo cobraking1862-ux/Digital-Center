@@ -415,7 +415,8 @@ public partial class LookupViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CanCancelCheck() => IsCheckingAvailability;
+    private bool CanCancelCheck() =>
+        IsCheckingAvailability || AvailabilityChecks.Any(row => row.IsResolvingDownload);
 
     [RelayCommand(CanExecute = nameof(CanCancelCheck))]
     private void CancelCheck()
@@ -457,6 +458,7 @@ public partial class LookupViewModel : ObservableObject, IDisposable
             PreferredQuality: dlSettings.PreferredQuality);
 
         row.IsResolvingDownload = true;
+        CancelCheckCommand.NotifyCanExecuteChanged();
         row.NeedsBrowserAttention = false;
         row.DownloadStatusText = $"Resolving {dlSettings.PreferredQuality} (auto-fallback enabled)…";
 
@@ -499,6 +501,7 @@ public partial class LookupViewModel : ObservableObject, IDisposable
         finally
         {
             row.IsResolvingDownload = false;
+            CancelCheckCommand.NotifyCanExecuteChanged();
         }
     }
 
