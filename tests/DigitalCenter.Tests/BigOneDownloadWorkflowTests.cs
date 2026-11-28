@@ -10,6 +10,7 @@ public sealed class BigOneDownloadWorkflowTests
     private const string SearchUrl = "https://new1.bollyflix.tours/?s=sample+title";
     private const string MovieUrl = "https://new1.bollyflix.tours/sample-title/";
     private const string FastDl1080Url = "https://dl.fastdlserver.site/?id=SAFE_1080&type=file";
+    private const string FastDl720Url = "https://dl.fastdlserver.site/?id=SAFE_720&type=file";
     private const string FileHostUrl = "https://new10.gdflix.io/file/SAFE_FILE_ID";
     private const string CloudUrl = "https://new10.gdflix.io/cloud/SAFE_FILE_ID/SAFE_TOKEN";
 
@@ -35,11 +36,13 @@ public sealed class BigOneDownloadWorkflowTests
             .Map(MovieUrl, new MockHttpMessageHandler.Response(200, Fixture("page2.html")))
             .Map(FastDl1080Url, new MockHttpMessageHandler.Response(
                 302, string.Empty, Location: fastDlRedirect ?? FileHostUrl))
+            .Map(FastDl720Url, new MockHttpMessageHandler.Response(
+                302, string.Empty, Location: fastDlRedirect ?? FileHostUrl))
             .Map(FileHostUrl, new MockHttpMessageHandler.Response(200, Fixture("page3.html")))
             .Map(CloudUrl, new MockHttpMessageHandler.Response(200, Fixture("page4.html")))
-            .MapHost("cloud-dl.bj1zcnlye7n.workers.dev",
+            .MapHost("cloud-dl.px6xkyh05ea.workers.dev",
                 finalCloudResponse ?? new MockHttpMessageHandler.Response(
-                    200, string.Empty, "application/zip", FileName: "SampleTitle.1080p.mkv.zip", IsAttachment: true))
+                    200, string.Empty, "application/zip", FileName: "SampleTitle.720p.mkv.zip", IsAttachment: true))
             .MapHost("quick.cloudpaglu.site",
                 new MockHttpMessageHandler.Response(404, "not found"));
         return handler;
@@ -153,16 +156,16 @@ public sealed class BigOneDownloadWorkflowTests
         var messages = new List<string>();
         var progress = new Progress<string>(messages.Add);
 
-        var outcome = await workflow.ResolveAsync(MovieRequest(SearchUrl, "1080p"), progress);
+        var outcome = await workflow.ResolveAsync(MovieRequest(SearchUrl, "720p"), progress);
 
         Assert.True(outcome.IsSuccess, outcome.Message);
         Assert.NotNull(outcome.Download);
-        Assert.Equal("1080p", outcome.Download!.Quality);
-        Assert.Equal("cloud-dl.bj1zcnlye7n.workers.dev", outcome.Download.DownloadUrl.Host);
-        Assert.Equal("SampleTitle.1080p.mkv.zip", outcome.Download.FileName);
+        Assert.Equal("720p", outcome.Download!.Quality);
+        Assert.Equal("cloud-dl.px6xkyh05ea.workers.dev", outcome.Download.DownloadUrl.Host);
+        Assert.Equal("SampleTitle.720p.mkv.zip", outcome.Download.FileName);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == SearchUrl);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == MovieUrl);
-        Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == FastDl1080Url);
+        Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == FastDl720Url);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == FileHostUrl);
         Assert.Contains(handler.RequestedUris, uri => uri.AbsoluteUri == CloudUrl);
         Assert.DoesNotContain(handler.RequestedUris, uri => uri.Host == "linksmod.top");
@@ -189,8 +192,8 @@ public sealed class BigOneDownloadWorkflowTests
                 new MockHttpMessageHandler.Response(302, string.Empty, Location: FileHostUrl))
             .Map(FileHostUrl, new MockHttpMessageHandler.Response(200, Fixture("page3.html")))
             .Map(CloudUrl, new MockHttpMessageHandler.Response(200, Fixture("page4.html")))
-            .MapHost("cloud-dl.bj1zcnlye7n.workers.dev",
-                new MockHttpMessageHandler.Response(200, string.Empty, "application/zip", FileName: "SampleTitle.1080p.mkv.zip", IsAttachment: true));
+            .MapHost("cloud-dl.px6xkyh05ea.workers.dev",
+                new MockHttpMessageHandler.Response(200, string.Empty, "application/zip", FileName: "SampleTitle.720p.mkv.zip", IsAttachment: true));
         using var http = new HttpClient(handler);
         var workflow = new BigOneDownloadWorkflow(http);
 
@@ -273,7 +276,7 @@ public sealed class BigOneDownloadWorkflowTests
     public async Task Workflow_RejectsUnexpectedFinalRedirect()
     {
         var handler = CreateCompleteChain()
-            .MapHost("cloud-dl.bj1zcnlye7n.workers.dev",
+            .MapHost("cloud-dl.px6xkyh05ea.workers.dev",
                 new MockHttpMessageHandler.Response(302, string.Empty, Location: "https://127.0.0.1/private"));
         using var http = new HttpClient(handler);
         var workflow = new BigOneDownloadWorkflow(http);
@@ -414,7 +417,7 @@ public sealed class BigOneDownloadWorkflowTests
             var settingsPath = Path.Combine(root, "download-settings.json");
             File.WriteAllText(settingsPath, """
                 {
-                  "IdmExecutablePath": "C:\Tools\IDMan.exe",
+                  "IdmExecutablePath": "C:\\Tools\\IDMan.exe",
                   "PreferredQuality": "720p",
                   "RouteIdmToMoviesWatchFolder": false,
                   "AutoCompleteTicketsOnImport": false,
