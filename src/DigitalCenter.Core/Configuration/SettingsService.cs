@@ -67,9 +67,9 @@ public sealed class SettingsService
         {
             if (settings.LookupSites.Count > 0 &&
                 !settings.LookupSites.Any(site =>
-                    string.Equals(site.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(site.Id, DownloadWorkflowIds.BigOneSite, StringComparison.OrdinalIgnoreCase) ||
                     (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
-                     site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase))))
+                     site.UrlTemplate.Contains(DownloadWorkflowIds.BigOneSiteHost, StringComparison.OrdinalIgnoreCase))))
             {
                 var bollyFlix = ImdbLookupService.GetDefaultSites().First(site =>
                     site.Id.Equals("builtin-bollyflix", StringComparison.OrdinalIgnoreCase));
