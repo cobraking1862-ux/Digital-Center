@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using System.IO;
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 using DigitalCenter.Core.Configuration;
@@ -713,8 +713,17 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
                           Uri.UnescapeDataString(parts[0]).Equals(key, StringComparison.OrdinalIgnoreCase) &&
                           Uri.UnescapeDataString(parts[1]).Equals(value, StringComparison.OrdinalIgnoreCase));
 
-    private static bool TryGetCurrentUri(IPage page, out Uri uri) =>
-        Uri.TryCreate(page.Url, UriKind.Absolute, out uri!);
+    private static bool TryGetCurrentUri(IPage page, out Uri uri)
+    {
+        if (Uri.TryCreate(page.Url, UriKind.Absolute, out var parsed))
+        {
+            uri = parsed;
+            return true;
+        }
+
+        uri = null!;
+        return false;
+    }
 
     private static string GetFileName(Uri finalUri)
     {
@@ -739,8 +748,9 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         return $"{uri.Scheme}://{uri.IdnHost}{path}{(string.IsNullOrEmpty(uri.Query) ? string.Empty : "?{query redacted}")}";
     }
 
-    private static void Report(IProgress<string>? progress, string message)
+    private void Report(IProgress<string>? progress, string message)
     {
+        _logger?.Info($"[BigOne Browser] {message}");
         progress?.Report($"BigOne Browser · {message}");
     }
 
