@@ -25,7 +25,13 @@ public sealed class SettingsService
     public AppSettings Load()
     {
         var settings = LoadRaw();
+        var previousVersion = settings.Version;
         MigrateLegacy(settings);
+        if (settings.Version != previousVersion && File.Exists(_settingsFile))
+        {
+            Save(settings);
+        }
+
         return settings;
     }
 
@@ -54,6 +60,25 @@ public sealed class SettingsService
     /// </summary>
     public static void MigrateLegacy(AppSettings settings)
     {
+        settings.LookupSites ??= [];
+
+        if (settings.Version < 11)
+        {
+            if (settings.LookupSites.Count > 0 &&
+                !settings.LookupSites.Any(site =>
+                    string.Equals(site.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(site.Name, "BollyFlix", StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
+                     site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase))))
+            {
+                var bollyFlix = ImdbLookupService.GetDefaultSites().First(site =>
+                    site.Id.Equals("builtin-bollyflix", StringComparison.OrdinalIgnoreCase));
+                settings.LookupSites.Add(bollyFlix);
+            }
+
+            settings.Version = 11;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.MoviesRoot) &&
             string.IsNullOrWhiteSpace(settings.SeriesRoot) &&
             !string.IsNullOrWhiteSpace(settings.LibraryRoot))
