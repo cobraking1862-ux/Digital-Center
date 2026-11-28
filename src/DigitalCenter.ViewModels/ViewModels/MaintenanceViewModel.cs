@@ -83,7 +83,9 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
         Action<string, string?> onWorkflowChanged)
     {
         Entry = entry;
-        AvailableWorkflows = availableWorkflows;
+        AvailableWorkflows = availableWorkflows
+            .Where(option => option.ProviderId != DownloadWorkflowIds.BigOneBrowser || IsBollyFlixEntry(entry))
+            .ToList();
         _onToggled = onToggled;
         _onWorkflowChanged = onWorkflowChanged;
         IsEnabled = entry.IsEnabled;
@@ -100,6 +102,10 @@ public sealed partial class LookupSiteRowViewModel : ObservableObject
     public string NoResultsMarker => Entry.NoResultsMarker ?? string.Empty;
     public bool HasNoResultsMarker => !string.IsNullOrWhiteSpace(Entry.NoResultsMarker);
     public bool IsBuiltIn => Entry.IsBuiltIn;
+
+    private static bool IsBollyFlixEntry(LookupSiteEntry entry) =>
+        entry.Name.Equals("BollyFlix", StringComparison.OrdinalIgnoreCase) ||
+        entry.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase);
 
     [ObservableProperty] public partial bool IsEnabled { get; set; }
     [ObservableProperty] public partial string SelectedProviderId { get; set; }
@@ -1214,10 +1220,12 @@ public partial class MaintenanceViewModel : ObservableObject
     private void ReloadLookupSites()
     {
         var settings = _settingsService.Load();
-        var dl = _downloadSettings.Load();
         var entries = settings.LookupSites is { Count: > 0 }
             ? settings.LookupSites
             : ImdbLookupService.GetDefaultSites().ToList();
+
+        _downloadSettings.MigrateBollyFlixBrowserBinding(entries);
+        var dl = _downloadSettings.Load();
 
         LookupSites.Clear();
         foreach (var entry in entries)
