@@ -17,6 +17,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
     private const string BollyFlixHost = DownloadWorkflowIds.BigOneSiteHost;
     private const string FastDlHost = "dl.fastdlserver.site";
     private const string GdFlixHost = "new10.gdflix.io";
+    private const string GdFlixCurrentHost = "new1.gdflix.io";
     private const string GdFlixRedirectHost = "gdflix.dev";
     private const int NavigationTimeoutMs = 45_000;
     private const int ElementTimeoutMs = 20_000;
@@ -27,6 +28,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         BollyFlixHost,
         FastDlHost,
         GdFlixHost,
+        GdFlixCurrentHost,
         GdFlixRedirectHost
     };
 
@@ -891,6 +893,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
     private static bool IsGdFlixHost(string host) =>
         host.Equals(GdFlixHost, StringComparison.OrdinalIgnoreCase) ||
+        host.Equals(GdFlixCurrentHost, StringComparison.OrdinalIgnoreCase) ||
         host.Equals(GdFlixRedirectHost, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFileHostUri(Uri uri) =>
