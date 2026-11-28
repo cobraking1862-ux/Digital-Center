@@ -171,7 +171,8 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
             Report(progress, $"Clicking FAST CLOUD / ZIPDISK to open the GDFlix cloud tab: {SafeUrl(cloudUri)}");
             var cloudPage = await page.RunAndWaitForPopupAsync(
-                async () => await page.Locator("a[href*='/cloud/']").First.ClickAsync(
+                async () => await page.Locator("a[href*='/cloud/']").Filter(
+                    new LocatorFilterOptions { HasText = "FAST CLOUD" }).First.ClickAsync(
                     new LocatorClickOptions { Timeout = ElementTimeoutMs }).ConfigureAwait(false),
                 new PageRunAndWaitForPopupOptions { Timeout = NavigationTimeoutMs }).ConfigureAwait(false);
 
@@ -902,7 +903,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         string.Join(" ", (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static readonly System.Text.RegularExpressions.Regex UrlInDiagnosticRegex = new(
-        @"https?://[^\s\""'< >]+",
+        """https?://[^\s"'<>]+""",
         System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     private static string RedactDiagnosticUrls(string message) =>
