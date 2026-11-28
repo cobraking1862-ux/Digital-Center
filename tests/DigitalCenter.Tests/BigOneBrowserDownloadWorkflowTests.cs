@@ -86,8 +86,8 @@ public sealed class BigOneBrowserDownloadWorkflowTests
                 new LookupSiteEntry
                 {
                     Id = "custom-old-bollyflix",
-                    Name = "BollyFlix mirror",
-                    UrlTemplate = "https://mirror.bollyflix.example/?s={imdb_id}"
+                    Name = "BollyFlix",
+                    UrlTemplate = "https://new1.bollyflix.tours/?s={imdb_id}"
                 }
             ]);
 
