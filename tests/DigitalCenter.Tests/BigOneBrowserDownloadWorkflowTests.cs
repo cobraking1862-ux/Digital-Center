@@ -246,6 +246,40 @@ public sealed class BigOneBrowserDownloadWorkflowTests
     }
 
     [Fact]
+    public void ParseFastCloudUri_AcceptsCurrentAndRedirectGdFlixHosts()
+    {
+        const string html = """
+            <a href="/cloud/SAFE_FILE/SAFE_TOKEN"><b>FAST CLOUD / ZIPDISK</b></a>
+            """;
+
+        var currentHost = BigOneBrowserDownloadWorkflow.ParseFastCloudUri(
+            html,
+            new Uri("https://new1.gdflix.io/file/SAFE_FILE"));
+        var redirectHost = BigOneBrowserDownloadWorkflow.ParseFastCloudUri(
+            html,
+            new Uri("https://gdflix.dev/file/SAFE_FILE"));
+
+        Assert.NotNull(currentHost);
+        Assert.Equal("new1.gdflix.io", currentHost!.Host);
+        Assert.NotNull(redirectHost);
+        Assert.Equal("gdflix.dev", redirectHost!.Host);
+    }
+
+    [Fact]
+    public void ParseCloudResumeUri_AllowsDynamicButtonWithoutStaticDownloadHref()
+    {
+        var cloudPage = new Uri("https://new10.gdflix.io/cloud/SAFE_FILE");
+        const string html = """
+            <button id="resume">Cloud Resume Download</button>
+            <button id="direct">Direct</button>
+            """;
+
+        // A dynamic action has no safe static href. The live workflow must wait for
+        // the user's Cloud Resume click and validate the actual browser Download event.
+        Assert.Null(BigOneBrowserDownloadWorkflow.ParseCloudResumeUri(html, cloudPage));
+    }
+
+    [Fact]
     public void ParseCloudResumeUri_RejectsUnapprovedWorkerSubdomains()
     {
         var cloudPage = new Uri("https://new10.gdflix.io/cloud/SAFE");
