@@ -79,7 +79,7 @@ public sealed class DownloadSettingsService
         var changed = false;
         foreach (var site in sites)
         {
-            var isBollyFlix = string.Equals(site.Name, "BollyFlix", StringComparison.OrdinalIgnoreCase) ||
+            var isBollyFlix = string.Equals(site.Id, "builtin-bollyflix", StringComparison.OrdinalIgnoreCase) ||
                               (!string.IsNullOrWhiteSpace(site.UrlTemplate) &&
                                site.UrlTemplate.Contains("new1.bollyflix.tours", StringComparison.OrdinalIgnoreCase));
             if (!isBollyFlix ||
