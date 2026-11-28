@@ -431,7 +431,7 @@ public sealed class BigOneDownloadWorkflowTests
 
             var loaded = service.Load();
 
-            Assert.Equal("C:\Tools\IDMan.exe", loaded.IdmExecutablePath);
+            Assert.Equal(@"C:\Tools\IDMan.exe", loaded.IdmExecutablePath);
             Assert.Equal("720p", loaded.PreferredQuality);
             Assert.False(loaded.RouteIdmToMoviesWatchFolder);
             Assert.False(loaded.AutoCompleteTicketsOnImport);
