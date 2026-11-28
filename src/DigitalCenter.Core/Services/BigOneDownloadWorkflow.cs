@@ -43,6 +43,9 @@ public sealed class BigOneDownloadWorkflow
         "(?:^|\\s)class\\s*=\\s*['\\\"](?<value>[^'\\\"]*)['\\\"]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TagRegex = new("<[^>]+>", RegexOptions.Compiled);
+    private static readonly Regex NonVisibleBlockRegex = new(
+        "<(?:script|style)\\b[^>]*>.*?</(?:script|style)\\s*>",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
     private static readonly HashSet<string> CloudHosts = new(StringComparer.OrdinalIgnoreCase)
@@ -59,6 +62,7 @@ public sealed class BigOneDownloadWorkflow
     private static readonly HashSet<string> FinalDestinationHosts = new(StringComparer.OrdinalIgnoreCase)
     {
         "cloud-dl.bj1zcnlye7n.workers.dev",
+        "cloud-dl.px6xkyh05ea.workers.dev",
         "quick.cloudpaglu.site"
     };
 
@@ -345,7 +349,7 @@ public sealed class BigOneDownloadWorkflow
         html.Contains("FAST CLOUD", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCloudLandingPage(string html) =>
-        html.Contains("Cloud Resume Download", StringComparison.OrdinalIgnoreCase) &&
+        html.Contains("Cloud Resume Download", StringComparison.OrdinalIgnoreCase) ||
         html.Contains("Quick Download (Ready)", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsSearchListingUri(Uri uri) =>
@@ -414,9 +418,39 @@ public sealed class BigOneDownloadWorkflow
                bytes[0] == 100 && bytes[1] is >= 64 and <= 127;
     }
 
-    private static bool ContainsChallenge(string body) =>
-        new[] { "just a moment", "captcha", "verify you are human", "cf-chl-", "login required", "sign in to continue", "authentication required" }
-            .Any(marker => body.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    private static bool ContainsChallenge(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return false;
+
+        // Ignore element IDs such as the ordinary GDFlix container id="cf_captcha" and
+        // challenge-library scripts. A Turnstile script being present is not itself a
+        // challenge; classify the rendered text and explicit Cloudflare challenge markup.
+        var visibleText = CleanText(NonVisibleBlockRegex.Replace(body, " "));
+        var visibleMarkers = new[]
+        {
+            "just a moment",
+            "captcha",
+            "verify you are human",
+            "checking your browser",
+            "enable javascript and cookies to continue",
+            "sorry, you have been blocked",
+            "access denied",
+            "login required",
+            "sign in to continue",
+            "authentication required"
+        };
+        if (visibleMarkers.Any(marker => visibleText.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        var challengeMarkup = new[]
+        {
+            "cf-chl-",
+            "id=\"challenge-form\"",
+            "id=\"cf-challenge-running\"",
+            "id=\"cf-please-wait\""
+        };
+        return challengeMarkup.Any(marker => body.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool IsHtml(string contentType) =>
         contentType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
