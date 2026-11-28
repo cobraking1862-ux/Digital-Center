@@ -48,7 +48,6 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
     private readonly AppPaths _paths;
     private readonly IAppLogger? _logger;
-    private readonly HtmlParser _htmlParser = new();
     private readonly SemaphoreSlim _runGate = new(1, 1);
     private readonly HashSet<IPage> _instrumentedPages = [];
     private IPlaywright? _playwright;
@@ -537,6 +536,7 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         if (response is not null)
         {
             Report(progress, $"{stage}: browser received HTTP {response.Status}.");
+            ValidateRedirectChain(response, stage);
         }
 
         if (!Uri.TryCreate(page.Url, UriKind.Absolute, out var currentUri) ||
@@ -610,6 +610,19 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
         catch (TimeoutException)
         {
             return false;
+        }
+    }
+
+    private static void ValidateRedirectChain(IResponse response, string stage)
+    {
+        for (var request = response.Request; request is not null; request = request.RedirectedFrom)
+        {
+            if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var requestedUri) ||
+                !IsAllowedPageHost(requestedUri.IdnHost))
+            {
+                throw new InvalidOperationException(
+                    $"The {stage} redirect chain included an unapproved host: {SafeUrl(request.Url)}.");
+            }
         }
     }
 
