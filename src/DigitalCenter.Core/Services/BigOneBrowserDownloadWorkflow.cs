@@ -178,6 +178,20 @@ public sealed class BigOneBrowserDownloadWorkflow : IDownloadWorkflowProvider, I
 
             await InstrumentPageAsync(cloudPage).ConfigureAwait(false);
             _page = cloudPage;
+
+            // A popup event can arrive before the new tab finishes its initial navigation.
+            // Wait for the expected GDFlix cloud URL instead of validating about:blank.
+            await cloudPage.WaitForURLAsync(
+                openedUrl =>
+                    Uri.TryCreate(openedUrl, UriKind.Absolute, out var candidateUri) &&
+                    IsGdFlixCloudPageUri(candidateUri) &&
+                    string.Equals(candidateUri.AbsolutePath, cloudUri.AbsolutePath, StringComparison.OrdinalIgnoreCase),
+                new PageWaitForURLOptions
+                {
+                    WaitUntil = WaitUntilState.DOMContentLoaded,
+                    Timeout = NavigationTimeoutMs
+                }).ConfigureAwait(false);
+
             Report(progress, $"FAST CLOUD popup opened: {SafeUrl(cloudPage.Url)}");
 
             if (!TryGetCurrentUri(cloudPage, out var cloudPageUri) || !IsGdFlixCloudPageUri(cloudPageUri) ||
